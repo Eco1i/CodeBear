@@ -17,6 +17,32 @@
 - 可选 DeepSeek AI 助手，用自然语言查询本地数据字典。
 - Windows 托盘运行，提供开箱即用的 x64 绿色版。
 
+## 界面预览
+
+### 浏览 PDM 数据字典
+
+按项目目录集中管理 PDM，在同一工作区查看数据表及其字段明细。
+
+![码熊工作区：浏览 PDM 数据字典](docs/images/workspace-overview.png)
+
+### 搜索表与字段
+
+按表名、描述、注释或字段快速检索，并在结果中高亮匹配内容。
+
+![码熊工作区：搜索表与字段](docs/images/data-search.png)
+
+### AI 助手
+
+使用自然语言查询本地数据字典。AI 功能完全可选，需要配置用户自己的 DeepSeek API Key。
+
+![码熊小码 AI 助手](docs/images/ai-assistant.png)
+
+### 导出建表脚本
+
+选择 PDM 或数据表，配置目标数据库参数，预览并下载生成的 DDL。
+
+![码熊：导出数据库建表脚本](docs/images/ddl-export.png)
+
 ## 获取与运行
 
 ### Windows 绿色版
