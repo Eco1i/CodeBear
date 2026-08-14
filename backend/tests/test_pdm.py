@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from backend.app.pdm import file_sha256, parse_pdm, update_pdm_fields
+from backend.app.pdm import file_sha256, parse_pdm, update_pdm_dictionary, update_pdm_fields
 
 
 SAMPLE_PDM = """<?xml version="1.0" encoding="UTF-8"?>
@@ -104,3 +104,28 @@ def test_update_fields_preserves_valid_pdm(tmp_path: Path) -> None:
     assert field.comment == "由码熊更新"
     assert file_sha256(source) == source_hash
 
+
+def test_update_table_metadata_preserves_valid_pdm(tmp_path: Path) -> None:
+    source = write_sample(tmp_path / "source.pdm")
+    destination = tmp_path / "updated.pdm"
+
+    updated_tables, updated_fields = update_pdm_dictionary(
+        source,
+        destination,
+        {
+            "o10": {
+                "name": "账户用户表",
+                "code": "t_account_user",
+                "comment": "保存账户用户及其状态",
+            }
+        },
+        {},
+    )
+
+    table = parse_pdm(destination).tables[0]
+    assert (updated_tables, updated_fields) == (1, 0)
+    assert (table.name, table.code, table.comment) == (
+        "账户用户表",
+        "t_account_user",
+        "保存账户用户及其状态",
+    )

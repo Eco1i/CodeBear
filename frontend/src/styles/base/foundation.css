@@ -1,0 +1,62 @@
+:root {
+  font-family: "JetBrains Mono", "Noto Sans SC Variable", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+  color: #20314d;
+  background: #f4f7fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --header-height: 64px;
+  --sidebar-width: 326px;
+  --workspace-edge: 8px;
+  --sidebar-resizer-width: 6px;
+  --sidebar-resizer-center: 3px;
+  --blue: #347ee8;
+  --blue-soft: #eaf3ff;
+  --green: #23b99a;
+  --border: #dbe5f1;
+  --muted: #7384a0;
+  --panel: #ffffff;
+  --compact-control-height: 25.5px;
+  --ai-assistant-width: 404px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body,
+button,
+input,
+textarea,
+.ant-app {
+  font-family: "JetBrains Mono", "Noto Sans SC Variable", "Noto Sans SC", "Microsoft YaHei UI", sans-serif !important;
+}
+
+.ant-app {
+  width: 100%;
+  height: 100%;
+}
+
+button,
+input {
+  font-size: inherit;
+}
+
+.prototype-glyph {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

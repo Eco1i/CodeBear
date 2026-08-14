@@ -86,8 +86,18 @@ def test_ai_key_is_protected_and_workspace_update_preserves_it(
     assert status["assistant_accessory"] == "blue_scarf"
     assert status["key_hint"] == "sk-••••3456"
     assert "sk-test-secret-123456" not in raw_settings
+    public_settings = store.read()
+    assert public_settings["assistant_name"] == "北极 小助理"
+    assert public_settings["assistant_accessory"] == "blue_scarf"
+    assert set(public_settings) == {
+        "workspace_root",
+        "assistant_name",
+        "assistant_accessory",
+    }
     next_workspace = tmp_path / "next-workspace"
-    store.update_workspace(str(next_workspace))
+    updated_settings = store.update_workspace(str(next_workspace))
+    assert updated_settings["assistant_name"] == "北极 小助理"
+    assert updated_settings["assistant_accessory"] == "blue_scarf"
     assert store.get_ai_api_key() == "sk-test-secret-123456"
     assert store.ai_status()["assistant_name"] == "北极 小助理"
     assert store.ai_status()["assistant_accessory"] == "blue_scarf"
@@ -111,6 +121,8 @@ def test_ai_name_can_be_saved_without_an_api_key(tmp_path: Path, monkeypatch: An
     assert status["assistant_accessory"] == "red_cap"
     assert status["configured"] is False
     assert "雪球" in paths.settings.read_text(encoding="utf-8")
+    assert store.read()["assistant_name"] == "雪球"
+    assert store.read()["assistant_accessory"] == "red_cap"
 
     with pytest.raises(ValueError, match="不支持的助手配饰"):
         store.update_ai_settings(assistant_accessory="unknown")

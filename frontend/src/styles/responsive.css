@@ -1,0 +1,119 @@
+@media (max-width: 1360px) {
+  :root {
+    --sidebar-width: 292px;
+  }
+
+  .table-search-controls .ant-input-affix-wrapper {
+    width: 310px;
+  }
+}
+
+@media (max-width: 1480px) {
+  .app-root.ai-assistant-open.ai-mode-sidebar {
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 1180px) {
+  .ai-assistant.is-fullscreen .ai-message-row.is-assistant .ai-message-content {
+    width: auto;
+    max-width: calc(100% - 45px);
+  }
+
+  .ai-assistant.is-fullscreen .ai-message-row.is-assistant .ai-message-content.has-supporting-content {
+    width: min(calc(100% - 45px), 960px);
+  }
+
+  .ai-assistant.is-fullscreen .ai-message-row.is-user .ai-message-content {
+    max-width: 70%;
+  }
+
+  .ai-table-peek {
+    width: min(100%, 820px);
+  }
+
+  .ai-history-drawer {
+    width: min(100%, 560px);
+  }
+}
+
+@media (min-width: 1481px) {
+  .app-root.ai-assistant-open.ai-mode-sidebar .ai-assistant.is-sidebar {
+    bottom: var(--workspace-edge);
+    border-bottom: 1px solid #dfe7f1;
+  }
+}
+
+@media (max-width: 520px) {
+  :root {
+    --ai-assistant-width: 100vw;
+  }
+
+  .ai-launcher-hint {
+    display: none;
+  }
+
+  .ai-assistant.is-floating,
+  .ai-assistant.is-fullscreen {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .ai-history-heading small,
+  .ai-history-new > span {
+    display: none;
+  }
+
+  .ai-history-drawer {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-root,
+  .ai-launcher,
+  .ai-launcher-hint,
+  .ai-assistant,
+  .ai-scope-chevron,
+  .ai-layout-glyph,
+  .ai-retrieval-toggle > svg,
+  .ai-evidence-card,
+  .ai-table-peek,
+  .ai-table-peek-backdrop,
+  .ai-history-drawer-layer,
+  .ai-history-drawer-backdrop,
+  .ai-history-drawer,
+  .ai-history-item,
+  .ai-history-item::before,
+  .ai-history-item-actions,
+  .ai-send-button {
+    transition-duration: 0.01ms !important;
+  }
+
+  .ai-bear-accessory,
+  .ai-bear-base,
+  .ai-persona-option-check {
+    animation: none !important;
+  }
+
+  .ai-bear-accessory {
+    transition: none !important;
+  }
+
+  .ai-personalize-trigger,
+  .ai-persona-preview-row > button,
+  .ai-persona-accessory-grid > button,
+  .ai-persona-accessory-art {
+    transition-duration: 0.01ms !important;
+  }
+
+  .ai-thinking > span {
+    animation: none;
+    opacity: 0.7;
+  }
+}

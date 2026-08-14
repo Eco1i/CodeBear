@@ -61,9 +61,13 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _text(element: etree._Element, local_name: str) -> str:
-    child = element.find(f"{A}{local_name}")
-    return child.text.strip() if child is not None and child.text else ""
+def _attribute_texts(element: etree._Element) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for child in element:
+        tag = child.tag
+        if isinstance(tag, str) and tag.startswith(A):
+            values[tag[len(A):]] = child.text.strip() if child.text else ""
+    return values
 
 
 def _split_data_type(raw_data_type: str, raw_length: str, raw_precision: str) -> tuple[str, str]:
@@ -139,34 +143,36 @@ def parse_pdm(path: Path) -> ParsedPdm:
                 if column_node.tag != f"{O}Column" or not column_node.get("Id"):
                     continue
                 xml_id = str(column_node.get("Id"))
+                attributes = _attribute_texts(column_node)
                 data_type, length = _split_data_type(
-                    _text(column_node, "DataType"),
-                    _text(column_node, "Length"),
-                    _text(column_node, "Precision"),
+                    attributes.get("DataType", ""),
+                    attributes.get("Length", ""),
+                    attributes.get("Precision", ""),
                 )
-                mandatory = _text(column_node, "Mandatory").lower() in {"1", "true", "yes"}
+                mandatory = attributes.get("Mandatory", "").lower() in {"1", "true", "yes"}
                 fields.append(
                     ParsedField(
                         xml_id=xml_id,
                         ordinal=len(fields) + 1,
-                        name=_text(column_node, "Name"),
-                        code=_text(column_node, "Code"),
+                        name=attributes.get("Name", ""),
+                        code=attributes.get("Code", ""),
                         data_type=data_type,
                         length=length,
                         nullable=not mandatory,
-                        default_value=_text(column_node, "DefaultValue"),
-                        comment=_text(column_node, "Comment"),
+                        default_value=attributes.get("DefaultValue", ""),
+                        comment=attributes.get("Comment", ""),
                         is_primary_key=xml_id in primary_key_ids,
                     )
                 )
 
+        attributes = _attribute_texts(table_node)
         tables.append(
             ParsedTable(
                 xml_id=str(table_xml_id),
                 ordinal=len(tables) + 1,
-                name=_text(table_node, "Name"),
-                code=_text(table_node, "Code"),
-                comment=_text(table_node, "Comment"),
+                name=attributes.get("Name", ""),
+                code=attributes.get("Code", ""),
+                comment=attributes.get("Comment", ""),
                 fields=tuple(fields),
             )
         )
@@ -174,7 +180,7 @@ def parse_pdm(path: Path) -> ParsedPdm:
     model_name = ""
     for model_node in root.iter(f"{O}Model"):
         if model_node.get("Id"):
-            model_name = _text(model_node, "Name")
+            model_name = _attribute_texts(model_node).get("Name", "")
             break
 
     stat = path.stat()
@@ -220,10 +226,11 @@ def _build_data_type(data_type: str, length: str) -> str:
     return f"{base}({length.strip()})"
 
 
-def update_pdm_fields(
+def update_pdm_dictionary(
     source: Path,
     destination: Path,
-    changes_by_xml_id: dict[str, dict[str, object]],
+    table_changes_by_xml_id: dict[str, dict[str, object]],
+    field_changes_by_xml_id: dict[str, dict[str, object]],
 ) -> tuple[int, int]:
     parser = etree.XMLParser(
         resolve_entities=False,
@@ -234,14 +241,30 @@ def update_pdm_fields(
     )
     tree = etree.parse(str(source), parser)
     root = tree.getroot()
-    found: set[str] = set()
+    found_tables: set[str] = set()
+    found_fields: set[str] = set()
+
+    for table_node in root.iter(f"{O}Table"):
+        xml_id = table_node.get("Id")
+        if not xml_id or xml_id not in table_changes_by_xml_id:
+            continue
+        change = table_changes_by_xml_id[xml_id]
+        found_tables.add(str(xml_id))
+        _set_text(table_node, "Name", str(change.get("name", "")).strip())
+        _set_text(table_node, "Code", str(change.get("code", "")).strip())
+        _set_text(
+            table_node,
+            "Comment",
+            str(change.get("comment", "")),
+            remove_empty=True,
+        )
 
     for column_node in root.iter(f"{O}Column"):
         xml_id = column_node.get("Id")
-        if not xml_id or xml_id not in changes_by_xml_id:
+        if not xml_id or xml_id not in field_changes_by_xml_id:
             continue
-        change = changes_by_xml_id[xml_id]
-        found.add(str(xml_id))
+        change = field_changes_by_xml_id[xml_id]
+        found_fields.add(str(xml_id))
         name = str(change.get("name", "")).strip()
         code = str(change.get("code", "")).strip()
         data_type = str(change.get("data_type", "")).strip()
@@ -263,9 +286,12 @@ def update_pdm_fields(
         _set_text(column_node, "DefaultValue", default_value, remove_empty=True)
         _set_text(column_node, "Comment", comment, remove_empty=True)
 
-    missing = set(changes_by_xml_id) - found
-    if missing:
-        raise ValueError(f"PDM 中找不到 {len(missing)} 个待修改字段")
+    missing_tables = set(table_changes_by_xml_id) - found_tables
+    if missing_tables:
+        raise ValueError(f"PDM 中找不到 {len(missing_tables)} 个待修改数据表")
+    missing_fields = set(field_changes_by_xml_id) - found_fields
+    if missing_fields:
+        raise ValueError(f"PDM 中找不到 {len(missing_fields)} 个待修改字段")
 
     tree.write(
         str(destination),
@@ -273,4 +299,18 @@ def update_pdm_fields(
         xml_declaration=True,
         pretty_print=False,
     )
-    return len(found), len(changes_by_xml_id)
+    return len(found_tables), len(found_fields)
+
+
+def update_pdm_fields(
+    source: Path,
+    destination: Path,
+    changes_by_xml_id: dict[str, dict[str, object]],
+) -> tuple[int, int]:
+    _, updated_fields = update_pdm_dictionary(
+        source,
+        destination,
+        {},
+        changes_by_xml_id,
+    )
+    return updated_fields, len(changes_by_xml_id)

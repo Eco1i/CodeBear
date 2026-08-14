@@ -25,6 +25,7 @@ data/
 *.sqlite
 *.sqlite3
 *.pdm
+!frontend/e2e/fixtures/*.pdm
 *.cbbak
 *.zip
 *.sha256

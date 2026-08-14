@@ -57,6 +57,7 @@ def verify_version_sync(version: str) -> None:
         "backend/app/config.py": match.group(1) if match else "<missing>",
         "frontend/package.json": package.get("version"),
         "frontend/package-lock.json": lock.get("version"),
+        "frontend/package-lock.json packages['']": lock.get("packages", {}).get("", {}).get("version"),
     }
     mismatches = {key: value for key, value in values.items() if value != version}
     if mismatches:
@@ -248,10 +249,14 @@ def verify_release(archive_path: Path, version: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="构建码熊 Windows x64 绿色版")
     parser.add_argument("--skip-npm-ci", action="store_true", help="复用现有 node_modules，仅用于本机调试")
+    parser.add_argument("--check-version-only", action="store_true", help="仅校验各端版本号是否与 VERSION 一致")
     arguments = parser.parse_args()
 
     version = read_version()
     verify_version_sync(version)
+    if arguments.check_version_only:
+        print(f"版本号同步校验通过：{version}", flush=True)
+        return
     print(f"开始构建码熊 v{version} Windows x64 绿色版", flush=True)
 
     if arguments.skip_npm_ci:

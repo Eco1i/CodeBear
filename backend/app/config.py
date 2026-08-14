@@ -14,7 +14,7 @@ from ctypes import wintypes
 
 
 APP_NAME = "码熊"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 INTERNAL_DIR_NAMES = {".码熊回收站", ".码熊备份"}
 AI_PROVIDER = "deepseek"
 AI_MODEL = "deepseek-v4-flash"
@@ -177,12 +177,34 @@ class SettingsStore:
             return {}
         return payload if isinstance(payload, dict) else {}
 
+    @staticmethod
+    def _ai_appearance(payload: dict[str, Any]) -> dict[str, str]:
+        ai_payload = payload.get("ai")
+        stored_name = ai_payload.get("assistant_name") if isinstance(ai_payload, dict) else None
+        stored_accessory = (
+            ai_payload.get("assistant_accessory") if isinstance(ai_payload, dict) else None
+        )
+        assistant_name = (
+            str(stored_name or DEFAULT_AI_ASSISTANT_NAME).strip()[:20]
+            or DEFAULT_AI_ASSISTANT_NAME
+        )
+        assistant_accessory = str(stored_accessory or DEFAULT_AI_ASSISTANT_ACCESSORY)
+        if assistant_accessory not in AI_ASSISTANT_ACCESSORIES:
+            assistant_accessory = DEFAULT_AI_ASSISTANT_ACCESSORY
+        return {
+            "assistant_name": assistant_name,
+            "assistant_accessory": assistant_accessory,
+        }
+
     def read(self) -> dict[str, str]:
         with self._lock:
             payload = self._read_unlocked()
             default_workspace = str(self.paths.app_data / "workspace")
             workspace = str(payload.get("workspace_root") or default_workspace)
-            result = {"workspace_root": str(Path(workspace).expanduser().resolve())}
+            result = {
+                "workspace_root": str(Path(workspace).expanduser().resolve()),
+                **self._ai_appearance(payload),
+            }
             Path(result["workspace_root"]).mkdir(parents=True, exist_ok=True)
             if payload.get("workspace_root") != result["workspace_root"]:
                 payload["workspace_root"] = result["workspace_root"]
@@ -198,7 +220,7 @@ class SettingsStore:
             payload = self._read_unlocked()
             payload["workspace_root"] = str(root)
             self._write_unlocked(payload)
-        return {"workspace_root": str(root)}
+        return self.read()
 
     def get_ai_api_key(self) -> str | None:
         environment_key = os.environ.get(AI_KEY_ENVIRONMENT_VARIABLE, "").strip()
@@ -233,22 +255,12 @@ class SettingsStore:
             hint = f"{visible_prefix}••••{visible_suffix}"
         with self._lock:
             payload = self._read_unlocked()
-            ai_payload = payload.get("ai")
-            stored_name = ai_payload.get("assistant_name") if isinstance(ai_payload, dict) else None
-            stored_accessory = ai_payload.get("assistant_accessory") if isinstance(ai_payload, dict) else None
-        assistant_name = (
-            str(stored_name or DEFAULT_AI_ASSISTANT_NAME).strip()[:20]
-            or DEFAULT_AI_ASSISTANT_NAME
-        )
-        assistant_accessory = str(stored_accessory or DEFAULT_AI_ASSISTANT_ACCESSORY)
-        if assistant_accessory not in AI_ASSISTANT_ACCESSORIES:
-            assistant_accessory = DEFAULT_AI_ASSISTANT_ACCESSORY
+            appearance = self._ai_appearance(payload)
         return {
             "provider": AI_PROVIDER,
             "model": AI_MODEL,
             "base_url": AI_BASE_URL,
-            "assistant_name": assistant_name,
-            "assistant_accessory": assistant_accessory,
+            **appearance,
             "configured": bool(key),
             "key_hint": hint,
             "storage": source,

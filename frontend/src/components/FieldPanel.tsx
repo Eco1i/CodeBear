@@ -8,7 +8,7 @@ import {
 } from "@ant-design/icons";
 import { Button, Checkbox, Empty, Input, Spin, Tooltip } from "antd";
 import type { InputRef } from "antd";
-import type { FieldDefinition, TableDetail } from "../types";
+import type { FieldDefinition, TableDetail, TableMetadataUpdate } from "../types";
 import { useGridScrollbarGutter } from "../useGridScrollbarGutter";
 import { FullTextPopover } from "./FullTextPopover";
 import { HighlightedText } from "./HighlightedText";
@@ -19,11 +19,16 @@ interface FieldPanelProps {
   loading: boolean;
   saving: boolean;
   highlightQuery: string;
-  onSave: (fields: FieldDefinition[]) => Promise<void>;
+  onSave: (table: TableMetadataUpdate, fields: FieldDefinition[]) => Promise<void>;
   onDirtyChange: (dirty: boolean) => void;
 }
 
 const cloneFields = (fields: FieldDefinition[]): FieldDefinition[] => fields.map((field) => ({ ...field }));
+const tableMetadata = (detail?: TableDetail | null): TableMetadataUpdate => ({
+  name: detail?.name || "",
+  code: detail?.code || "",
+  comment: detail?.comment || "",
+});
 const EDITABLE_FIELD_KEYS = [
   "name",
   "code",
@@ -41,6 +46,14 @@ function hasFieldChanges(original: FieldDefinition[], draft: FieldDefinition[]):
     const baseline = originalById.get(field.id);
     return !baseline || EDITABLE_FIELD_KEYS.some((key) => baseline[key] !== field[key]);
   });
+}
+
+function hasTableChanges(original: TableDetail | null, draft: TableMetadataUpdate): boolean {
+  return (
+    (original?.name || "") !== draft.name ||
+    (original?.code || "") !== draft.code ||
+    (original?.comment || "") !== draft.comment
+  );
 }
 
 function matchesField(field: FieldDefinition, query: string): boolean {
@@ -68,6 +81,7 @@ export function FieldPanel({
 }: FieldPanelProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<FieldDefinition[]>([]);
+  const [draftTable, setDraftTable] = useState<TableMetadataUpdate>(tableMetadata());
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [draftQuery, setDraftQuery] = useState("");
@@ -80,6 +94,7 @@ export function FieldPanel({
   useEffect(() => {
     setEditing(false);
     setDraft(cloneFields(detail?.fields || []));
+    setDraftTable(tableMetadata(detail));
     setSearchOpen(false);
     setQuery("");
     setDraftQuery("");
@@ -106,8 +121,10 @@ export function FieldPanel({
 
   const sourceFields = editing ? draft : detail?.fields || [];
   const dirty = useMemo(
-    () => editing && hasFieldChanges(detail?.fields || [], draft),
-    [detail?.fields, draft, editing],
+    () =>
+      editing &&
+      (hasTableChanges(detail, draftTable) || hasFieldChanges(detail?.fields || [], draft)),
+    [detail, draft, draftTable, editing],
   );
   const visibleFields = useMemo(
     () => sourceFields.filter((field) => matchesField(field, query.trim())),
@@ -134,16 +151,18 @@ export function FieldPanel({
 
   const startEditing = () => {
     setDraft(cloneFields(detail?.fields || []));
+    setDraftTable(tableMetadata(detail));
     setEditing(true);
   };
 
   const cancelEditing = () => {
     setDraft(cloneFields(detail?.fields || []));
+    setDraftTable(tableMetadata(detail));
     setEditing(false);
   };
 
   const save = async () => {
-    await onSave(draft);
+    await onSave(draftTable, draft);
     setEditing(false);
   };
 
@@ -153,28 +172,54 @@ export function FieldPanel({
         <div className="section-title field-title">
           <span className="section-index">02</span>
           {detail ? (
-            <span className="table-identity">
+            <span className={`table-identity${editing ? " is-editing" : ""}`}>
               <span className="table-icon"><TableGlyph /></span>
-              <span className="table-heading">
-                <strong>{detail.name || detail.code}</strong>
-                <small>
-                  <code>{detail.code}</code>
-                  {detail.comment && <i>·</i>}
-                  {detail.comment && (
-                    <FullTextPopover title="表说明" text={detail.comment}>
-                      <button
-                        type="button"
-                        className="table-comment-trigger"
-                        aria-label="查看完整表说明"
-                        title="点击查看完整表说明"
-                      >
-                        <InfoCircleOutlined />
-                        <span>{detail.comment}</span>
-                      </button>
-                    </FullTextPopover>
-                  )}
-                </small>
-              </span>
+              {editing ? (
+                <span className="table-meta-editor">
+                  <Input
+                    aria-label="表名称"
+                    prefix={<span className="table-meta-label">名称</span>}
+                    placeholder="表名称"
+                    value={draftTable.name}
+                    onChange={(event) => setDraftTable((current) => ({ ...current, name: event.target.value }))}
+                  />
+                  <Input
+                    aria-label="表代码"
+                    prefix={<span className="table-meta-label">代码</span>}
+                    placeholder="表代码"
+                    value={draftTable.code}
+                    onChange={(event) => setDraftTable((current) => ({ ...current, code: event.target.value }))}
+                  />
+                  <Input
+                    aria-label="表描述"
+                    prefix={<span className="table-meta-label">描述</span>}
+                    placeholder="表描述"
+                    value={draftTable.comment}
+                    onChange={(event) => setDraftTable((current) => ({ ...current, comment: event.target.value }))}
+                  />
+                </span>
+              ) : (
+                <span className="table-heading">
+                  <strong>{detail.name || detail.code}</strong>
+                  <small>
+                    <code>{detail.code}</code>
+                    {detail.comment && <i>·</i>}
+                    {detail.comment && (
+                      <FullTextPopover title="表说明" text={detail.comment}>
+                        <button
+                          type="button"
+                          className="table-comment-trigger"
+                          aria-label="查看完整表说明"
+                          title="点击查看完整表说明"
+                        >
+                          <InfoCircleOutlined />
+                          <span>{detail.comment}</span>
+                        </button>
+                      </FullTextPopover>
+                    )}
+                  </small>
+                </span>
+              )}
             </span>
           ) : (
             <span><strong>字段字典</strong><small>选择一张数据表后查看明细</small></span>
@@ -231,7 +276,15 @@ export function FieldPanel({
             {editing ? (
               <>
                 <Button icon={<CloseOutlined />} disabled={saving} onClick={cancelEditing}>取消</Button>
-                <Button type="primary" icon={<CheckOutlined />} loading={saving} onClick={save}>保存修改</Button>
+                <Button
+                  type="primary"
+                  icon={<CheckOutlined />}
+                  loading={saving}
+                  disabled={!dirty}
+                  onClick={save}
+                >
+                  保存修改
+                </Button>
               </>
             ) : (
               <Button icon={<EditOutlined />} onClick={startEditing}>编辑字典</Button>

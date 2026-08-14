@@ -106,8 +106,15 @@ class FieldUpdate(BaseModel):
     comment: str = ""
 
 
+class TableUpdate(BaseModel):
+    name: str = ""
+    code: str = ""
+    comment: str = ""
+
+
 class FieldsSavePayload(BaseModel):
     expected_hash: str
+    table: TableUpdate | None = None
     fields: list[FieldUpdate]
 
 
@@ -552,6 +559,7 @@ def save_table_fields(table_id: str, payload: FieldsSavePayload) -> dict:
         table_id,
         payload.expected_hash,
         [field.model_dump() for field in payload.fields],
+        table=payload.table.model_dump() if payload.table else None,
     )
 
 

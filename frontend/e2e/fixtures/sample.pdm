@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?PowerDesigner Name="端到端测试模型" Target="ORACLE Version 11g" version="15.1.0.2850"?>
+<Model xmlns:a="attribute" xmlns:c="collection" xmlns:o="object">
+  <o:RootObject Id="o1">
+    <c:Children>
+      <o:Model Id="o2">
+        <a:Name>端到端测试模型</a:Name>
+        <c:Tables>
+          <o:Table Id="o10">
+            <a:Name>用户表</a:Name>
+            <a:Code>t_user</a:Code>
+            <a:Comment>保存系统用户</a:Comment>
+            <c:Columns>
+              <o:Column Id="o11">
+                <a:Name>用户编号</a:Name>
+                <a:Code>user_id</a:Code>
+                <a:DataType>NUMBER(20)</a:DataType>
+                <a:Length>20</a:Length>
+                <a:Mandatory>1</a:Mandatory>
+                <a:Comment>全局唯一编号</a:Comment>
+              </o:Column>
+              <o:Column Id="o12">
+                <a:Name>用户名称</a:Name>
+                <a:Code>user_name</a:Code>
+                <a:DataType>VARCHAR2(64)</a:DataType>
+                <a:Length>64</a:Length>
+                <a:DefaultValue>'匿名'</a:DefaultValue>
+              </o:Column>
+            </c:Columns>
+            <c:Keys>
+              <o:Key Id="o20">
+                <c:Key.Columns><o:Column Ref="o11" /></c:Key.Columns>
+              </o:Key>
+            </c:Keys>
+            <c:PrimaryKey><o:Key Ref="o20" /></c:PrimaryKey>
+          </o:Table>
+        </c:Tables>
+      </o:Model>
+    </c:Children>
+  </o:RootObject>
+</Model>

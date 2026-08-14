@@ -1,55 +1,49 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
+import { App as AntApp, Button, Tag } from "antd";
 import {
-  App as AntApp,
-  Button,
-  Empty,
-  Input,
-  Modal,
-  Spin,
-  Tag,
-  Tooltip,
-} from "antd";
-import {
-  ApartmentOutlined,
   CodeOutlined,
-  DatabaseFilled,
   DeleteOutlined,
-  FolderOutlined,
-  InboxOutlined,
-  ReloadOutlined,
   SafetyCertificateOutlined,
-  SettingOutlined,
-  UndoOutlined,
 } from "@ant-design/icons";
-import { ApiError, api } from "./api";
-import { AiAssistant } from "./components/AiAssistant";
-import { BackupMigrationModal } from "./components/BackupMigrationModal";
-import { DdlExportModal } from "./components/DdlExportModal";
+import { tablesApi } from "./features/tables/api";
+import { workspaceApi } from "./features/workspace/api";
+import { ApiError } from "./shared/api/client";
 import { FieldPanel } from "./components/FieldPanel";
 import { ProjectNavigator } from "./components/ProjectNavigator";
 import { ProjectGlyph } from "./components/PrototypeGlyphs";
 import { TablePanel } from "./components/TablePanel";
+import { useAiLayout } from "./features/ai/useAiLayout";
+import { LazyFeatureOverlays } from "./features/shell/LazyFeatureOverlays";
+import {
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  useSidebarResize,
+} from "./features/shell/useSidebarResize";
+import { TrashModal } from "./features/workspace/components/TrashModal";
+import { WorkspaceDialog } from "./features/workspace/components/WorkspaceDialog";
+import {
+  errorMessage,
+  getProjectId,
+  normalizeWorkspacePath,
+  pathParent,
+  projectForNode,
+  walkNodes,
+} from "./features/workspace/model";
+import type { DialogKind, DialogState } from "./features/workspace/model";
 import type {
   AiEvidenceTable,
-  AiLayoutMode,
   BackupImportResult,
   FieldDefinition,
   Project,
   SearchMode,
   Settings,
   TableDetail,
+  TableMetadataUpdate,
   TableSummary,
   TrashItem,
   WorkspaceNode,
 } from "./types";
 
-type DialogKind = "project" | "folder" | "rename" | "settings" | null;
-
-const SIDEBAR_MIN_WIDTH = 245;
-const SIDEBAR_MAX_WIDTH = 440;
-const SIDEBAR_STORAGE_KEY = "maxiong.sidebarWidth";
-const AI_LAYOUT_STORAGE_KEY = "maxiong.ai.layout-mode";
 const TABLE_PAGE_SIZE = 100;
 const TABLE_PREFETCH_ROWS = 50;
 
@@ -62,68 +56,6 @@ interface TableQuery {
   allNodes: boolean;
 }
 
-function clampSidebarWidth(width: number): number {
-  return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, Math.round(width)));
-}
-
-function readStoredSidebarWidth(): number | null {
-  try {
-    const width = Number(window.localStorage.getItem(SIDEBAR_STORAGE_KEY));
-    return Number.isFinite(width) && width >= SIDEBAR_MIN_WIDTH && width <= SIDEBAR_MAX_WIDTH ? width : null;
-  } catch {
-    return null;
-  }
-}
-
-function readStoredAiLayoutMode(): AiLayoutMode {
-  try {
-    const mode = window.localStorage.getItem(AI_LAYOUT_STORAGE_KEY);
-    // Fullscreen is a temporary focus mode. Never use it as the launch mode.
-    if (mode === "sidebar" || mode === "floating") return mode;
-    if (mode === "fullscreen") {
-      window.localStorage.setItem(AI_LAYOUT_STORAGE_KEY, "sidebar");
-    }
-  } catch {
-    // Local storage can be unavailable in locked-down browser profiles.
-  }
-  return "sidebar";
-}
-
-interface DialogState {
-  kind: DialogKind;
-  node?: WorkspaceNode;
-}
-
-function walkNodes(nodes: WorkspaceNode[], visit: (node: WorkspaceNode) => boolean): WorkspaceNode | null {
-  for (const node of nodes) {
-    if (visit(node)) return node;
-    const child = walkNodes(node.children || [], visit);
-    if (child) return child;
-  }
-  return null;
-}
-
-function pathParent(path: string): string {
-  const index = path.lastIndexOf("/");
-  return index === -1 ? "" : path.slice(0, index);
-}
-
-function getProjectId(node: WorkspaceNode | null): string | undefined {
-  return node?.project_id || (node?.type === "project" ? node.id.replace("project:", "") : undefined);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "操作失败，请稍后重试";
-}
-
-function projectForNode(projects: Project[], node: WorkspaceNode | null): Project | undefined {
-  const projectId = getProjectId(node);
-  return projects.find((project) => project.id === projectId);
-}
-
-function normalizeWorkspacePath(path: string): string {
-  return path.trim().replaceAll("/", "\\").replace(/\\+$/, "").toLocaleLowerCase();
-}
 
 export default function App() {
   const { message, modal } = AntApp.useApp();
@@ -155,22 +87,32 @@ export default function App() {
   const [dialogBusy, setDialogBusy] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
+  const [backupFeatureLoaded, setBackupFeatureLoaded] = useState(false);
   const [ddlExportOpen, setDdlExportOpen] = useState(false);
-  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
-  const [aiLayoutMode, setAiLayoutMode] = useState<AiLayoutMode>(readStoredAiLayoutMode);
-  const lastNonFullscreenAiModeRef = useRef<Exclude<AiLayoutMode, "fullscreen">>(
-    aiLayoutMode === "fullscreen" ? "sidebar" : aiLayoutMode,
-  );
+  const [ddlFeatureLoaded, setDdlFeatureLoaded] = useState(false);
+  const {
+    open: aiAssistantOpen,
+    loaded: aiFeatureLoaded,
+    mode: aiLayoutMode,
+    lastNonFullscreenModeRef: lastNonFullscreenAiModeRef,
+    changeMode: changeAiLayoutMode,
+    changeOpen: changeAiAssistantOpen,
+    openAssistant: openAiAssistant,
+  } = useAiLayout();
   const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
   const [trashLoading, setTrashLoading] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState<number | null>(readStoredSidebarWidth);
-  const [sidebarResizing, setSidebarResizing] = useState(false);
-  const appRootRef = useRef<HTMLDivElement>(null);
-  const sidebarResizerRef = useRef<HTMLDivElement>(null);
-  const liveSidebarWidthRef = useRef<number | null>(sidebarWidth);
-  const sidebarResizeLeftRef = useRef(0);
-  const pendingSidebarWidthRef = useRef<number | null>(null);
-  const sidebarResizeFrameRef = useRef<number | null>(null);
+  const {
+    appRootRef,
+    sidebarResizerRef,
+    sidebarResizing,
+    rootStyle: appRootStyle,
+    effectiveWidth: effectiveSidebarWidth,
+    startResize: startSidebarResize,
+    moveResize: moveSidebarResize,
+    finishResize: finishSidebarResize,
+    commitResize: commitSidebarResize,
+    resizeWithKeyboard: resizeSidebarWithKeyboard,
+  } = useSidebarResize();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importTargetRef = useRef<WorkspaceNode | null>(null);
   const tableQueryRef = useRef<TableQuery | null>(null);
@@ -186,8 +128,13 @@ export default function App() {
   const loadWorkspace = useCallback(async (preferred?: WorkspaceNode | null) => {
     setNavigationLoading(true);
     try {
-      const [nextSettings, nextProjects] = await Promise.all([api.settings(), api.projects()]);
-      const nextTrees = await Promise.all(nextProjects.map((project) => api.tree(project.id)));
+      const [nextSettings, nextProjects] = await Promise.all([
+        workspaceApi.settings(),
+        workspaceApi.projects(),
+      ]);
+      const nextTrees = await Promise.all(
+        nextProjects.map((project) => workspaceApi.tree(project.id)),
+      );
       setSettings(nextSettings);
       setProjects(nextProjects);
       setTrees(nextTrees);
@@ -264,13 +211,14 @@ export default function App() {
       if (checking || document.visibilityState === "hidden") return;
       checking = true;
       try {
-        const nextSettings = await api.settings();
+        const nextSettings = await workspaceApi.settings();
         if (!active) return;
         if (!settings) {
           setSettings(nextSettings);
           return;
         }
-        handleExternalWorkspaceChange(nextSettings);
+        if (handleExternalWorkspaceChange(nextSettings)) return;
+        setSettings(nextSettings);
       } catch {
         // The local service may still be restarting; the next focus will retry.
       } finally {
@@ -308,7 +256,7 @@ export default function App() {
 
       try {
         const offset = page * TABLE_PAGE_SIZE;
-        const result = await api.tables({
+        const result = await tablesApi.search({
           ...query,
           limit: TABLE_PAGE_SIZE,
           offset,
@@ -426,8 +374,8 @@ export default function App() {
     }
     let cancelled = false;
     setDetailLoading(true);
-    api
-      .table(selectedTableId)
+    tablesApi
+      .detail(selectedTableId)
       .then((result) => {
         if (!cancelled) setDetail(result);
       })
@@ -543,26 +491,6 @@ export default function App() {
     });
   };
 
-  const changeAiLayoutMode = useCallback((mode: AiLayoutMode) => {
-    setAiLayoutMode(mode);
-    if (mode === "fullscreen") return;
-    lastNonFullscreenAiModeRef.current = mode;
-    try {
-      window.localStorage.setItem(AI_LAYOUT_STORAGE_KEY, mode);
-    } catch {
-      // Keep the current-session choice when storage is unavailable.
-    }
-  }, []);
-
-  const changeAiAssistantOpen = useCallback((nextOpen: boolean) => {
-    if (nextOpen) {
-      setAiLayoutMode((currentMode) => (
-        currentMode === "fullscreen" ? lastNonFullscreenAiModeRef.current : currentMode
-      ));
-    }
-    setAiAssistantOpen(nextOpen);
-  }, []);
-
   const activeProject = projectForNode(projects, selectedNode);
   const scopeTitle = allNodes ? "所有项目" : selectedNode?.name || "码熊工作区";
   const scopeDescription = allNodes
@@ -598,7 +526,7 @@ export default function App() {
 
   const openSettingsDialog = async () => {
     try {
-      const nextSettings = await api.settings();
+      const nextSettings = await workspaceApi.settings();
       if (handleExternalWorkspaceChange(nextSettings)) return;
       setSettings(nextSettings);
       setDialogValue(nextSettings.workspace_root);
@@ -623,7 +551,7 @@ export default function App() {
     setDialogBusy(true);
     try {
       if (dialog.kind === "project") {
-        const project = await api.createProject(value);
+        const project = await workspaceApi.createProject(value);
         await refreshAfterMutation({
           id: `project:${project.id}`,
           project_id: project.id,
@@ -636,17 +564,17 @@ export default function App() {
         const node = dialog.node;
         const projectId = getProjectId(node)!;
         const parent = node.type === "folder" ? node.relative_path : node.type === "pdm" ? pathParent(node.relative_path) : "";
-        await api.createFolder(projectId, parent, value);
+        await workspaceApi.createFolder(projectId, parent, value);
         await refreshAfterMutation(node);
         message.success("文件夹已创建");
       } else if (dialog.kind === "rename" && dialog.node) {
         const node = dialog.node;
         const projectId = getProjectId(node)!;
-        await api.renameNode(projectId, node.relative_path, value);
+        await workspaceApi.renameNode(projectId, node.relative_path, value);
         await refreshAfterMutation(null);
         message.success("节点已重命名");
       } else if (dialog.kind === "settings") {
-        const updated = await api.updateWorkspace(value);
+        const updated = await workspaceApi.updateWorkspace(value);
         setSettings(updated);
         await refreshAfterMutation(null);
         message.success("工作区已更新");
@@ -675,7 +603,7 @@ export default function App() {
     if (!projectId) throw new Error("无法识别导入目标项目");
     const parentPath =
       target.type === "folder" ? target.relative_path : target.type === "pdm" ? pathParent(target.relative_path) : "";
-    const result = await api.importPdm(projectId, parentPath, files, overwrite);
+    const result = await workspaceApi.importPdm(projectId, parentPath, files, overwrite);
     await refreshAfterMutation(target);
     if (result.imported.length) {
       message.success(`已导入 ${result.imported.length} 个 PDM，共解析 ${result.imported.reduce((sum, item) => sum + item.table_count, 0)} 张表`);
@@ -733,7 +661,7 @@ export default function App() {
       duration: 0,
     });
     try {
-      const result = await api.refresh(projectId, force);
+      const result = await workspaceApi.refresh(projectId, force);
       await refreshAfterMutation(node);
       const summary = force
         ? `强制重新解析完成：成功 ${result.indexed} 个，失败 ${result.errors.length} 个`
@@ -773,7 +701,7 @@ export default function App() {
 
   const moveNode = async (source: WorkspaceNode, target: WorkspaceNode) => {
     try {
-      await api.moveNode(getProjectId(source)!, source.relative_path, target.relative_path);
+      await workspaceApi.moveNode(getProjectId(source)!, source.relative_path, target.relative_path);
       await refreshAfterMutation(target);
       message.success("节点已移动");
     } catch (error) {
@@ -790,7 +718,7 @@ export default function App() {
       okButtonProps: { danger: true },
       cancelText: "取消",
       onOk: async () => {
-        await api.trashNode(getProjectId(node)!, node.relative_path);
+        await workspaceApi.trashNode(getProjectId(node)!, node.relative_path);
         await refreshAfterMutation(null);
         message.success("已移入回收站");
       },
@@ -801,7 +729,7 @@ export default function App() {
     setTrashOpen(true);
     setTrashLoading(true);
     try {
-      setTrashItems(await api.trash());
+      setTrashItems(await workspaceApi.trash());
     } catch (error) {
       message.error(errorMessage(error));
     } finally {
@@ -811,7 +739,7 @@ export default function App() {
 
   const restoreTrash = async (item: TrashItem) => {
     try {
-      await api.restoreTrash(item.id);
+      await workspaceApi.restoreTrash(item.id);
       setTrashItems((current) => current.filter((candidate) => candidate.id !== item.id));
       await refreshAfterMutation(null);
       message.success(`“${item.name}”已恢复`);
@@ -820,13 +748,31 @@ export default function App() {
     }
   };
 
-  const saveFields = async (fields: FieldDefinition[]) => {
+  const saveDictionary = async (table: TableMetadataUpdate, fields: FieldDefinition[]) => {
     if (!detail) return;
     setSaving(true);
     try {
-      const updated = await api.saveFields(detail.id, detail.source_hash, fields);
+      const updated = await tablesApi.saveDictionary(
+        detail.id,
+        detail.source_hash,
+        table,
+        fields,
+      );
       setDetail(updated);
-      message.success("字段字典已写回项目 PDM，原文件备份已保留");
+      setTables((current) =>
+        current.map((item) =>
+          item?.id === updated.id
+            ? {
+                ...item,
+                name: updated.name,
+                code: updated.code,
+                comment: updated.comment,
+                source_hash: updated.source_hash,
+              }
+            : item,
+        ),
+      );
+      message.success("数据字典已写回项目 PDM，原文件备份已保留");
     } catch (error) {
       message.error(errorMessage(error));
       throw error;
@@ -834,105 +780,6 @@ export default function App() {
       setSaving(false);
     }
   };
-
-  const dialogTitle =
-    dialog.kind === "project"
-      ? "新建项目"
-      : dialog.kind === "folder"
-        ? "新建子文件夹"
-        : dialog.kind === "rename"
-          ? "重命名节点"
-          : "本机工作区设置";
-
-  const updateLiveSidebarWidth = (width: number) => {
-    const nextWidth = clampSidebarWidth(width);
-    liveSidebarWidthRef.current = nextWidth;
-    appRootRef.current?.style.setProperty("--sidebar-width", `${nextWidth}px`);
-    sidebarResizerRef.current?.setAttribute("aria-valuenow", String(nextWidth));
-    return nextWidth;
-  };
-
-  const commitSidebarWidth = (width: number) => {
-    setSidebarWidth(updateLiveSidebarWidth(width));
-  };
-
-  const persistSidebarWidth = () => {
-    const width = liveSidebarWidthRef.current;
-    if (width === null) return;
-    try {
-      window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(width));
-    } catch {
-      // The resizer still works when browser storage is unavailable.
-    }
-  };
-
-  const startSidebarResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    sidebarResizeLeftRef.current =
-      appRootRef.current?.querySelector<HTMLElement>(".project-navigator")?.getBoundingClientRect().left ||
-      appRootRef.current?.getBoundingClientRect().left ||
-      0;
-    pendingSidebarWidthRef.current = liveSidebarWidthRef.current;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setSidebarResizing(true);
-  };
-
-  const moveSidebarResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    pendingSidebarWidthRef.current = event.clientX - sidebarResizeLeftRef.current;
-    if (sidebarResizeFrameRef.current !== null) return;
-    sidebarResizeFrameRef.current = window.requestAnimationFrame(() => {
-      sidebarResizeFrameRef.current = null;
-      const width = pendingSidebarWidthRef.current;
-      if (width !== null) updateLiveSidebarWidth(width);
-    });
-  };
-
-  const commitSidebarResize = () => {
-    if (sidebarResizeFrameRef.current !== null) {
-      window.cancelAnimationFrame(sidebarResizeFrameRef.current);
-      sidebarResizeFrameRef.current = null;
-    }
-    const width = pendingSidebarWidthRef.current ?? liveSidebarWidthRef.current;
-    pendingSidebarWidthRef.current = null;
-    if (width !== null) commitSidebarWidth(width);
-    setSidebarResizing(false);
-    persistSidebarWidth();
-  };
-
-  const finishSidebarResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    pendingSidebarWidthRef.current = event.clientX - sidebarResizeLeftRef.current;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    commitSidebarResize();
-  };
-
-  const resizeSidebarWithKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const currentWidth =
-      liveSidebarWidthRef.current ||
-      appRootRef.current?.querySelector<HTMLElement>(".project-navigator")?.getBoundingClientRect().width ||
-      326;
-    const nextWidth =
-      event.key === "ArrowLeft"
-        ? currentWidth - 10
-        : event.key === "ArrowRight"
-          ? currentWidth + 10
-          : event.key === "Home"
-            ? SIDEBAR_MIN_WIDTH
-            : event.key === "End"
-              ? SIDEBAR_MAX_WIDTH
-              : null;
-    if (nextWidth === null) return;
-    event.preventDefault();
-    commitSidebarWidth(nextWidth);
-    window.setTimeout(persistSidebarWidth, 0);
-  };
-
-  const appRootStyle =
-    sidebarWidth === null ? undefined : ({ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties);
-  const effectiveSidebarWidth = sidebarWidth ?? (window.innerWidth <= 1360 ? 292 : 326);
 
   return (
     <div
@@ -955,13 +802,22 @@ export default function App() {
           <Tag color="blue">本地工作台</Tag>
         </div>
         <div className="header-actions">
-          <Button icon={<SafetyCertificateOutlined />} onClick={() => setBackupOpen(true)}>
+          <Button
+            icon={<SafetyCertificateOutlined />}
+            onClick={() => {
+              setBackupFeatureLoaded(true);
+              setBackupOpen(true);
+            }}
+          >
             备份迁移
           </Button>
           <Button
             icon={<CodeOutlined />}
             disabled={!activeProject || activeProject.table_count === 0}
-            onClick={() => setDdlExportOpen(true)}
+            onClick={() => {
+              setDdlFeatureLoaded(true);
+              setDdlExportOpen(true);
+            }}
           >
             导出 SQL
           </Button>
@@ -1044,7 +900,7 @@ export default function App() {
               loading={detailLoading}
               saving={saving}
               highlightQuery={searchMode === "field" ? searchQuery : ""}
-              onSave={saveFields}
+              onSave={saveDictionary}
               onDirtyChange={handleDirtyChange}
             />
           </div>
@@ -1060,106 +916,47 @@ export default function App() {
         onChange={handleFileSelection}
       />
 
-      <Modal
-        open={dialog.kind !== null}
-        title={dialogTitle}
-        okText={dialog.kind === "settings" ? "保存设置" : "确定"}
-        cancelText="取消"
-        confirmLoading={dialogBusy}
-        onOk={submitDialog}
-        onCancel={closeDialog}
-        destroyOnHidden
-      >
-        {dialog.kind === "settings" ? (
-          <div className="dialog-form">
-            <label>工作区根目录</label>
-            <Input
-              value={dialogValue}
-              disabled={projects.length > 0}
-              onChange={(event) => setDialogValue(event.target.value)}
-              onPressEnter={submitDialog}
-              prefix={<SettingOutlined />}
-            />
-            <small>
-              {projects.length
-                ? "当前已有项目。为防止项目路径失联，需清空或移入回收站后才能切换工作区。"
-                : "新项目和码熊的回收站、备份目录都会保存在这里。"}
-            </small>
-          </div>
-        ) : (
-          <div className="dialog-form">
-            <label>{dialog.kind === "project" ? "项目名称" : dialog.kind === "folder" ? "文件夹名称" : "新名称"}</label>
-            <Input
-              autoFocus
-              value={dialogValue}
-              onChange={(event) => setDialogValue(event.target.value)}
-              onPressEnter={submitDialog}
-              placeholder="请输入名称"
-            />
-          </div>
-        )}
-      </Modal>
+      <WorkspaceDialog
+        dialog={dialog}
+        value={dialogValue}
+        busy={dialogBusy}
+        projects={projects}
+        onValueChange={setDialogValue}
+        onSubmit={submitDialog}
+        onClose={closeDialog}
+      />
 
-      <Modal
+      <TrashModal
         open={trashOpen}
-        title={<span><InboxOutlined /> 码熊回收站</span>}
-        width={760}
-        footer={<Button onClick={() => setTrashOpen(false)}>关闭</Button>}
-        className="trash-modal"
-        onCancel={() => setTrashOpen(false)}
-      >
-        <div className="trash-list">
-          {trashLoading ? (
-            <div className="trash-loading"><Spin /> 正在读取回收站…</div>
-          ) : trashItems.length ? (
-            trashItems.map((item) => (
-              <div className="trash-item" key={item.id}>
-                <span className="trash-icon">
-                  {item.kind === "project" ? <ApartmentOutlined /> : item.kind === "folder" ? <FolderOutlined /> : <DatabaseFilled />}
-                </span>
-                <span className="trash-copy">
-                  <strong>{item.name}</strong>
-                  <small>{item.project_name} · {item.deleted_at.replace("T", " ")}</small>
-                </span>
-                <Tag>{item.kind === "project" ? "项目" : item.kind === "folder" ? "文件夹" : "PDM"}</Tag>
-                <Tooltip title="恢复到原位置">
-                  <Button icon={<UndoOutlined />} onClick={() => restoreTrash(item)}>恢复</Button>
-                </Tooltip>
-              </div>
-            ))
-          ) : (
-            <Empty description="回收站是空的" />
-          )}
-        </div>
-      </Modal>
+        loading={trashLoading}
+        items={trashItems}
+        onClose={() => setTrashOpen(false)}
+        onRestore={restoreTrash}
+      />
 
-      <BackupMigrationModal
-        open={backupOpen}
+      <LazyFeatureOverlays
         trees={trees}
         selectedNode={selectedNode}
-        hasUnsavedChanges={hasUnsavedChanges}
-        onClose={() => setBackupOpen(false)}
-        onRequestContextChange={requestContextChange}
-        onImported={handleBackupImported}
-      />
-
-      <DdlExportModal
-        open={ddlExportOpen}
-        project={activeProject || null}
-        selectedNode={selectedNode}
-        hasUnsavedChanges={hasUnsavedChanges}
-        onClose={() => setDdlExportOpen(false)}
-      />
-
-      <AiAssistant
-        open={aiAssistantOpen}
-        mode={aiLayoutMode}
-        activeProject={activeProject}
-        selectedNode={selectedNode}
         selectedTable={detail}
-        onOpenChange={changeAiAssistantOpen}
-        onModeChange={changeAiLayoutMode}
-        onOpenTable={openAiEvidenceTable}
+        activeProject={activeProject}
+        hasUnsavedChanges={hasUnsavedChanges}
+        backupLoaded={backupFeatureLoaded}
+        backupOpen={backupOpen}
+        ddlLoaded={ddlFeatureLoaded}
+        ddlOpen={ddlExportOpen}
+        aiLoaded={aiFeatureLoaded}
+        aiOpen={aiAssistantOpen}
+        aiMode={aiLayoutMode}
+        aiAssistantName={settings?.assistant_name}
+        aiAssistantAccessory={settings?.assistant_accessory}
+        onCloseBackup={() => setBackupOpen(false)}
+        onBackupImported={handleBackupImported}
+        onCloseDdl={() => setDdlExportOpen(false)}
+        onRequestContextChange={requestContextChange}
+        onOpenAi={openAiAssistant}
+        onAiOpenChange={changeAiAssistantOpen}
+        onAiModeChange={changeAiLayoutMode}
+        onOpenAiTable={openAiEvidenceTable}
       />
     </div>
   );

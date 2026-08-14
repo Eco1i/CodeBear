@@ -22,44 +22,33 @@ import {
   Tag,
   Tree,
 } from "antd";
-import type { DataNode } from "antd/es/tree";
-
-import { api } from "../api";
+import { backupApi } from "../features/backup/api";
+import {
+  backupTree,
+  buildTreeIndex,
+  collectSubtreeKeys,
+  compactSelection,
+  exportTreeNode,
+  filterTree,
+  formatBytes,
+  formatCreatedAt,
+  normalizeProjectNode,
+  selectionSummary,
+} from "../features/backup/model";
+import type {
+  ConflictPolicy,
+  ImportSource,
+  SelectionSummary,
+  TransferNode,
+} from "../features/backup/model";
 import type {
   BackupExportNode,
   BackupImportNode,
   BackupImportResult,
   BackupInspection,
-  NodeType,
   WorkspaceNode,
 } from "../types";
 import { FolderGlyph, PdmGlyph, ProjectGlyph, TreeChevronGlyph } from "./PrototypeGlyphs";
-
-type ConflictPolicy = "skip" | "rename" | "overwrite";
-type ImportSource = "archive" | "legacy";
-
-interface TransferNode extends DataNode {
-  key: string;
-  label: string;
-  nodeType: NodeType;
-  size: number;
-  exportSelection?: BackupExportNode;
-  importSelection?: BackupImportNode;
-  children?: TransferNode[];
-}
-
-interface TreeIndex {
-  nodes: Map<string, TransferNode>;
-  parents: Map<string, string>;
-  keys: string[];
-}
-
-interface SelectionSummary {
-  projectCount: number;
-  folderCount: number;
-  pdmCount: number;
-  totalBytes: number;
-}
 
 interface BackupMigrationModalProps {
   open: boolean;
@@ -69,165 +58,6 @@ interface BackupMigrationModalProps {
   onClose: () => void;
   onRequestContextChange: (action: () => void) => void;
   onImported: (result: BackupImportResult) => void | Promise<void>;
-}
-
-function normalizeProjectNode(node: WorkspaceNode, projectId: string): WorkspaceNode {
-  return {
-    ...node,
-    project_id: node.project_id || projectId,
-    children: node.children?.map((child) => normalizeProjectNode(child, projectId)),
-  };
-}
-
-function exportTreeNode(node: WorkspaceNode): TransferNode {
-  const projectId = node.project_id || node.id.replace("project:", "");
-  return {
-    key: node.id,
-    title: node.name,
-    label: node.name,
-    nodeType: node.type,
-    size: node.file_size || 0,
-    isLeaf: node.type === "pdm",
-    exportSelection: {
-      project_id: projectId,
-      type: node.type,
-      relative_path: node.relative_path,
-    },
-    children: node.children?.map(exportTreeNode),
-  };
-}
-
-function backupTree(inspection: BackupInspection): TransferNode[] {
-  return inspection.projects.map((project) => {
-    const projectKey = `backup:${project.key}:project`;
-    const projectNode: TransferNode = {
-      key: projectKey,
-      title: project.name,
-      label: project.name,
-      nodeType: "project",
-      size: 0,
-      importSelection: { project_key: project.key, type: "project", relative_path: "" },
-      children: [],
-    };
-    const folderNodes = new Map<string, TransferNode>();
-    const sortedEntries = [...project.entries].sort((left, right) => {
-      const depth = left.path.split("/").length - right.path.split("/").length;
-      if (depth) return depth;
-      if (left.type !== right.type) return left.type === "folder" ? -1 : 1;
-      return left.path.localeCompare(right.path, "zh-CN");
-    });
-
-    sortedEntries.forEach((entry) => {
-      const key = `backup:${project.key}:${entry.type}:${entry.path}`;
-      const label = entry.path.split("/").at(-1) || entry.path;
-      const node: TransferNode = {
-        key,
-        title: label,
-        label,
-        nodeType: entry.type,
-        size: entry.size || 0,
-        isLeaf: entry.type === "pdm",
-        importSelection: {
-          project_key: project.key,
-          type: entry.type,
-          relative_path: entry.path,
-        },
-        children: entry.type === "folder" ? [] : undefined,
-      };
-      const slash = entry.path.lastIndexOf("/");
-      const parentPath = slash === -1 ? "" : entry.path.slice(0, slash);
-      const parent = parentPath ? folderNodes.get(parentPath) : projectNode;
-      (parent?.children || projectNode.children)?.push(node);
-      if (entry.type === "folder") folderNodes.set(entry.path, node);
-    });
-    return projectNode;
-  });
-}
-
-function buildTreeIndex(tree: TransferNode[]): TreeIndex {
-  const nodes = new Map<string, TransferNode>();
-  const parents = new Map<string, string>();
-  const keys: string[] = [];
-  const walk = (items: TransferNode[], parent?: string) => {
-    items.forEach((item) => {
-      nodes.set(item.key, item);
-      keys.push(item.key);
-      if (parent) parents.set(item.key, parent);
-      walk(item.children || [], item.key);
-    });
-  };
-  walk(tree);
-  return { nodes, parents, keys };
-}
-
-function collectSubtreeKeys(node: TransferNode, result: string[]): void {
-  result.push(node.key);
-  node.children?.forEach((child) => collectSubtreeKeys(child, result));
-}
-
-function compactSelection(keys: string[], index: TreeIndex): TransferNode[] {
-  const checked = new Set(keys);
-  return keys
-    .filter((key) => {
-      let parent = index.parents.get(key);
-      while (parent) {
-        if (checked.has(parent)) return false;
-        parent = index.parents.get(parent);
-      }
-      return true;
-    })
-    .map((key) => index.nodes.get(key))
-    .filter((node): node is TransferNode => Boolean(node));
-}
-
-function selectionSummary(keys: string[], index: TreeIndex): SelectionSummary {
-  const projects = new Set<string>();
-  let folderCount = 0;
-  let pdmCount = 0;
-  let totalBytes = 0;
-  keys.forEach((key) => {
-    const node = index.nodes.get(key);
-    if (!node) return;
-    const selection = node.exportSelection || node.importSelection;
-    if (node.nodeType === "project") {
-      projects.add(node.exportSelection?.project_id || node.importSelection?.project_key || key);
-    } else if (selection) {
-      projects.add(
-        "project_id" in selection ? selection.project_id : selection.project_key,
-      );
-    }
-    if (node.nodeType === "folder") folderCount += 1;
-    if (node.nodeType === "pdm") {
-      pdmCount += 1;
-      totalBytes += node.size;
-    }
-  });
-  return { projectCount: projects.size, folderCount, pdmCount, totalBytes };
-}
-
-function filterTree(node: TransferNode, query: string): TransferNode | null {
-  if (!query) return node;
-  const children = (node.children || [])
-    .map((child) => filterTree(child, query))
-    .filter((child): child is TransferNode => Boolean(child));
-  if (node.label.toLocaleLowerCase().includes(query) || children.length) {
-    return { ...node, children };
-  }
-  return null;
-}
-
-function formatBytes(bytes: number): string {
-  if (!bytes) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  const order = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / 1024 ** order;
-  return `${value >= 10 || order === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[order]}`;
-}
-
-function formatCreatedAt(value: string): string {
-  if (!value) return "旧版数据目录";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
 }
 
 function nodeTitle(node: TransferNode) {
@@ -283,7 +113,9 @@ export function BackupMigrationModal({
   const [conflictPolicy, setConflictPolicy] = useState<ConflictPolicy>("rename");
   const [inspecting, setInspecting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
   const backupInputRef = useRef<HTMLInputElement>(null);
+  const importProgressTimerRef = useRef<number | null>(null);
 
   const exportTree = useMemo(
     () =>
@@ -349,8 +181,40 @@ export function BackupMigrationModal({
     }
   }, [importIndex, importTree, inspection]);
 
+  useEffect(() => () => {
+    if (importProgressTimerRef.current !== null) {
+      window.clearInterval(importProgressTimerRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!importing) return undefined;
+    const confirmBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", confirmBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", confirmBeforeLeaving);
+  }, [importing]);
+
+  const stopImportProgressTimer = () => {
+    if (importProgressTimerRef.current === null) return;
+    window.clearInterval(importProgressTimerRef.current);
+    importProgressTimerRef.current = null;
+  };
+
+  const startImportProgress = () => {
+    stopImportProgressTimer();
+    setImportProgress(6);
+    importProgressTimerRef.current = window.setInterval(() => {
+      setImportProgress((current) => (
+        Math.min(92, current + Math.max(0.7, (92 - current) * 0.075))
+      ));
+    }, 180);
+  };
+
   const discardInspection = (current = inspection) => {
-    if (current?.token) void api.discardBackup(current.token).catch(() => undefined);
+    if (current?.token) void backupApi.discard(current.token).catch(() => undefined);
     setInspection(null);
     setImportCheckedKeys([]);
     setImportExpandedKeys([]);
@@ -373,7 +237,7 @@ export function BackupMigrationModal({
     }
     setExporting(true);
     try {
-      const result = await api.exportBackup(nodes);
+      const result = await backupApi.export(nodes);
       const url = URL.createObjectURL(result.blob);
       const link = document.createElement("a");
       link.href = url;
@@ -398,8 +262,8 @@ export function BackupMigrationModal({
     setInspecting(true);
     const previous = inspection;
     try {
-      const result = await api.inspectBackup(file);
-      if (previous) void api.discardBackup(previous.token).catch(() => undefined);
+      const result = await backupApi.inspect(file);
+      if (previous) void backupApi.discard(previous.token).catch(() => undefined);
       setInspection(result);
     } catch (error) {
       message.error(error instanceof Error ? error.message : "无法读取备份包");
@@ -416,8 +280,8 @@ export function BackupMigrationModal({
     setInspecting(true);
     const previous = inspection;
     try {
-      const result = await api.inspectLegacyData(legacyPath.trim());
-      if (previous) void api.discardBackup(previous.token).catch(() => undefined);
+      const result = await backupApi.inspectLegacy(legacyPath.trim());
+      if (previous) void backupApi.discard(previous.token).catch(() => undefined);
       setInspection(result);
     } catch (error) {
       message.error(error instanceof Error ? error.message : "无法读取旧版 data 目录");
@@ -436,9 +300,13 @@ export function BackupMigrationModal({
       return;
     }
     setImporting(true);
+    startImportProgress();
     try {
-      const result = await api.importBackup(inspection.token, nodes, conflictPolicy);
-      await api.discardBackup(inspection.token).catch(() => undefined);
+      const result = await backupApi.import(inspection.token, nodes, conflictPolicy);
+      stopImportProgressTimer();
+      setImportProgress(100);
+      await new Promise((resolve) => window.setTimeout(resolve, 420));
+      await backupApi.discard(inspection.token).catch(() => undefined);
       await onImported(result);
       const suffix = result.parse_errors.length ? `，${result.parse_errors.length} 个 PDM 解析失败` : "";
       message.success(`已导入 ${result.imported.length} 个 PDM${suffix}`);
@@ -446,8 +314,11 @@ export function BackupMigrationModal({
       setImportCheckedKeys([]);
       onClose();
     } catch (error) {
+      stopImportProgressTimer();
+      setImportProgress(0);
       message.error(error instanceof Error ? error.message : "导入失败");
     } finally {
+      stopImportProgressTimer();
       setImporting(false);
     }
   };
@@ -670,17 +541,33 @@ export function BackupMigrationModal({
               showIcon
               message="导入只写入当前程序工作区，备份包和旧版 data 均不会被修改。"
             />
-            <Button
-              type="primary"
-              size="large"
-              block
-              icon={<ImportOutlined />}
-              loading={importing}
-              disabled={!importCheckedKeys.length}
-              onClick={requestImport}
-            >
-              开始导入所选节点
-            </Button>
+            {importing ? (
+              <div
+                className="backup-import-progress"
+                role="progressbar"
+                aria-label="备份导入进度"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(importProgress)}
+                aria-valuetext={`已导入 ${Math.round(importProgress)}%`}
+              >
+                <div className="backup-import-progress-track" aria-hidden="true">
+                  <span style={{ width: `${importProgress}%` }} />
+                </div>
+                <b>{Math.round(importProgress)}%</b>
+              </div>
+            ) : (
+              <Button
+                type="primary"
+                size="large"
+                block
+                icon={<ImportOutlined />}
+                disabled={!importCheckedKeys.length}
+                onClick={requestImport}
+              >
+                开始导入所选节点
+              </Button>
+            )}
           </>
         ) : (
           <>

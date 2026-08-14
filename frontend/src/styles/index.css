@@ -1,0 +1,13 @@
+/* Keep this import order stable: it mirrors the historical single stylesheet cascade. */
+@import "./base/foundation.css";
+@import "./shell/layout.css";
+@import "./workspace/navigator.css";
+@import "./tables/index.css";
+@import "./workspace/dialogs.css";
+@import "./backup/index.css";
+@import "./workspace/trash.css";
+@import "./ai/index.css";
+@import "./base/scrollbars.css";
+@import "./responsive.css";
+@import "./ddl/index.css";
+@import "./shell/feature-loading.css";

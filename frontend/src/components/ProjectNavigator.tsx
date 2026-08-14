@@ -166,6 +166,7 @@ export function ProjectNavigator({
   onOpenSettings,
 }: NavigatorProps) {
   const treeRef = useRef<RcTree>(null);
+  const handledLocateRevisionRef = useRef(0);
   const [draftQuery, setDraftQuery] = useState("");
   const [query, setQuery] = useState("");
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>(
@@ -194,7 +195,11 @@ export function ProjectNavigator({
   const allExpandedKeys = useMemo(() => [...nodeMap.keys()], [nodeMap]);
 
   useEffect(() => {
-    if (!locateRevision || !locateNode) return;
+    if (
+      !locateRevision ||
+      !locateNode ||
+      handledLocateRevisionRef.current === locateRevision
+    ) return;
     const pdmNode = [...nodeMap.values()].find(
       (node) =>
         node.type === "pdm" &&
@@ -202,6 +207,7 @@ export function ProjectNavigator({
         (node.pdm_id === locateNode.pdmId || node.relative_path === locateNode.relativePath),
     );
     if (!pdmNode) return;
+    handledLocateRevisionRef.current = locateRevision;
     setDraftQuery("");
     setQuery("");
     const ancestors: React.Key[] = [`project:${locateNode.projectId}`];
@@ -211,9 +217,11 @@ export function ProjectNavigator({
       folderPath = folderPath ? `${folderPath}/${part}` : part;
       ancestors.push(`folder:${locateNode.projectId}:${folderPath}`);
     });
-    const nextExpandedKeys = [...new Set([...expandedKeys, ...ancestors])];
-    setExpandedKeys(nextExpandedKeys);
-    storeExpandedKeys(nextExpandedKeys);
+    setExpandedKeys((currentKeys) => {
+      const nextExpandedKeys = [...new Set([...currentKeys, ...ancestors])];
+      storeExpandedKeys(nextExpandedKeys);
+      return nextExpandedKeys;
+    });
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         treeRef.current?.scrollTo({ key: pdmNode.id, align: "auto" });
@@ -358,13 +366,14 @@ export function ProjectNavigator({
             />
           </Tooltip>
           <Tooltip title="新建项目">
-            <Button type="text" size="small" icon={<PlusOutlined />} onClick={onCreateProject} />
+            <Button type="text" size="small" icon={<PlusOutlined />} aria-label="新建项目" onClick={onCreateProject} />
           </Tooltip>
           <Tooltip title="新建文件夹">
             <Button
               type="text"
               size="small"
               icon={<FolderOpenOutlined />}
+              aria-label="新建文件夹"
               disabled={!selectedNode}
               onClick={() => selectedNode && onCreateFolder(selectedNode)}
             />
@@ -374,13 +383,14 @@ export function ProjectNavigator({
               type="text"
               size="small"
               icon={<ReloadOutlined spin={loading} />}
+              aria-label="刷新项目"
               disabled={!trees.length}
               onClick={() => onRefresh(selectedNode)}
             />
           </Tooltip>
           <Dropdown menu={{ items: moreMenuItems }} trigger={["click"]} placement="bottomRight">
             <Tooltip title="更多操作">
-              <Button type="text" size="small" icon={<MoreOutlined />} disabled={!trees.length} />
+              <Button type="text" size="small" icon={<MoreOutlined />} aria-label="更多操作" disabled={!trees.length} />
             </Tooltip>
           </Dropdown>
         </div>
@@ -437,7 +447,7 @@ export function ProjectNavigator({
           </span>
         </button>
         <Tooltip title="打开回收站">
-          <Button type="text" icon={<InboxOutlined />} onClick={onOpenTrash} />
+          <Button type="text" icon={<InboxOutlined />} aria-label="打开回收站" onClick={onOpenTrash} />
         </Tooltip>
       </div>
     </aside>

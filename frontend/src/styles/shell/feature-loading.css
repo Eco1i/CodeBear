@@ -1,0 +1,21 @@
+/* Lazy feature boundary shown only while a large optional workspace tool is loading. */
+.feature-loading {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  color: #526581;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(35, 57, 88, 0.16);
+  transform: translate(-50%, -50%);
+}
+
+.feature-loading.is-ai {
+  inset: auto 22px 22px auto;
+  transform: none;
+}

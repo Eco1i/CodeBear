@@ -26,7 +26,16 @@ import {
   Tooltip,
 } from "antd";
 
-import { api } from "../api";
+import { ddlApi } from "../features/ddl/api";
+import {
+  cacheCatalogTables,
+  cleanFileName,
+  compactNumber,
+  DEFAULT_CONFIG,
+  mergeCatalogGroups,
+  optionText,
+  scopeIncludesGroup,
+} from "../features/ddl/model";
 import type { EditorView } from "@codemirror/view";
 import type {
   DdlCatalog,
@@ -60,27 +69,6 @@ interface DdlExportModalProps {
 
 type PreviewTab = "script" | "problems";
 type DdlGenerateMeta = Omit<DdlGenerateResult, "script">;
-
-const DEFAULT_CONFIG: DdlConfig = {
-  database: "mysql",
-  version: "8.0",
-  schema: "",
-  include_comments: true,
-  drop_table: false,
-  if_not_exists: true,
-  engine: "InnoDB",
-  charset: "utf8mb4",
-  collation: "utf8mb4_0900_ai_ci",
-  tablespace: "",
-  tdsql_mode: "shard",
-  ignite_template: "PARTITIONED",
-  ignite_backups: 1,
-  ignite_atomicity: "ATOMIC",
-  ignite_write_sync: "FULL_SYNC",
-  ignite_cache_group: "",
-  ignite_affinity_key: true,
-};
-
 
 function DatabaseLogo({ database }: { database: DdlDatabase }) {
   if (database === "mysql") {
@@ -137,14 +125,6 @@ function DatabaseLogo({ database }: { database: DdlDatabase }) {
       </svg>
     </span>
   );
-}
-
-
-function optionText(option: DdlValueOption): string {
-  return [option.value, option.label, option.description, option.default_collation, option.charset]
-    .filter(Boolean)
-    .join(" ")
-    .toLocaleLowerCase();
 }
 
 
@@ -248,40 +228,6 @@ function DatabaseSelect({
 }
 
 
-function scopeIncludesGroup(node: WorkspaceNode | null, group: DdlCatalogGroup): boolean {
-  if (!node || node.type === "project") return true;
-  if (node.type === "pdm") {
-    return node.pdm_id === group.id || node.relative_path === group.relative_path;
-  }
-  const prefix = node.relative_path.replace(/\/+$/, "");
-  return !prefix || group.relative_path.startsWith(`${prefix}/`);
-}
-
-
-function mergeCatalogGroups(base: DdlCatalog, hydrated: DdlCatalog): DdlCatalog {
-  const hydratedById = new Map(hydrated.groups.map((group) => [group.id, group]));
-  return {
-    ...base,
-    groups: base.groups.map((group) => hydratedById.get(group.id) || group),
-  };
-}
-
-
-function cacheCatalogTables(target: Map<string, DdlCatalogTable>, groups: DdlCatalogGroup[]) {
-  groups.forEach((group) => group.tables.forEach((table) => target.set(table.id, table)));
-}
-
-
-function compactNumber(value: number): string {
-  return new Intl.NumberFormat("zh-CN").format(value);
-}
-
-
-function cleanFileName(value: string): string {
-  return value.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").replace(/[. ]+$/g, "").slice(0, 120) || "码熊建表脚本";
-}
-
-
 function warningIcon(warning: DdlWarning) {
   if (warning.severity === "error") return <ExclamationCircleOutlined />;
   if (warning.severity === "info") return <InfoCircleOutlined />;
@@ -355,8 +301,8 @@ export function DdlExportModal({
     const loadCatalog = async () => {
       try {
         const [nextOptions, summaryCatalog] = await Promise.all([
-          api.ddlOptions(),
-          api.ddlCatalog(project.id, { includeTables: false }, controller.signal),
+          ddlApi.options(),
+          ddlApi.catalog(project.id, { includeTables: false }, controller.signal),
         ]);
         if (controller.signal.aborted) return;
         const projectScope = !selectedNode || selectedNode.type === "project";
@@ -372,7 +318,7 @@ export function DdlExportModal({
           : scopedGroups.map((group) => group.id);
         let nextCatalog = summaryCatalog;
         if (hydrateIds.length) {
-          const hydratedCatalog = await api.ddlCatalog(
+          const hydratedCatalog = await ddlApi.catalog(
             project.id,
             { includeTables: true, pdmIds: hydrateIds },
             controller.signal,
@@ -480,7 +426,7 @@ export function DdlExportModal({
     setSearchGroups(null);
     setSearching(true);
     try {
-      const searchCatalog = await api.ddlCatalog(
+      const searchCatalog = await ddlApi.catalog(
         project.id,
         { includeTables: true, query: nextQuery },
         controller.signal,
@@ -535,7 +481,7 @@ export function DdlExportModal({
       next.delete(groupId);
       return next;
     });
-    const promise = api.ddlCatalog(
+    const promise = ddlApi.catalog(
       project.id,
       { includeTables: true, pdmIds: [groupId] },
       controller.signal,
@@ -590,7 +536,7 @@ export function DdlExportModal({
     if (!project) return;
     setAllSelecting(true);
     try {
-      const fullCatalog = await api.ddlCatalog(project.id, { includeTables: true });
+      const fullCatalog = await ddlApi.catalog(project.id, { includeTables: true });
       cacheCatalogTables(tableByIdRef.current, fullCatalog.groups);
       setCatalog((current) => current ? mergeCatalogGroups(current, fullCatalog) : fullCatalog);
       setSelectedIds(new Set(fullCatalog.groups.flatMap((group) => group.tables.map((table) => table.id))));
@@ -661,7 +607,7 @@ export function DdlExportModal({
     const signature = currentSignature;
     setGenerating(true);
     try {
-      const nextResult = await api.generateDdl([...selectedIds], config, controller.signal);
+      const nextResult = await ddlApi.generate([...selectedIds], config, controller.signal);
       if (controller.signal.aborted) return;
       const { script: nextScript, ...nextMeta } = nextResult;
       scriptValueRef.current = nextScript;

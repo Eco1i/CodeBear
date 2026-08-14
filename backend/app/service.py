@@ -21,7 +21,7 @@ from .config import APP_VERSION, INTERNAL_DIR_NAMES, SettingsStore
 from .database import Database
 from .ddl import ddl_options as build_ddl_options
 from .ddl import generate_ddl as render_ddl
-from .pdm import ParsedPdm, file_sha256, parse_pdm, update_pdm_fields
+from .pdm import ParsedPdm, file_sha256, parse_pdm, update_pdm_dictionary
 
 
 WINDOWS_RESERVED_NAMES = {
@@ -91,6 +91,10 @@ def resolve_relative(root: Path, relative_path: str | None) -> Path:
 
 def _like_escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _fts_phrase(value: str) -> str:
+    return f'"{value.replace(chr(34), chr(34) * 2)}"'
 
 
 def _add_parent_folders(relative_path: str, folders: set[str]) -> None:
@@ -663,6 +667,8 @@ class WorkspaceService:
         imported_items: list[dict[str, str]] = []
         skipped_items: list[dict[str, str]] = []
         renamed_items: list[dict[str, str]] = []
+        index_candidates: list[tuple[str, str, Path]] = []
+        parse_errors: list[dict[str, str]] = []
 
         rollback_parent = self.settings.paths.app_data / "staging"
         rollback_parent.mkdir(parents=True, exist_ok=True)
@@ -735,17 +741,53 @@ class WorkspaceService:
                                 temporary.unlink(missing_ok=True)
                             if not existed:
                                 created_files.append(target)
+                            imported_relative = target.relative_to(root).as_posix()
                             imported_items.append(
                                 {
                                     "project": str(project["name"]),
-                                    "relative_path": target.relative_to(root).as_posix(),
+                                    "relative_path": imported_relative,
                                 }
                             )
+                            index_candidates.append((project_id, imported_relative, target))
 
-                refresh_results = [
-                    self.refresh_project(project_id)
-                    for project_id in affected_projects
-                ]
+                if index_candidates:
+                    with self.database.transaction() as connection:
+                        existing_pdm_ids = {
+                            str(row["id"])
+                            for project_id, relative_path, _ in index_candidates
+                            if (row := connection.execute(
+                                "SELECT id FROM pdm_files WHERE project_id = ? AND relative_path = ?",
+                                (project_id, relative_path),
+                            ).fetchone()) is not None
+                        }
+                        with self.database.defer_fts_updates(connection, existing_pdm_ids) as updated_pdm_ids:
+                            for project_id, relative_path, absolute_path in index_candidates:
+                                try:
+                                    parsed = parse_pdm(absolute_path)
+                                    pdm_id = self._index_parsed(
+                                        connection,
+                                        project_id,
+                                        relative_path,
+                                        absolute_path,
+                                        parsed,
+                                    )
+                                except (etree.XMLSyntaxError, OSError, ValueError) as exc:
+                                    error_message = str(exc)
+                                    pdm_id = self._index_parse_error(
+                                        connection,
+                                        project_id,
+                                        relative_path,
+                                        absolute_path,
+                                        error_message,
+                                    )
+                                    parse_errors.append(
+                                        {
+                                            "relative_path": relative_path,
+                                            "status": "error",
+                                            "error": error_message,
+                                        }
+                                    )
+                                updated_pdm_ids.add(pdm_id)
             except Exception as exc:
                 for created_file in reversed(created_files):
                     try:
@@ -785,11 +827,6 @@ class WorkspaceService:
                     raise ServiceError(422, str(exc), code=exc.code) from exc
                 raise ServiceError(500, f"导入备份失败：{exc}", code="backup_import_failed") from exc
 
-        parse_errors = [
-            error
-            for result in refresh_results
-            for error in result.get("errors", [])
-        ]
         return {
             "projects": [
                 {"id": project_id, "name": project["name"]}
@@ -867,13 +904,11 @@ class WorkspaceService:
             ),
         )
         connection.execute("DELETE FROM model_tables WHERE pdm_id = ?", (resolved_pdm_id,))
+        table_rows: list[tuple[Any, ...]] = []
+        field_rows: list[tuple[Any, ...]] = []
         for table in parsed.tables:
             table_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"maxiong:{resolved_pdm_id}:table:{table.xml_id}"))
-            connection.execute(
-                """
-                INSERT INTO model_tables(id, pdm_id, xml_id, ordinal, name, code, comment, field_count)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-                """,
+            table_rows.append(
                 (
                     table_id,
                     resolved_pdm_id,
@@ -883,16 +918,10 @@ class WorkspaceService:
                     table.code,
                     table.comment,
                     len(table.fields),
-                ),
+                )
             )
-            connection.executemany(
-                """
-                INSERT INTO model_fields(
-                    id, table_id, xml_id, ordinal, name, code, data_type, length,
-                    nullable, default_value, comment, is_primary_key
-                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
+            field_rows.extend(
+                (
                     (
                         str(uuid.uuid5(uuid.NAMESPACE_URL, f"maxiong:{resolved_pdm_id}:field:{field.xml_id}")),
                         table_id,
@@ -908,9 +937,200 @@ class WorkspaceService:
                         1 if field.is_primary_key else 0,
                     )
                     for field in table.fields
-                ],
+                )
             )
+        connection.executemany(
+            """
+            INSERT INTO model_tables(id, pdm_id, xml_id, ordinal, name, code, comment, field_count)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            table_rows,
+        )
+        connection.executemany(
+            """
+            INSERT INTO model_fields(
+                id, table_id, xml_id, ordinal, name, code, data_type, length,
+                nullable, default_value, comment, is_primary_key
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            field_rows,
+        )
         return resolved_pdm_id
+
+    @staticmethod
+    def _update_saved_table_index(
+        connection: sqlite3.Connection,
+        detail: dict[str, Any],
+        absolute_path: Path,
+        parsed: ParsedPdm,
+    ) -> None:
+        table_id = str(detail["id"])
+        pdm_id = str(detail["pdm_id"])
+        table_xml_id = str(detail["xml_id"])
+        parsed_table = next(
+            (candidate for candidate in parsed.tables if candidate.xml_id == table_xml_id),
+            None,
+        )
+        if parsed_table is None:
+            raise ServiceError(
+                422,
+                "保存校验失败：找不到刚刚修改的数据表",
+                code="validation_failed",
+            )
+
+        indexed_fields = {
+            str(field["xml_id"]): field
+            for field in detail["fields"]
+        }
+        parsed_fields = {field.xml_id: field for field in parsed_table.fields}
+        if set(indexed_fields) != set(parsed_fields):
+            raise ServiceError(
+                422,
+                "保存校验失败：当前表的字段集合发生了意外变化",
+                code="validation_failed",
+            )
+
+        stat = absolute_path.stat()
+        updated_pdm = connection.execute(
+            """
+            UPDATE pdm_files
+            SET source_hash = ?, file_size = ?, mtime_ns = ?,
+                model_name = ?, pd_version = ?, target_db = ?,
+                table_count = ?, field_count = ?, parsed_at = ?, parse_error = NULL
+            WHERE id = ?
+            """,
+            (
+                parsed.source_hash,
+                stat.st_size,
+                stat.st_mtime_ns,
+                parsed.model_name,
+                parsed.pd_version,
+                parsed.target_db,
+                len(parsed.tables),
+                parsed.field_count,
+                utc_now(),
+                pdm_id,
+            ),
+        )
+        if updated_pdm.rowcount != 1:
+            raise ServiceError(409, "PDM 索引已变化，请刷新后再保存", code="pdm_changed")
+
+        current_table = (
+            int(detail["ordinal"]),
+            str(detail["name"]),
+            str(detail["code"]),
+            str(detail["comment"]),
+            int(detail["field_count"]),
+        )
+        saved_table = (
+            parsed_table.ordinal,
+            parsed_table.name,
+            parsed_table.code,
+            parsed_table.comment,
+            len(parsed_table.fields),
+        )
+        if saved_table != current_table:
+            updated_table = connection.execute(
+                """
+                UPDATE model_tables
+                SET ordinal = ?, name = ?, code = ?, comment = ?, field_count = ?
+                WHERE id = ? AND pdm_id = ? AND xml_id = ?
+                """,
+                (*saved_table, table_id, pdm_id, table_xml_id),
+            )
+            if updated_table.rowcount != 1:
+                raise ServiceError(409, "数据表索引已变化，请刷新后再保存", code="table_changed")
+
+        field_updates: list[tuple[Any, ...]] = []
+        for parsed_field in parsed_table.fields:
+            indexed_field = indexed_fields[parsed_field.xml_id]
+            current_field = (
+                int(indexed_field["ordinal"]),
+                str(indexed_field["name"]),
+                str(indexed_field["code"]),
+                str(indexed_field["data_type"]),
+                str(indexed_field["length"]),
+                1 if bool(indexed_field["nullable"]) else 0,
+                str(indexed_field["default_value"]),
+                str(indexed_field["comment"]),
+                1 if bool(indexed_field["is_primary_key"]) else 0,
+            )
+            saved_field = (
+                parsed_field.ordinal,
+                parsed_field.name,
+                parsed_field.code,
+                parsed_field.data_type,
+                parsed_field.length,
+                1 if parsed_field.nullable else 0,
+                parsed_field.default_value,
+                parsed_field.comment,
+                1 if parsed_field.is_primary_key else 0,
+            )
+            if saved_field != current_field:
+                field_updates.append(
+                    (
+                        *saved_field,
+                        str(indexed_field["id"]),
+                        table_id,
+                        parsed_field.xml_id,
+                    )
+                )
+
+        if field_updates:
+            updated_fields = connection.executemany(
+                """
+                UPDATE model_fields
+                SET ordinal = ?, name = ?, code = ?, data_type = ?, length = ?,
+                    nullable = ?, default_value = ?, comment = ?, is_primary_key = ?
+                WHERE id = ? AND table_id = ? AND xml_id = ?
+                """,
+                field_updates,
+            )
+            if updated_fields.rowcount != len(field_updates):
+                raise ServiceError(409, "字段索引已变化，请刷新后再保存", code="field_changed")
+
+    def _index_parse_error(
+        self,
+        connection: sqlite3.Connection,
+        project_id: str,
+        relative_path: str,
+        absolute_path: Path,
+        error_message: str,
+    ) -> str:
+        row = connection.execute(
+            "SELECT id FROM pdm_files WHERE project_id = ? AND relative_path = ?",
+            (project_id, relative_path),
+        ).fetchone()
+        pdm_id = str(row["id"]) if row else str(uuid.uuid4())
+        stat = absolute_path.stat()
+        connection.execute(
+            """
+            INSERT INTO pdm_files(
+                id, project_id, relative_path, file_name, source_hash, file_size, mtime_ns,
+                table_count, field_count, parsed_at, parse_error
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                file_size = excluded.file_size,
+                mtime_ns = excluded.mtime_ns,
+                parsed_at = excluded.parsed_at,
+                parse_error = excluded.parse_error,
+                table_count = 0,
+                field_count = 0
+            """,
+            (
+                pdm_id,
+                project_id,
+                relative_path,
+                absolute_path.name,
+                file_sha256(absolute_path),
+                stat.st_size,
+                stat.st_mtime_ns,
+                utc_now(),
+                error_message[:2000],
+            ),
+        )
+        connection.execute("DELETE FROM model_tables WHERE pdm_id = ?", (pdm_id,))
+        return pdm_id
 
     def index_file(self, project_id: str, relative_path: str, *, force: bool = False) -> dict[str, Any]:
         project = self.get_project(project_id)
@@ -946,38 +1166,7 @@ class WorkspaceService:
         except (etree.XMLSyntaxError, OSError, ValueError) as exc:  # type: ignore[name-defined]
             error_message = str(exc)
             with self.database.transaction() as connection:
-                row = connection.execute(
-                    "SELECT id FROM pdm_files WHERE project_id = ? AND relative_path = ?",
-                    (project_id, relative),
-                ).fetchone()
-                pdm_id = str(row["id"]) if row else str(uuid.uuid4())
-                connection.execute(
-                    """
-                    INSERT INTO pdm_files(
-                        id, project_id, relative_path, file_name, source_hash, file_size, mtime_ns,
-                        table_count, field_count, parsed_at, parse_error
-                    ) VALUES(?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
-                    ON CONFLICT(id) DO UPDATE SET
-                        file_size = excluded.file_size,
-                        mtime_ns = excluded.mtime_ns,
-                        parsed_at = excluded.parsed_at,
-                        parse_error = excluded.parse_error,
-                        table_count = 0,
-                        field_count = 0
-                    """,
-                    (
-                        pdm_id,
-                        project_id,
-                        relative,
-                        absolute.name,
-                        file_sha256(absolute),
-                        stat.st_size,
-                        stat.st_mtime_ns,
-                        utc_now(),
-                        error_message[:2000],
-                    ),
-                )
-                connection.execute("DELETE FROM model_tables WHERE pdm_id = ?", (pdm_id,))
+                self._index_parse_error(connection, project_id, relative, absolute, error_message)
             return {"relative_path": relative, "status": "error", "error": error_message}
 
     def refresh_project(self, project_id: str, *, force: bool = False) -> dict[str, Any]:
@@ -1290,26 +1479,45 @@ class WorkspaceService:
                 where.append("pf.relative_path LIKE ? ESCAPE '\\'")
                 params.append(f"{_like_escape(relative)}/%")
         needle = query.strip()
+        use_fts = self.database.fts_available and len(needle) >= 3
         if needle:
-            like = f"%{_like_escape(needle)}%"
-            if mode == "field":
-                where.append(
-                    """
-                    EXISTS (
-                        SELECT 1 FROM model_fields mf
-                        WHERE mf.table_id = t.id
-                          AND (mf.code LIKE ? ESCAPE '\\' COLLATE NOCASE
-                               OR mf.name LIKE ? ESCAPE '\\' COLLATE NOCASE
-                               OR mf.comment LIKE ? ESCAPE '\\' COLLATE NOCASE)
+            if use_fts:
+                if mode == "field":
+                    where.append(
+                        """
+                        t.id IN (
+                            SELECT mf.table_id
+                            FROM model_fields_fts
+                            JOIN model_fields mf ON mf.rowid = model_fields_fts.rowid
+                            WHERE model_fields_fts MATCH ?
+                        )
+                        """
                     )
-                    """
-                )
-                params.extend([like, like, like])
+                else:
+                    where.append(
+                        "t.rowid IN (SELECT rowid FROM model_tables_fts WHERE model_tables_fts MATCH ?)"
+                    )
+                params.append(_fts_phrase(needle))
             else:
-                where.append(
-                    "(t.code LIKE ? ESCAPE '\\' COLLATE NOCASE OR t.name LIKE ? ESCAPE '\\' COLLATE NOCASE OR t.comment LIKE ? ESCAPE '\\' COLLATE NOCASE)"
-                )
-                params.extend([like, like, like])
+                like = f"%{_like_escape(needle)}%"
+                if mode == "field":
+                    where.append(
+                        """
+                        EXISTS (
+                            SELECT 1 FROM model_fields mf
+                            WHERE mf.table_id = t.id
+                              AND (mf.code LIKE ? ESCAPE '\\' COLLATE NOCASE
+                                   OR mf.name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                                   OR mf.comment LIKE ? ESCAPE '\\' COLLATE NOCASE)
+                        )
+                        """
+                    )
+                    params.extend([like, like, like])
+                else:
+                    where.append(
+                        "(t.code LIKE ? ESCAPE '\\' COLLATE NOCASE OR t.name LIKE ? ESCAPE '\\' COLLATE NOCASE OR t.comment LIKE ? ESCAPE '\\' COLLATE NOCASE)"
+                    )
+                    params.extend([like, like, like])
         clause = f"WHERE {' AND '.join(where)}" if where else ""
         base = f"""
             FROM model_tables t
@@ -1317,27 +1525,42 @@ class WorkspaceService:
             JOIN projects p ON p.id = pf.project_id
             {clause}
         """
-        with self.database.connect() as connection:
-            stats = connection.execute(
-                f"""
-                SELECT COUNT(*) AS total,
-                       COALESCE(SUM(t.field_count), 0) AS field_total,
-                       COUNT(DISTINCT pf.id) AS pdm_total
-                {base}
-                """,
-                params,
-            ).fetchone()
-            rows = connection.execute(
-                f"""
-                SELECT t.id, t.name, t.code, t.comment, t.field_count,
-                       p.id AS project_id, p.name AS project_name,
-                       pf.id AS pdm_id, pf.relative_path, pf.source_hash
-                {base}
-                ORDER BY p.name COLLATE NOCASE, pf.relative_path COLLATE NOCASE, t.ordinal
-                LIMIT ? OFFSET ?
-                """,
-                [*params, limit, offset],
-            ).fetchall()
+        try:
+            with self.database.connect() as connection:
+                stats = connection.execute(
+                    f"""
+                    SELECT COUNT(*) AS total,
+                           COALESCE(SUM(t.field_count), 0) AS field_total,
+                           COUNT(DISTINCT pf.id) AS pdm_total
+                    {base}
+                    """,
+                    params,
+                ).fetchone()
+                rows = connection.execute(
+                    f"""
+                    SELECT t.id, t.name, t.code, t.comment, t.field_count,
+                           p.id AS project_id, p.name AS project_name,
+                           pf.id AS pdm_id, pf.relative_path, pf.source_hash
+                    {base}
+                    ORDER BY p.name COLLATE NOCASE, pf.relative_path COLLATE NOCASE, t.ordinal
+                    LIMIT ? OFFSET ?
+                    """,
+                    [*params, limit, offset],
+                ).fetchall()
+        except sqlite3.OperationalError:
+            if not use_fts:
+                raise
+            self.database.fts_available = False
+            return self.search_tables(
+                project_id=project_id,
+                scope_type=scope_type,
+                scope_path=scope_path,
+                mode=mode,
+                query=query,
+                all_nodes=all_nodes,
+                limit=limit,
+                offset=offset,
+            )
         return {
             "items": [dict(row) for row in rows],
             "total": int(stats["total"]),
@@ -1542,6 +1765,7 @@ class WorkspaceService:
         table_id: str,
         expected_hash: str,
         fields: list[dict[str, Any]],
+        table: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         with self._write_lock:
             detail = self.table_detail(table_id)
@@ -1566,7 +1790,7 @@ class WorkspaceService:
                 data_type = str(field.get("data_type", "")).strip()
                 if not code or not data_type:
                     raise ServiceError(422, "字段英文名和数据类型不能为空", code="invalid_field")
-                changes[str(original["xml_id"])] = {
+                candidate = {
                     "name": str(field.get("name", "")),
                     "code": code,
                     "data_type": data_type,
@@ -1575,13 +1799,42 @@ class WorkspaceService:
                     "default_value": str(field.get("default_value", "")),
                     "comment": str(field.get("comment", "")),
                 }
+                current = {
+                    "name": str(original["name"]),
+                    "code": str(original["code"]),
+                    "data_type": str(original["data_type"]),
+                    "length": str(original["length"]),
+                    "nullable": bool(original["nullable"]),
+                    "default_value": str(original["default_value"]),
+                    "comment": str(original["comment"]),
+                }
+                if candidate != current:
+                    changes[str(original["xml_id"])] = candidate
             if set(known_fields) != {str(field.get("id", "")) for field in fields}:
                 raise ServiceError(422, "保存时必须提交当前表的全部字段", code="incomplete_fields")
 
-            backup = self._backup_existing(project, path, "字段编辑")
+            table_changes: dict[str, dict[str, object]] = {}
+            if table is not None:
+                candidate_table = {
+                    "name": str(table.get("name", "")).strip(),
+                    "code": str(table.get("code", "")).strip(),
+                    "comment": str(table.get("comment", "")),
+                }
+                current_table = {
+                    "name": str(detail["name"]),
+                    "code": str(detail["code"]),
+                    "comment": str(detail["comment"]),
+                }
+                if candidate_table != current_table:
+                    table_changes[str(detail["xml_id"])] = candidate_table
+
+            if not table_changes and not changes:
+                return detail
+
+            backup = self._backup_existing(project, path, "字典编辑")
             temp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
             try:
-                update_pdm_fields(path, temp, changes)
+                update_pdm_dictionary(path, temp, table_changes, changes)
                 parsed = parse_pdm(temp)
                 with self.database.connect() as connection:
                     pdm_row = connection.execute("SELECT * FROM pdm_files WHERE id = ?", (detail["pdm_id"],)).fetchone()
@@ -1592,13 +1845,11 @@ class WorkspaceService:
                 os.replace(temp, path)
                 after_hash = parsed.source_hash
                 with self.database.transaction() as connection:
-                    self._index_parsed(
+                    self._update_saved_table_index(
                         connection,
-                        str(detail["project_id"]),
-                        str(detail["relative_path"]),
+                        detail,
                         path,
                         parsed,
-                        pdm_id=str(detail["pdm_id"]),
                     )
                     connection.execute(
                         """
