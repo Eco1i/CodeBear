@@ -347,3 +347,70 @@ def test_backup_can_restore_dictionary_items_and_bindings(tmp_path: Path) -> Non
     )["items"][0]
     bindings = target_dictionaries.field_bindings(str(target_table["id"]))
     assert bindings[0]["dictionary_name"] == "O32 业务标志"
+
+
+def test_backup_payload_import_preserves_case_sensitive_codes(tmp_path: Path) -> None:
+    _, dictionaries = make_services(tmp_path)
+    restored = dictionaries.import_backup_payload(
+        {
+            "version": 1,
+            "dictionaries": [
+                {
+                    "key": "dict-case",
+                    "name": "大小写字典",
+                    "description": "",
+                    "source_type": "manual",
+                    "items": [
+                        {"code": "B|1", "name": "回售", "description": ""},
+                        {"code": "b|1", "name": "预受要约撤销", "description": ""},
+                    ],
+                }
+            ],
+            "bindings": [],
+        },
+        {},
+    )
+    assert restored == {"dictionary_count": 1, "item_count": 2, "binding_count": 0}
+    created = [d for d in dictionaries.list_dictionaries() if d["name"] == "大小写字典"]
+    assert len(created) == 1
+    items = dictionaries.list_items(str(created[0]["id"]))["items"]
+    assert [item["code"] for item in items] == ["B|1", "b|1"]
+
+
+def test_backup_payload_import_rejects_empty_or_duplicate_codes(tmp_path: Path) -> None:
+    _, dictionaries = make_services(tmp_path)
+    with pytest.raises(ServiceError) as exc_info:
+        dictionaries.import_backup_payload(
+            {
+                "version": 1,
+                "dictionaries": [
+                    {
+                        "key": "dict-empty",
+                        "name": "空值字典",
+                        "items": [{"code": "", "name": "缺码", "description": ""}],
+                    }
+                ],
+                "bindings": [],
+            },
+            {},
+        )
+    assert exc_info.value.code == "invalid_backup"
+    with pytest.raises(ServiceError) as exc_info:
+        dictionaries.import_backup_payload(
+            {
+                "version": 1,
+                "dictionaries": [
+                    {
+                        "key": "dict-dup",
+                        "name": "重复字典",
+                        "items": [
+                            {"code": "B|1", "name": "回售", "description": ""},
+                            {"code": "B|1", "name": "回售", "description": ""},
+                        ],
+                    }
+                ],
+                "bindings": [],
+            },
+            {},
+        )
+    assert exc_info.value.code == "invalid_backup"

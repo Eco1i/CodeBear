@@ -640,9 +640,9 @@ class DictionaryService:
                     if not isinstance(item, dict):
                         raise ServiceError(422, "字典备份内容格式无效", code="invalid_backup")
                     code = _clean_text(item.get("code"))[:500]
-                    if not code or code.casefold() in seen:
+                    if not code or code in seen:
                         raise ServiceError(422, "字典备份包含空值或重复值", code="invalid_backup")
-                    seen.add(code.casefold())
+                    seen.add(code)
                     normalized_items.append(
                         (code, _clean_text(item.get("name"))[:1000], _clean_text(item.get("description"))[:2000], ordinal)
                     )
