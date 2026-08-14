@@ -75,6 +75,41 @@ CREATE INDEX IF NOT EXISTS idx_fields_table ON model_fields(table_id, ordinal);
 CREATE INDEX IF NOT EXISTS idx_fields_code ON model_fields(code);
 CREATE INDEX IF NOT EXISTS idx_fields_name ON model_fields(name);
 
+CREATE TABLE IF NOT EXISTS dictionaries (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    description TEXT NOT NULL DEFAULT '',
+    source_type TEXT NOT NULL DEFAULT 'manual' CHECK(source_type IN ('manual', 'excel')),
+    source_name TEXT NOT NULL DEFAULT '',
+    source_sheet TEXT NOT NULL DEFAULT '',
+    code_column TEXT NOT NULL DEFAULT '',
+    name_column TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS dictionary_items (
+    id TEXT PRIMARY KEY,
+    dictionary_id TEXT NOT NULL REFERENCES dictionaries(id) ON DELETE CASCADE,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    ordinal INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(dictionary_id, code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dictionary_items_dictionary
+ON dictionary_items(dictionary_id, ordinal, code);
+
+CREATE TABLE IF NOT EXISTS dictionary_field_bindings (
+    field_id TEXT PRIMARY KEY REFERENCES model_fields(id) ON DELETE CASCADE,
+    dictionary_id TEXT NOT NULL REFERENCES dictionaries(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_dictionary_bindings_dictionary
+ON dictionary_field_bindings(dictionary_id, field_id);
+
 CREATE TABLE IF NOT EXISTS trash (
     id TEXT PRIMARY KEY,
     original_project_id TEXT,

@@ -141,8 +141,8 @@
 .navigator-tree .navigator-tree-node-selected > .ant-tree-node-content-wrapper,
 .navigator-tree .navigator-tree-node-selected > .ant-tree-node-content-wrapper:hover {
   border-color: #c8ddf9;
-  background: var(--blue-soft);
-  color: #315d99;
+  background: var(--blue-soft) !important;
+  color: #315d99 !important;
 }
 
 .navigator-tree .navigator-tree-node-selected > .ant-tree-switcher {

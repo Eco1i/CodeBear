@@ -7,8 +7,15 @@ import type {
 } from "./types";
 
 export const backupApi = {
-  export: async (nodes: BackupExportNode[]): Promise<{ blob: Blob; fileName: string }> => {
-    const response = await requireOk(await fetch("/api/backups/export", json("POST", { nodes })));
+  export: async (
+    nodes: BackupExportNode[],
+    options: { includeDictionaries: boolean; includeDictionaryBindings: boolean },
+  ): Promise<{ blob: Blob; fileName: string }> => {
+    const response = await requireOk(await fetch("/api/backups/export", json("POST", {
+      nodes,
+      include_dictionaries: options.includeDictionaries,
+      include_dictionary_bindings: options.includeDictionaryBindings,
+    })));
     return {
       blob: await response.blob(),
       fileName: response.headers.get("X-CodeBear-Filename") || "CodeBear-Backup.cbbak",

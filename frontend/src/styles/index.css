@@ -10,4 +10,5 @@
 @import "./base/scrollbars.css";
 @import "./responsive.css";
 @import "./ddl/index.css";
+@import "./dictionaries/index.css";
 @import "./shell/feature-loading.css";

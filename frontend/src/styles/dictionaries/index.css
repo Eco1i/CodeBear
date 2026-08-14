@@ -1,0 +1,551 @@
+.dictionary-center-modal {
+  --dictionary-body-font-size: 12px;
+  --dictionary-secondary-font-size: 11px;
+  max-width: calc(100vw - 32px);
+  padding-bottom: 0;
+}
+
+.dictionary-center-modal .ant-btn,
+.dictionary-manage-modal .ant-btn,
+.dictionary-import-modal .ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--dictionary-body-font-size, 12px);
+  white-space: nowrap;
+}
+
+.dictionary-center-modal .ant-btn > span,
+.dictionary-manage-modal .ant-btn > span,
+.dictionary-import-modal .ant-btn > span {
+  white-space: nowrap;
+}
+
+.dictionary-center-modal input.ant-input,
+.dictionary-center-modal input.ant-input::placeholder,
+.dictionary-manage-modal input.ant-input,
+.dictionary-manage-modal input.ant-input::placeholder,
+.dictionary-import-modal input.ant-input,
+.dictionary-import-modal input.ant-input::placeholder {
+  font-size: 12px;
+}
+
+.dictionary-center-modal .ant-modal-container {
+  height: min(780px, calc(100vh - 32px));
+  min-height: min(680px, calc(100vh - 32px));
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #d9e4f1;
+  border-radius: 11px;
+  box-shadow: 0 24px 68px rgba(25, 45, 72, 0.26);
+}
+
+.dictionary-center-modal .ant-modal-header {
+  height: 68px;
+  min-height: 68px;
+  margin: 0;
+  padding: 0 64px 0 20px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #dfe8f3;
+}
+
+.dictionary-center-modal .ant-modal-close {
+  top: 14px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  color: #71839c;
+  background: #f4f7fb;
+}
+
+.dictionary-center-modal .ant-modal-body {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.dictionary-center-modal .ant-modal-footer {
+  height: 62px;
+  min-height: 62px;
+  margin: 0;
+  padding: 14px 18px;
+  border-top: 1px solid #dfe8f3;
+}
+
+.dictionary-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.dictionary-title-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #bfe9df;
+  border-radius: 9px;
+  color: #159d84;
+  background: #eaf9f5;
+  font-size: 18px;
+}
+
+.dictionary-modal-title > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dictionary-modal-title b {
+  color: #203550;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.dictionary-modal-title small {
+  color: #8494aa;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.dictionary-center-layout,
+.dictionary-binding-layout {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  overflow: hidden;
+}
+
+.dictionary-center-layout {
+  grid-template-columns: 305px minmax(0, 1fr);
+}
+
+.dictionary-list-pane,
+.dictionary-scope-pane {
+  min-width: 0;
+  min-height: 0;
+  padding: 14px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #e0e8f2;
+  background: #fbfdff;
+}
+
+.dictionary-pane-heading {
+  height: 38px;
+  min-height: 38px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.dictionary-pane-heading > span,
+.dictionary-manage-toolbar > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dictionary-pane-heading b,
+.dictionary-manage-toolbar b {
+  color: #243955;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dictionary-pane-heading small,
+.dictionary-manage-toolbar small {
+  color: #8a9aae;
+  font-size: 11px;
+}
+
+.dictionary-list-pane > .ant-input-affix-wrapper {
+  height: 34px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.dictionary-list-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.dictionary-list-item {
+  width: 100%;
+  height: 34px;
+  min-height: 34px;
+  margin: 0 0 4px;
+  padding: 0 9px 0 7px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dictionary-list-item:hover {
+  background: #f1f7ff;
+}
+
+.dictionary-list-item.is-selected {
+  border-color: #c6ece3;
+  background: #eaf9f5;
+  box-shadow: inset 3px 0 #18aa8e;
+}
+
+.dictionary-list-icon {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d6e5f4;
+  border-radius: 5px;
+  color: #5483ba;
+  background: #fff;
+  font-size: 12px;
+}
+
+.dictionary-list-item.is-selected .dictionary-list-icon {
+  border-color: #bfe8dd;
+  color: #159d84;
+}
+
+.dictionary-list-label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.dictionary-list-label b {
+  overflow: hidden;
+  color: #263b57;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dictionary-list-item strong {
+  color: #7e91a9;
+  font-size: 10px;
+}
+
+.dictionary-list-actions {
+  height: 43px;
+  min-height: 43px;
+  padding-top: 9px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  border-top: 1px solid #e6edf5;
+}
+
+.dictionary-list-actions .ant-btn {
+  height: 33px;
+  font-size: 12px;
+}
+
+.dictionary-detail-pane,
+.dictionary-candidate-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+}
+
+.dictionary-detail-header {
+  height: 67px;
+  min-height: 67px;
+  padding: 13px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid #e2eaf3;
+}
+
+.dictionary-detail-header > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dictionary-detail-header > span b {
+  overflow: hidden;
+  color: #203550;
+  font-size: 15px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dictionary-detail-header > span small {
+  overflow: hidden;
+  color: #8696aa;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dictionary-detail-header > div {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 7px;
+}
+
+.dictionary-detail-header .ant-btn {
+  height: 32px;
+  padding-inline: 10px;
+  font-size: 12px;
+}
+
+.dictionary-metrics {
+  height: 70px;
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 1px solid #e2eaf3;
+  background: #fbfdff;
+}
+
+.dictionary-metrics > span {
+  min-width: 0;
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-right: 1px solid #e7edf5;
+}
+
+.dictionary-metrics > span:last-child { border-right: 0; }
+.dictionary-metrics small { color: #8a9aae; font-size: 11px; }
+.dictionary-metrics b { overflow: hidden; color: #314965; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+.dictionary-detail-tabs {
+  height: 54px;
+  min-height: 54px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  border-bottom: 1px solid #e2eaf3;
+}
+
+.dictionary-detail-tabs .ant-tabs { height: 54px; }
+.dictionary-detail-tabs .ant-tabs-nav { height: 54px; margin: 0; }
+.dictionary-detail-tabs .ant-tabs-tab { padding: 15px 2px 12px; font-size: 12px; font-weight: 700; }
+.dictionary-detail-tabs > .ant-input-affix-wrapper { width: 260px; height: 32px; font-size: 12px; }
+
+.dictionary-detail-table {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.dictionary-detail-table .ant-table-body,
+.dictionary-candidate-pane > .ant-table-wrapper .ant-table-body {
+  height: 390px;
+}
+
+.dictionary-center-modal .ant-table,
+.dictionary-manage-modal .ant-table {
+  color: #566a85;
+  font-size: 12px;
+}
+
+.dictionary-center-modal .ant-table-wrapper,
+.dictionary-center-modal .ant-table,
+.dictionary-center-modal .ant-table-container,
+.dictionary-manage-modal .ant-table-wrapper,
+.dictionary-manage-modal .ant-table,
+.dictionary-manage-modal .ant-table-container {
+  border-radius: 0;
+}
+
+.dictionary-center-modal .ant-table-thead > tr > th,
+.dictionary-manage-modal .ant-table-thead > tr > th {
+  height: 40px;
+  padding: 8px 11px;
+  color: #526985;
+  background: #f1f6fc;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dictionary-center-modal .ant-table-tbody > tr > td,
+.dictionary-manage-modal .ant-table-tbody > tr > td {
+  height: 42px;
+  padding: 8px 11px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.dictionary-center-modal .ant-table-cell code {
+  color: #365f93;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.dictionary-centered {
+  min-height: 120px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #8797aa;
+  font-size: 12px;
+}
+
+.dictionary-binding-layout {
+  grid-template-columns: 315px minmax(0, 1fr);
+}
+
+.dictionary-binding-target {
+  height: 58px;
+  min-height: 58px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #c9ece3;
+  border-radius: 8px;
+  color: #159d84;
+  background: #eaf9f5;
+  font-size: 17px;
+}
+
+.dictionary-binding-target > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dictionary-binding-target small { color: #8395a9; font-size: 11px; }
+.dictionary-binding-target b { overflow: hidden; color: #263d58; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+.dictionary-scope-tree {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  border: 1px solid #e2eaf3;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.dictionary-current-scope {
+  height: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #e2eaf3;
+  color: #3e83df;
+}
+
+.dictionary-current-scope small { color: #8999ad; font-size: 11px; }
+.dictionary-current-scope b { overflow: hidden; color: #304763; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+.dictionary-candidate-search {
+  height: 62px;
+  min-height: 62px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid #e2eaf3;
+}
+
+.dictionary-candidate-search .ant-input-affix-wrapper { min-width: 0; height: 36px; flex: 1; font-size: 12px; }
+
+.dictionary-candidate-summary {
+  height: 43px;
+  min-height: 43px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2eaf3;
+}
+
+.dictionary-candidate-summary > span { display: flex; align-items: baseline; gap: 8px; }
+.dictionary-candidate-summary b { color: #2d435f; font-size: 12px; }
+.dictionary-candidate-summary small { color: #8b9bad; font-size: 11px; }
+.dictionary-candidate-summary strong { color: #159d84; font-size: 12px; }
+
+.dictionary-manage-modal .ant-modal-container,
+.dictionary-import-modal .ant-modal-container {
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #d9e4f1;
+  border-radius: 10px;
+}
+
+.dictionary-manage-modal .ant-modal-header,
+.dictionary-import-modal .ant-modal-header { margin: 0; padding: 15px 18px; border-bottom: 1px solid #e2eaf3; }
+.dictionary-manage-modal .ant-modal-body { height: min(550px, calc(100vh - 190px)); padding: 14px 16px; overflow: hidden; display: flex; flex-direction: column; }
+.dictionary-import-modal .ant-modal-body { height: min(520px, calc(100vh - 190px)); padding: 15px 18px; overflow: auto; scrollbar-gutter: stable; }
+.dictionary-manage-modal .ant-modal-footer,
+.dictionary-import-modal .ant-modal-footer { margin: 0; padding: 12px 16px; border-top: 1px solid #e2eaf3; }
+
+.dictionary-submodal-title { display: inline-flex; align-items: center; gap: 8px; color: #243955; font-size: 14px; font-weight: 800; }
+.dictionary-submodal-title .anticon { color: #159d84; }
+
+.dictionary-manage-meta { display: grid; grid-template-columns: 1fr 1.5fr; gap: 12px; }
+.dictionary-manage-meta label { display: flex; flex-direction: column; gap: 5px; color: #5e718b; font-size: 11px; font-weight: 700; }
+.dictionary-manage-meta .ant-input { height: 32px; font-size: 12px; }
+.dictionary-manage-toolbar { height: 55px; min-height: 55px; display: flex; align-items: center; justify-content: space-between; }
+.dictionary-manage-toolbar .ant-btn { height: 30px; font-size: 12px; }
+.dictionary-manage-modal .ant-table-wrapper { min-height: 0; flex: 1; }
+.dictionary-manage-modal .ant-table-tbody .ant-input { height: 30px; font-size: 12px; }
+.dictionary-manage-modal .ant-table-body { height: 350px; }
+
+.dictionary-center-modal .ant-pagination,
+.dictionary-manage-modal .ant-pagination {
+  margin: 10px 12px !important;
+  font-size: 11px;
+}
+
+.dictionary-import-modal .ant-upload-wrapper .ant-upload-drag { padding: 14px 10px; border-color: #cedbeb; background: #f8fbff; }
+.dictionary-import-modal .ant-upload-drag-icon { margin-bottom: 6px !important; }
+.dictionary-import-modal .ant-upload-drag-icon .anticon { color: #20a78d !important; font-size: 28px !important; }
+.dictionary-import-modal .ant-upload-text { color: #304661 !important; font-size: 12px !important; font-weight: 700; }
+.dictionary-import-modal .ant-upload-hint { color: #8a9aaf !important; font-size: 11px !important; }
+.dictionary-import-modal .ant-upload-list,
+.dictionary-import-modal .ant-upload-list-item,
+.dictionary-import-modal .ant-upload-list-item-name { font-size: 11px; }
+.dictionary-import-body { min-height: 250px; padding-top: 14px; }
+.dictionary-import-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; }
+.dictionary-import-grid .ant-form-item { margin-bottom: 12px; }
+.dictionary-import-grid .ant-form-item-label { padding-bottom: 4px; }
+.dictionary-import-grid .ant-form-item-label > label { color: #5d718c; font-size: 11px; font-weight: 700; }
+.dictionary-import-modal .ant-form-item-explain-error { font-size: 11px; }
+.dictionary-import-grid .ant-input,
+.dictionary-import-grid .ant-select-content,
+.dictionary-import-grid .ant-select-input { font-size: 12px !important; }
+.dictionary-excel-preview { min-height: 42px; padding: 8px 10px; display: flex; align-items: center; gap: 6px; overflow: hidden; border: 1px solid #e1e9f3; border-radius: 7px; background: #fbfdff; }
+.dictionary-excel-preview > span:not(.ant-tag) { padding: 4px 7px; border-radius: 5px; color: #58708e; background: #eef4fb; font-size: 11px; white-space: nowrap; }
+.dictionary-import-placeholder { height: 250px; display: grid; place-items: center; color: #91a0b2; font-size: 11px; }
+
+@media (max-width: 900px) {
+  .dictionary-center-layout,
+  .dictionary-binding-layout { grid-template-columns: 260px minmax(0, 1fr); }
+  .dictionary-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); height: 104px; min-height: 104px; }
+}

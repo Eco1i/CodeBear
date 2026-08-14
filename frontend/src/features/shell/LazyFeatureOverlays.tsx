@@ -22,6 +22,9 @@ const BackupMigrationModal = lazy(() =>
 const DdlExportModal = lazy(() =>
   import("../../components/DdlExportModal").then((module) => ({ default: module.DdlExportModal })),
 );
+const DictionaryCenterModal = lazy(() =>
+  import("../../components/DictionaryCenterModal").then((module) => ({ default: module.DictionaryCenterModal })),
+);
 
 interface LazyFeatureOverlaysProps {
   trees: WorkspaceNode[];
@@ -33,6 +36,8 @@ interface LazyFeatureOverlaysProps {
   backupOpen: boolean;
   ddlLoaded: boolean;
   ddlOpen: boolean;
+  dictionaryLoaded: boolean;
+  dictionaryOpen: boolean;
   aiLoaded: boolean;
   aiOpen: boolean;
   aiMode: AiLayoutMode;
@@ -41,6 +46,8 @@ interface LazyFeatureOverlaysProps {
   onCloseBackup: () => void;
   onBackupImported: (result: BackupImportResult) => void | Promise<void>;
   onCloseDdl: () => void;
+  onCloseDictionary: () => void;
+  onDictionaryBindingsChanged: () => void;
   onRequestContextChange: (action: () => void) => void;
   onOpenAi: () => void;
   onAiOpenChange: (open: boolean) => void;
@@ -73,6 +80,18 @@ export function LazyFeatureOverlays(props: LazyFeatureOverlaysProps) {
             selectedNode={props.selectedNode}
             hasUnsavedChanges={props.hasUnsavedChanges}
             onClose={props.onCloseDdl}
+          />
+        </Suspense>
+      ) : null}
+
+      {props.dictionaryLoaded ? (
+        <Suspense fallback={<div className="feature-loading" role="status"><Spin size="small" /> 正在打开字典中心…</div>}>
+          <DictionaryCenterModal
+            open={props.dictionaryOpen}
+            trees={props.trees}
+            selectedNode={props.selectedNode}
+            onClose={props.onCloseDictionary}
+            onBindingsChanged={props.onDictionaryBindingsChanged}
           />
         </Suspense>
       ) : null}

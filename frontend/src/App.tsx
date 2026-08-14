@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { App as AntApp, Button, Tag } from "antd";
 import {
+  BookOutlined,
   CodeOutlined,
   DeleteOutlined,
   SafetyCertificateOutlined,
@@ -90,6 +91,9 @@ export default function App() {
   const [backupFeatureLoaded, setBackupFeatureLoaded] = useState(false);
   const [ddlExportOpen, setDdlExportOpen] = useState(false);
   const [ddlFeatureLoaded, setDdlFeatureLoaded] = useState(false);
+  const [dictionaryOpen, setDictionaryOpen] = useState(false);
+  const [dictionaryFeatureLoaded, setDictionaryFeatureLoaded] = useState(false);
+  const [dictionaryBindingRevision, setDictionaryBindingRevision] = useState(0);
   const {
     open: aiAssistantOpen,
     loaded: aiFeatureLoaded,
@@ -821,6 +825,15 @@ export default function App() {
           >
             导出 SQL
           </Button>
+          <Button
+            icon={<BookOutlined />}
+            onClick={() => {
+              setDictionaryFeatureLoaded(true);
+              setDictionaryOpen(true);
+            }}
+          >
+            字典中心
+          </Button>
         </div>
       </header>
       <div className="app-body">
@@ -902,6 +915,7 @@ export default function App() {
               highlightQuery={searchMode === "field" ? searchQuery : ""}
               onSave={saveDictionary}
               onDirtyChange={handleDirtyChange}
+              bindingRevision={dictionaryBindingRevision}
             />
           </div>
         </main>
@@ -944,6 +958,8 @@ export default function App() {
         backupOpen={backupOpen}
         ddlLoaded={ddlFeatureLoaded}
         ddlOpen={ddlExportOpen}
+        dictionaryLoaded={dictionaryFeatureLoaded}
+        dictionaryOpen={dictionaryOpen}
         aiLoaded={aiFeatureLoaded}
         aiOpen={aiAssistantOpen}
         aiMode={aiLayoutMode}
@@ -952,6 +968,8 @@ export default function App() {
         onCloseBackup={() => setBackupOpen(false)}
         onBackupImported={handleBackupImported}
         onCloseDdl={() => setDdlExportOpen(false)}
+        onCloseDictionary={() => setDictionaryOpen(false)}
+        onDictionaryBindingsChanged={() => setDictionaryBindingRevision((current) => current + 1)}
         onRequestContextChange={requestContextChange}
         onOpenAi={openAiAssistant}
         onAiOpenChange={changeAiAssistantOpen}

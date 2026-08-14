@@ -30,6 +30,8 @@ export interface BackupStats {
   folder_count: number;
   pdm_count: number;
   total_bytes: number;
+  dictionary_count?: number;
+  binding_count?: number;
 }
 
 export interface BackupInspection {
@@ -50,4 +52,9 @@ export interface BackupImportResult {
   skipped: Array<{ project: string; relative_path: string }>;
   renamed: Array<{ project: string; source_path: string; relative_path: string }>;
   parse_errors: Array<{ relative_path: string; status: "error"; error: string }>;
+  dictionary_import?: {
+    dictionary_count: number;
+    item_count: number;
+    binding_count: number;
+  };
 }

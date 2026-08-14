@@ -5,5 +5,6 @@
 export * from "./features/ai/types";
 export * from "./features/backup/types";
 export * from "./features/ddl/types";
+export * from "./features/dictionaries/types";
 export * from "./features/tables/types";
 export * from "./features/workspace/types";

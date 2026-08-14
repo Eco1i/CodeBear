@@ -298,6 +298,53 @@
   color: #20ae91;
 }
 
+.backup-dictionary-options {
+  margin-top: 14px;
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border: 1px solid #dce6f1;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.backup-dictionary-options .ant-checkbox-wrapper {
+  color: #596d87;
+  font-size: 9px;
+}
+
+.backup-dictionary-receipt {
+  min-height: 48px;
+  margin: -4px 0 12px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #cce9e1;
+  border-radius: 7px;
+  color: #17a187;
+  background: #effaf7;
+  font-size: 15px;
+}
+
+.backup-dictionary-receipt > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.backup-dictionary-receipt b {
+  color: #31506c;
+  font-size: 10px;
+}
+
+.backup-dictionary-receipt small {
+  color: #7e91a7;
+  font-size: 8px;
+}
+
 .backup-summary-pane .ant-alert {
   margin-top: auto;
   padding: 8px 10px;

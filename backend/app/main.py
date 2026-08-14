@@ -15,9 +15,10 @@ from starlette.background import BackgroundTask
 
 from .ai import AiService
 from .ai_history import AiConversationService
-from .backup import MAX_ARCHIVE_BYTES
+from .backup import MAX_ARCHIVE_BYTES, extract_dictionary_payload
 from .config import APP_NAME, APP_VERSION, AppPaths, SettingsStore, bundled_resource
 from .database import Database
+from .dictionaries import DictionaryService, MAX_EXCEL_BYTES
 from .security import LocalRequestGuardMiddleware
 from .service import ServiceError, WorkspaceService
 
@@ -31,6 +32,7 @@ paths = AppPaths.create()
 settings_store = SettingsStore(paths)
 database = Database(paths.database)
 service = WorkspaceService(database, settings_store)
+dictionary_service = DictionaryService(database)
 ai_service = AiService(database, settings_store)
 ai_conversation_service = AiConversationService(database)
 
@@ -153,6 +155,8 @@ class BackupExportNode(BaseModel):
 
 class BackupExportPayload(BaseModel):
     nodes: list[BackupExportNode] = Field(min_length=1, max_length=50_000)
+    include_dictionaries: bool = False
+    include_dictionary_bindings: bool = False
 
 
 class BackupImportNode(BaseModel):
@@ -165,6 +169,29 @@ class BackupImportPayload(BaseModel):
     token: str = Field(min_length=1, max_length=100)
     nodes: list[BackupImportNode] = Field(min_length=1, max_length=50_000)
     conflict_policy: Literal["skip", "rename", "overwrite"] = "rename"
+
+
+class DictionaryCreatePayload(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    description: str = Field(default="", max_length=1000)
+
+
+class DictionaryItemPayload(BaseModel):
+    code: str = Field(min_length=1, max_length=500)
+    name: str = Field(default="", max_length=1000)
+    description: str = Field(default="", max_length=2000)
+
+
+class DictionaryItemsPayload(BaseModel):
+    items: list[DictionaryItemPayload] = Field(max_length=100_000)
+
+
+class DictionaryBindingPayload(BaseModel):
+    field_ids: list[str] = Field(min_length=1, max_length=5_000)
+
+
+class DictionaryUnbindPayload(BaseModel):
+    field_ids: list[str] = Field(default_factory=list, max_length=5_000)
 
 
 class LegacyDataPayload(BaseModel):
@@ -418,7 +445,16 @@ def import_pdm_files(
 
 @app.post("/api/backups/export")
 def export_backup(payload: BackupExportPayload) -> FileResponse:
-    archive_path, file_name = service.export_backup([node.model_dump() for node in payload.nodes])
+    selections = [node.model_dump() for node in payload.nodes]
+    dictionary_payload = dictionary_service.export_backup_payload(
+        selections,
+        include_dictionaries=payload.include_dictionaries,
+        include_bindings=payload.include_dictionary_bindings,
+    )
+    archive_path, file_name = service.export_backup(
+        selections,
+        dictionary_payload=dictionary_payload,
+    )
     return FileResponse(
         archive_path,
         media_type="application/octet-stream",
@@ -462,11 +498,20 @@ def inspect_legacy_data(payload: LegacyDataPayload) -> dict:
 
 @app.post("/api/backups/import")
 def import_backup(payload: BackupImportPayload) -> dict:
-    return service.import_backup(
+    archive_path = service._staged_backup_path(payload.token)
+    dictionary_payload = extract_dictionary_payload(archive_path)
+    result = service.import_backup(
         payload.token,
         [node.model_dump() for node in payload.nodes],
         payload.conflict_policy,
     )
+    project_mapping = result.pop("project_mapping", {})
+    if dictionary_payload is not None:
+        result["dictionary_import"] = dictionary_service.import_backup_payload(
+            dictionary_payload,
+            project_mapping,
+        )
+    return result
 
 
 @app.delete("/api/backups/{token}")
@@ -521,6 +566,139 @@ def search_tables(
         limit=limit,
         offset=offset,
     )
+
+
+def _prepare_dictionary_excel(file: UploadFile) -> None:
+    file.file.seek(0, 2)
+    size = file.file.tell()
+    file.file.seek(0)
+    if size > MAX_EXCEL_BYTES:
+        raise ServiceError(413, "Excel 文件不能超过 50 MB", code="dictionary_excel_too_large")
+
+
+@app.get("/api/dictionaries")
+def list_dictionaries(q: str = Query(default="", max_length=200)) -> list[dict]:
+    return dictionary_service.list_dictionaries(q)
+
+
+@app.post("/api/dictionaries", status_code=201)
+def create_dictionary(payload: DictionaryCreatePayload) -> dict:
+    return dictionary_service.create_dictionary(payload.name, payload.description)
+
+
+@app.post("/api/dictionaries/excel/inspect")
+def inspect_dictionary_excel(file: Annotated[UploadFile, File()]) -> dict:
+    try:
+        _prepare_dictionary_excel(file)
+        return dictionary_service.inspect_excel(file.file, file.filename or "dictionary.xlsx")
+    finally:
+        file.file.close()
+
+
+@app.post("/api/dictionaries/excel/import")
+def import_dictionary_excel(
+    file: Annotated[UploadFile, File()],
+    name: Annotated[str, Form(min_length=1, max_length=160)],
+    sheet_name: Annotated[str, Form(min_length=1, max_length=160)],
+    name_column: Annotated[str, Form(min_length=1, max_length=500)],
+    description: Annotated[str, Form(max_length=1000)] = "",
+    description_column: Annotated[str, Form(max_length=500)] = "",
+    dictionary_id: Annotated[str, Form(max_length=100)] = "",
+    code_columns: Annotated[list[str], Form(max_length=500)] = [],
+) -> dict:
+    try:
+        _prepare_dictionary_excel(file)
+        return dictionary_service.import_excel(
+            file.file,
+            file.filename or "dictionary.xlsx",
+            name=name,
+            description=description,
+            sheet_name=sheet_name,
+            code_columns=code_columns,
+            name_column=name_column,
+            description_column=description_column,
+            dictionary_id=dictionary_id or None,
+        )
+    finally:
+        file.file.close()
+
+
+@app.get("/api/dictionaries/field-bindings")
+def dictionary_field_bindings(table_id: str = Query(min_length=1, max_length=100)) -> list[dict]:
+    return dictionary_service.field_bindings(table_id)
+
+
+@app.get("/api/dictionaries/field-candidates")
+def dictionary_field_candidates(
+    dictionary_id: str = Query(min_length=1, max_length=100),
+    project_id: str = Query(min_length=1, max_length=100),
+    scope_type: Literal["project", "folder", "pdm"] = "project",
+    scope_path: str = Query(default="", max_length=1000),
+    q: str = Query(default="", max_length=200),
+    mode: Literal["bind", "unbind"] = "bind",
+    limit: int = Query(default=5_000, ge=1, le=5_000),
+) -> dict:
+    return dictionary_service.field_candidates(
+        dictionary_id,
+        project_id=project_id,
+        scope_type=scope_type,
+        scope_path=scope_path,
+        query=q,
+        mode=mode,
+        limit=limit,
+    )
+
+
+@app.get("/api/dictionaries/{dictionary_id}")
+def dictionary_detail(dictionary_id: str) -> dict:
+    return dictionary_service.dictionary_detail(dictionary_id)
+
+
+@app.put("/api/dictionaries/{dictionary_id}")
+def update_dictionary(dictionary_id: str, payload: DictionaryCreatePayload) -> dict:
+    return dictionary_service.update_dictionary(dictionary_id, payload.name, payload.description)
+
+
+@app.delete("/api/dictionaries/{dictionary_id}")
+def delete_dictionary(dictionary_id: str) -> dict[str, bool]:
+    dictionary_service.delete_dictionary(dictionary_id)
+    return {"deleted": True}
+
+
+@app.get("/api/dictionaries/{dictionary_id}/items")
+def list_dictionary_items(
+    dictionary_id: str,
+    q: str = Query(default="", max_length=500),
+    limit: int = Query(default=5_000, ge=1, le=5_000),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    return dictionary_service.list_items(dictionary_id, q, limit=limit, offset=offset)
+
+
+@app.put("/api/dictionaries/{dictionary_id}/items")
+def replace_dictionary_items(dictionary_id: str, payload: DictionaryItemsPayload) -> dict:
+    return dictionary_service.replace_items(
+        dictionary_id,
+        [item.model_dump() for item in payload.items],
+    )
+
+
+@app.get("/api/dictionaries/{dictionary_id}/bindings")
+def list_dictionary_bindings(
+    dictionary_id: str,
+    q: str = Query(default="", max_length=200),
+) -> list[dict]:
+    return dictionary_service.bound_fields(dictionary_id, q)
+
+
+@app.post("/api/dictionaries/{dictionary_id}/bindings")
+def bind_dictionary_fields(dictionary_id: str, payload: DictionaryBindingPayload) -> dict[str, int]:
+    return {"count": dictionary_service.bind_fields(dictionary_id, payload.field_ids)}
+
+
+@app.post("/api/dictionaries/{dictionary_id}/unbind")
+def unbind_dictionary_fields(dictionary_id: str, payload: DictionaryUnbindPayload) -> dict[str, int]:
+    return {"count": dictionary_service.unbind_fields(dictionary_id, payload.field_ids or None)}
 
 
 @app.get("/api/ddl/options")

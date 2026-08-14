@@ -6,9 +6,12 @@ import {
   InfoCircleOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Button, Checkbox, Empty, Input, Spin, Tooltip } from "antd";
+import { Button, Checkbox, Drawer, Empty, Input, Spin, Table, Tag, Tooltip } from "antd";
 import type { InputRef } from "antd";
+import type { ColumnsType } from "antd/es/table";
 import type { FieldDefinition, TableDetail, TableMetadataUpdate } from "../types";
+import { dictionariesApi } from "../features/dictionaries/api";
+import type { DictionaryFieldBinding, DictionaryItem } from "../features/dictionaries/types";
 import { useGridScrollbarGutter } from "../useGridScrollbarGutter";
 import { FullTextPopover } from "./FullTextPopover";
 import { HighlightedText } from "./HighlightedText";
@@ -21,6 +24,7 @@ interface FieldPanelProps {
   highlightQuery: string;
   onSave: (table: TableMetadataUpdate, fields: FieldDefinition[]) => Promise<void>;
   onDirtyChange: (dirty: boolean) => void;
+  bindingRevision?: number;
 }
 
 const cloneFields = (fields: FieldDefinition[]): FieldDefinition[] => fields.map((field) => ({ ...field }));
@@ -78,6 +82,7 @@ export function FieldPanel({
   highlightQuery,
   onSave,
   onDirtyChange,
+  bindingRevision = 0,
 }: FieldPanelProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<FieldDefinition[]>([]);
@@ -85,6 +90,12 @@ export function FieldPanel({
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [draftQuery, setDraftQuery] = useState("");
+  const [bindings, setBindings] = useState<Map<string, DictionaryFieldBinding>>(new Map());
+  const [drawerBinding, setDrawerBinding] = useState<DictionaryFieldBinding | null>(null);
+  const [drawerItems, setDrawerItems] = useState<DictionaryItem[]>([]);
+  const [drawerQuery, setDrawerQuery] = useState("");
+  const [drawerDraftQuery, setDrawerDraftQuery] = useState("");
+  const [drawerLoading, setDrawerLoading] = useState(false);
   const searchRef = useRef<InputRef>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const scrollBodyRef = useRef<HTMLDivElement>(null);
@@ -99,6 +110,46 @@ export function FieldPanel({
     setQuery("");
     setDraftQuery("");
   }, [detail?.id]);
+
+  useEffect(() => {
+    let active = true;
+    if (!detail?.id) {
+      setBindings(new Map());
+      return () => { active = false; };
+    }
+    void dictionariesApi.bindingsForTable(detail.id).then((result) => {
+      if (active) setBindings(new Map(result.map((binding) => [binding.field_id, binding])));
+    }).catch(() => {
+      if (active) setBindings(new Map());
+    });
+    return () => { active = false; };
+  }, [bindingRevision, detail?.id]);
+
+  const openDictionaryDrawer = async (binding: DictionaryFieldBinding) => {
+    setDrawerBinding(binding);
+    setDrawerQuery("");
+    setDrawerDraftQuery("");
+    setDrawerLoading(true);
+    try {
+      const result = await dictionariesApi.items(binding.dictionary_id);
+      setDrawerItems(result.items);
+    } catch {
+      setDrawerItems([]);
+    } finally {
+      setDrawerLoading(false);
+    }
+  };
+
+  const visibleDrawerItems = useMemo(() => {
+    const cleaned = drawerQuery.trim().toLocaleLowerCase();
+    if (!cleaned) return drawerItems;
+    return drawerItems.filter((item) => `${item.code}\n${item.name}\n${item.description}`.toLocaleLowerCase().includes(cleaned));
+  }, [drawerItems, drawerQuery]);
+
+  const drawerColumns: ColumnsType<DictionaryItem> = [
+    { title: "字典值", dataIndex: "code", width: 160, render: (value) => <code>{value}</code> },
+    { title: "字典值名称", dataIndex: "name", ellipsis: true },
+  ];
 
   useEffect(() => {
     const handleKeydown = (event: KeyboardEvent) => {
@@ -144,6 +195,7 @@ export function FieldPanel({
   );
 
   const submitFieldSearch = () => setQuery(draftQuery.trim());
+  const submitDrawerSearch = () => setDrawerQuery(drawerDraftQuery.trim());
 
   const updateField = <K extends keyof FieldDefinition>(id: string, key: K, value: FieldDefinition[K]) => {
     setDraft((current) => current.map((field) => (field.id === id ? { ...field, [key]: value } : field)));
@@ -329,9 +381,20 @@ export function FieldPanel({
                   {editing ? (
                     <Input value={field.code} onChange={(event) => updateField(field.id, "code", event.target.value)} />
                   ) : (
-                    <code title={field.code}>
-                      <HighlightedText text={field.code || "—"} query={activeHighlightQuery} />
-                    </code>
+                    bindings.has(field.id) ? (
+                      <button
+                        type="button"
+                        className="field-dictionary-trigger"
+                        title={`查看“${bindings.get(field.id)?.dictionary_name}”字典`}
+                        onClick={() => void openDictionaryDrawer(bindings.get(field.id)!)}
+                      >
+                        <HighlightedText text={field.code || "—"} query={activeHighlightQuery} />
+                      </button>
+                    ) : (
+                      <code title={field.code}>
+                        <HighlightedText text={field.code || "—"} query={activeHighlightQuery} />
+                      </code>
+                    )
                   )}
                 </span>
                 <span>
@@ -396,6 +459,53 @@ export function FieldPanel({
             ))}
         </div>
       </div>
+      <Drawer
+        open={Boolean(drawerBinding)}
+        width={520}
+        className="field-dictionary-drawer"
+        title={(
+          <span className="field-dictionary-drawer-title">
+            <span><strong>{drawerBinding?.dictionary_name}</strong><small>字段字典值查询</small></span>
+            <Tag color="green">{drawerBinding?.item_count || 0} 条</Tag>
+          </span>
+        )}
+        onClose={() => setDrawerBinding(null)}
+      >
+        <Input
+          allowClear
+          prefix={(
+            <button
+              type="button"
+              className="input-search-trigger"
+              aria-label="搜索字典值或名称"
+              title="搜索"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={submitDrawerSearch}
+            >
+              <SearchOutlined />
+            </button>
+          )}
+          placeholder="搜索字典值或名称"
+          value={drawerDraftQuery}
+          onChange={(event) => setDrawerDraftQuery(event.target.value)}
+          onPressEnter={submitDrawerSearch}
+          onClear={() => {
+            setDrawerDraftQuery("");
+            setDrawerQuery("");
+          }}
+        />
+        <div className="field-dictionary-drawer-table">
+          <Table
+            rowKey={(item) => item.id || item.code}
+            size="small"
+            loading={drawerLoading}
+            pagination={{ pageSize: 100, showSizeChanger: false }}
+            columns={drawerColumns}
+            dataSource={visibleDrawerItems}
+            scroll={{ y: "calc(100vh - 230px)" }}
+          />
+        </div>
+      </Drawer>
     </section>
   );
 }

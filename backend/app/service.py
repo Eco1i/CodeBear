@@ -405,7 +405,12 @@ class WorkspaceService:
         )
         return entries, project_selected
 
-    def export_backup(self, selections: list[dict[str, Any]]) -> tuple[Path, str]:
+    def export_backup(
+        self,
+        selections: list[dict[str, Any]],
+        *,
+        dictionary_payload: dict[str, Any] | None = None,
+    ) -> tuple[Path, str]:
         if not selections:
             raise ServiceError(422, "请至少选择一个待导出节点", code="empty_backup_selection")
         if len(selections) > 50_000:
@@ -441,7 +446,12 @@ class WorkspaceService:
         archive_path = self.backup_staging_root / f"export-{uuid.uuid4()}.cbbak"
         file_name = f"CodeBear-Backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.cbbak"
         try:
-            create_backup_archive(archive_path, projects, app_version=APP_VERSION)
+            create_backup_archive(
+                archive_path,
+                projects,
+                app_version=APP_VERSION,
+                dictionary_payload=dictionary_payload,
+            )
         except BackupFormatError as exc:
             archive_path.unlink(missing_ok=True)
             raise ServiceError(422, str(exc), code=exc.code) from exc
@@ -669,6 +679,7 @@ class WorkspaceService:
         renamed_items: list[dict[str, str]] = []
         index_candidates: list[tuple[str, str, Path]] = []
         parse_errors: list[dict[str, str]] = []
+        project_mapping: dict[str, str] = {}
 
         rollback_parent = self.settings.paths.app_data / "staging"
         rollback_parent.mkdir(parents=True, exist_ok=True)
@@ -685,6 +696,7 @@ class WorkspaceService:
                             created_projects.append(project)
                             existing_projects[str(project["name"]).casefold()] = project
                         project_id = str(project["id"])
+                        project_mapping[str(source_project["key"])] = project_id
                         affected_projects[project_id] = project
                         root = Path(project["root_path"]).resolve()
 
@@ -836,6 +848,7 @@ class WorkspaceService:
             "skipped": skipped_items,
             "renamed": renamed_items,
             "parse_errors": parse_errors,
+            "project_mapping": project_mapping,
         }
 
     def create_folder(self, project_id: str, parent_path: str, name: str) -> dict[str, Any]:

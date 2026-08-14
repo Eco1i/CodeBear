@@ -161,6 +161,132 @@ button.data-grid-row {
   font-weight: 700;
 }
 
+.field-dictionary-trigger {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  color: #159d84;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.field-dictionary-trigger:hover,
+.field-dictionary-trigger:focus-visible {
+  color: #087f6b;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.field-dictionary-drawer .ant-drawer-header {
+  min-height: 64px;
+  padding: 13px 16px;
+  border-bottom: 1px solid #e1e9f3;
+}
+
+.field-dictionary-drawer .ant-drawer-body {
+  min-height: 0;
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.field-dictionary-drawer-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.field-dictionary-drawer-title > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.field-dictionary-drawer-title strong {
+  overflow: hidden;
+  color: #253b57;
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-dictionary-drawer-title small {
+  color: #8999ad;
+  font-size: 11px;
+}
+
+.field-dictionary-drawer-title .ant-tag {
+  margin: 0;
+  font-size: 11px;
+}
+
+.field-dictionary-drawer .ant-input-affix-wrapper {
+  height: 34px;
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.field-dictionary-drawer input.ant-input,
+.field-dictionary-drawer input.ant-input::placeholder {
+  font-size: 12px;
+}
+
+.field-dictionary-drawer-table {
+  min-height: 0;
+  flex: 1;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid #e1e9f3;
+  border-radius: 7px;
+}
+
+.field-dictionary-drawer-table .ant-table {
+  color: #566a85;
+  font-size: 12px;
+}
+
+.field-dictionary-drawer-table .ant-table-thead > tr > th {
+  height: 38px;
+  padding: 8px 10px;
+  color: #526985;
+  background: #f1f6fc;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.field-dictionary-drawer-table .ant-table-tbody > tr > td {
+  height: 42px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.field-dictionary-drawer-table code {
+  color: #365f93;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.field-dictionary-drawer-table .ant-pagination {
+  margin: 10px 12px;
+  font-size: 11px;
+}
+
 .path-cell {
   color: #7586a0;
   font-size: 10px;

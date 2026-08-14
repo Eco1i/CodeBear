@@ -13,10 +13,12 @@ from typing import Any, BinaryIO
 BACKUP_FORMAT = "codebear-backup"
 BACKUP_FORMAT_VERSION = 1
 MANIFEST_NAME = "manifest.json"
+DICTIONARY_DATA_NAME = "dictionary-data.json"
 MAX_ARCHIVE_BYTES = 2 * 1024 * 1024 * 1024
 MAX_UNCOMPRESSED_BYTES = 4 * 1024 * 1024 * 1024
 MAX_ARCHIVE_MEMBERS = 50_000
 MAX_MANIFEST_BYTES = 8 * 1024 * 1024
+MAX_DICTIONARY_BYTES = 64 * 1024 * 1024
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 WINDOWS_INVALID_SEGMENT = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 WINDOWS_RESERVED_NAMES = {
@@ -89,6 +91,7 @@ def create_backup_archive(
     projects: list[dict[str, Any]],
     *,
     app_version: str,
+    dictionary_payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     destination.parent.mkdir(parents=True, exist_ok=True)
     manifest_projects: list[dict[str, Any]] = []
@@ -148,6 +151,20 @@ def create_backup_archive(
                 }
             )
 
+        dictionary_meta: dict[str, Any] | None = None
+        if dictionary_payload is not None:
+            dictionary_bytes = json.dumps(dictionary_payload, ensure_ascii=False, indent=2).encode("utf-8")
+            if len(dictionary_bytes) > MAX_DICTIONARY_BYTES:
+                raise BackupFormatError("字典备份内容超过 64 MB 限制", code="backup_too_large")
+            dictionary_meta = {
+                "archive_path": DICTIONARY_DATA_NAME,
+                "size": len(dictionary_bytes),
+                "sha256": hashlib.sha256(dictionary_bytes).hexdigest(),
+                "dictionary_count": len(dictionary_payload.get("dictionaries", [])),
+                "binding_count": len(dictionary_payload.get("bindings", [])),
+            }
+            archive.writestr(DICTIONARY_DATA_NAME, dictionary_bytes)
+
         manifest = {
             "format": BACKUP_FORMAT,
             "format_version": BACKUP_FORMAT_VERSION,
@@ -159,8 +176,12 @@ def create_backup_archive(
                 "folder_count": folder_count,
                 "pdm_count": pdm_count,
                 "total_bytes": total_bytes,
+                "dictionary_count": int(dictionary_meta["dictionary_count"]) if dictionary_meta else 0,
+                "binding_count": int(dictionary_meta["binding_count"]) if dictionary_meta else 0,
             },
         }
+        if dictionary_meta is not None:
+            manifest["dictionary_data"] = dictionary_meta
         archive.writestr(
             MANIFEST_NAME,
             json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"),
@@ -300,10 +321,59 @@ def inspect_backup_archive(path: Path) -> dict[str, Any]:
             normalized_projects.append({"key": key, "name": name.strip(), "entries": normalized_entries})
             project_count += 1
 
+        dictionary_data = manifest.get("dictionary_data")
+        dictionary_count = 0
+        binding_count = 0
+        normalized_dictionary_meta: dict[str, Any] | None = None
+        if dictionary_data is not None:
+            if not isinstance(dictionary_data, dict):
+                raise BackupFormatError("字典备份清单格式错误")
+            archive_path = _safe_archive_path(dictionary_data.get("archive_path"), label="字典归档路径")
+            size = dictionary_data.get("size")
+            sha256 = dictionary_data.get("sha256")
+            dictionary_count = dictionary_data.get("dictionary_count", 0)
+            binding_count = dictionary_data.get("binding_count", 0)
+            if (
+                not isinstance(size, int)
+                or size < 0
+                or size > MAX_DICTIONARY_BYTES
+                or not isinstance(sha256, str)
+                or not SHA256_PATTERN.fullmatch(sha256)
+                or not isinstance(dictionary_count, int)
+                or dictionary_count < 0
+                or not isinstance(binding_count, int)
+                or binding_count < 0
+            ):
+                raise BackupFormatError("字典备份清单格式错误")
+            info = info_by_name.get(archive_path)
+            if info is None or info.file_size != size:
+                raise BackupFormatError("字典备份内容缺失或大小不一致")
+            payload_bytes = archive.read(info)
+            if hashlib.sha256(payload_bytes).hexdigest() != sha256:
+                raise BackupFormatError("字典备份内容校验失败", code="backup_checksum_failed")
+            try:
+                payload = json.loads(payload_bytes.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise BackupFormatError("字典备份内容无法读取") from exc
+            if not isinstance(payload, dict) or payload.get("version") != 1:
+                raise BackupFormatError("字典备份内容格式无效")
+            if not isinstance(payload.get("dictionaries"), list) or not isinstance(payload.get("bindings"), list):
+                raise BackupFormatError("字典备份内容格式无效")
+            if len(payload["dictionaries"]) != dictionary_count or len(payload["bindings"]) != binding_count:
+                raise BackupFormatError("字典备份统计不一致")
+            referenced_members.add(archive_path)
+            normalized_dictionary_meta = {
+                "archive_path": archive_path,
+                "size": size,
+                "sha256": sha256,
+                "dictionary_count": dictionary_count,
+                "binding_count": binding_count,
+            }
+
         if set(info_by_name) != referenced_members:
             raise BackupFormatError("备份包包含未登记的文件")
 
-        return {
+        result = {
             "format": BACKUP_FORMAT,
             "format_version": version,
             "app_version": str(manifest.get("app_version") or ""),
@@ -314,8 +384,24 @@ def inspect_backup_archive(path: Path) -> dict[str, Any]:
                 "folder_count": folder_count,
                 "pdm_count": pdm_count,
                 "total_bytes": total_bytes,
+                "dictionary_count": dictionary_count,
+                "binding_count": binding_count,
             },
         }
+        if normalized_dictionary_meta is not None:
+            result["dictionary_data"] = normalized_dictionary_meta
+        return result
+
+
+def extract_dictionary_payload(path: Path) -> dict[str, Any] | None:
+    manifest = inspect_backup_archive(path)
+    metadata = manifest.get("dictionary_data")
+    if not isinstance(metadata, dict):
+        return None
+    with zipfile.ZipFile(path, mode="r") as archive:
+        raw = archive.read(str(metadata["archive_path"]))
+    payload = json.loads(raw.decode("utf-8"))
+    return payload if isinstance(payload, dict) else None
 
 
 def extract_backup_entry(

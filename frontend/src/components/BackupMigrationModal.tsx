@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  BookOutlined,
   CheckCircleOutlined,
   DownloadOutlined,
   FileZipOutlined,
@@ -12,6 +13,7 @@ import {
   Alert,
   App as AntApp,
   Button,
+  Checkbox,
   Empty,
   Input,
   Modal,
@@ -104,6 +106,8 @@ export function BackupMigrationModal({
   const [exportCheckedKeys, setExportCheckedKeys] = useState<string[]>([]);
   const [exportExpandedKeys, setExportExpandedKeys] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
+  const [includeDictionaries, setIncludeDictionaries] = useState(true);
+  const [includeDictionaryBindings, setIncludeDictionaryBindings] = useState(true);
   const [importSource, setImportSource] = useState<ImportSource>("archive");
   const [legacyPath, setLegacyPath] = useState("");
   const [inspection, setInspection] = useState<BackupInspection | null>(null);
@@ -237,7 +241,10 @@ export function BackupMigrationModal({
     }
     setExporting(true);
     try {
-      const result = await backupApi.export(nodes);
+      const result = await backupApi.export(nodes, {
+        includeDictionaries,
+        includeDictionaryBindings: includeDictionaries && includeDictionaryBindings,
+      });
       const url = URL.createObjectURL(result.blob);
       const link = document.createElement("a");
       link.href = url;
@@ -390,6 +397,21 @@ export function BackupMigrationModal({
           <span><CheckCircleOutlined /> 每个文件写入 SHA-256 校验值</span>
           <span><CheckCircleOutlined /> 不包含缓存、回收站和本机设置</span>
         </div>
+        <div className="backup-dictionary-options">
+          <Checkbox checked={includeDictionaries} onChange={(event) => {
+            setIncludeDictionaries(event.target.checked);
+            if (!event.target.checked) setIncludeDictionaryBindings(false);
+          }}>
+            导出字典数据
+          </Checkbox>
+          <Checkbox
+            checked={includeDictionaries && includeDictionaryBindings}
+            disabled={!includeDictionaries}
+            onChange={(event) => setIncludeDictionaryBindings(event.target.checked)}
+          >
+            导出字段绑定信息
+          </Checkbox>
+        </div>
         {hasUnsavedChanges && (
           <Alert type="warning" showIcon message="请先保存或放弃当前字段修改，再导出备份。" />
         )}
@@ -515,6 +537,12 @@ export function BackupMigrationModal({
               <span><small>创建时间</small><b>{formatCreatedAt(inspection.created_at)}</b></span>
             </div>
             <SelectionReceipt summary={importSummary} />
+            {(inspection.stats.dictionary_count || inspection.stats.binding_count) ? (
+              <div className="backup-dictionary-receipt">
+                <BookOutlined />
+                <span><b>{inspection.stats.dictionary_count || 0} 套字典</b><small>{inspection.stats.binding_count || 0} 条字段绑定将自动恢复</small></span>
+              </div>
+            ) : null}
             <div className="backup-policy">
               <label>同路径 PDM 已存在时</label>
               <Radio.Group
