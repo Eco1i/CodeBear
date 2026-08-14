@@ -131,6 +131,10 @@ packaging/    Windows 绿色版构建和验收脚本
 .github/      CI、发布工作流和协作模板
 ```
 
+## 更新记录
+
+版本发布说明见 [CHANGELOG.md](CHANGELOG.md)，Windows 绿色版发行包见 [GitHub Releases](https://github.com/Eco1i/CodeBear/releases)。
+
 ## 参与贡献
 
 提交代码前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告，不要在公开 Issue 中披露漏洞细节。
