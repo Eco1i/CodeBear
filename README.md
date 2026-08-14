@@ -14,6 +14,7 @@
 - 安全编辑字段，写回前检查外部修改、创建备份并重新解析校验。
 - 提供回收站、`.cbbak` 选择性备份，以及旧版 `data` 目录迁移。
 - 生成 MySQL、Oracle、达梦、TDSQL MySQL 版和 Apache Ignite 建表脚本。
+- 内置字典中心：手工维护数据字典，或从 Excel 批量导入（字典值列可多选组成唯一组合键），并将字典绑定到字段快速查询。
 - 可选 DeepSeek AI 助手，用自然语言查询本地数据字典。
 - Windows 托盘运行，提供开箱即用的 x64 绿色版。
 
@@ -36,6 +37,12 @@
 使用自然语言查询本地数据字典。AI 功能完全可选，需要配置用户自己的 DeepSeek API Key。
 
 ![码熊小码 AI 助手](docs/images/ai-assistant.png)
+
+### 字典中心
+
+统一维护业务字典：手工编辑、Excel 批量导入（字典值列可多选组合唯一值）以及字段绑定查询。
+
+![码熊字典中心](docs/images/dictionary-center.png)
 
 ### 导出建表脚本
 
