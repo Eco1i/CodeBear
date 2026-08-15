@@ -108,6 +108,7 @@ export function BackupMigrationModal({
   const [exporting, setExporting] = useState(false);
   const [includeDictionaries, setIncludeDictionaries] = useState(true);
   const [includeDictionaryBindings, setIncludeDictionaryBindings] = useState(true);
+  const [includeRelations, setIncludeRelations] = useState(true);
   const [importSource, setImportSource] = useState<ImportSource>("archive");
   const [legacyPath, setLegacyPath] = useState("");
   const [inspection, setInspection] = useState<BackupInspection | null>(null);
@@ -244,6 +245,7 @@ export function BackupMigrationModal({
       const result = await backupApi.export(nodes, {
         includeDictionaries,
         includeDictionaryBindings: includeDictionaries && includeDictionaryBindings,
+        includeRelations,
       });
       const url = URL.createObjectURL(result.blob);
       const link = document.createElement("a");
@@ -410,6 +412,9 @@ export function BackupMigrationModal({
             onChange={(event) => setIncludeDictionaryBindings(event.target.checked)}
           >
             导出字段绑定信息
+          </Checkbox>
+          <Checkbox checked={includeRelations} onChange={(event) => setIncludeRelations(event.target.checked)}>
+            导出手工维护的表关系
           </Checkbox>
         </div>
         {hasUnsavedChanges && (

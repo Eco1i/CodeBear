@@ -161,6 +161,13 @@
   background: #fbfdff;
 }
 
+.relation-list-search .ant-input-affix-wrapper {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  background: transparent;
+}
+
 .relation-list-search .ant-input {
   border: none;
   box-shadow: none;
@@ -169,7 +176,8 @@
   background: transparent;
 }
 
-.relation-list-search .anticon {
+.relation-list-search .anticon,
+.relation-list-search .input-search-trigger {
   color: #a7b6ca;
   font-size: 12px;
 }
@@ -633,26 +641,21 @@
   font-size: 11px;
 }
 
-.relation-graph-search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.relation-graph-search.ant-input-affix-wrapper {
   height: 28px;
+  width: 208px;
   padding: 0 8px;
   border: 1px solid #dbe5f1;
   border-radius: 6px;
   background: #fff;
 }
 
-.relation-graph-search .ant-input {
-  width: 118px;
-  border: none;
-  box-shadow: none;
-  padding: 0;
+.relation-graph-search.ant-input-affix-wrapper .ant-input {
   font-size: 11px;
 }
 
-.relation-graph-search .anticon {
+.relation-graph-search.ant-input-affix-wrapper .anticon,
+.relation-graph-search.ant-input-affix-wrapper .input-search-trigger {
   color: #a7b6ca;
   font-size: 11px;
 }

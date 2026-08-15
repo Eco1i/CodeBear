@@ -307,3 +307,32 @@ def test_export_filters_by_selection_scope(tmp_path: Path) -> None:
     assert len(service.export_relation_payload(project_scope)["relations"]) == 1
     other_scope = [{"project_id": "not-exist", "type": "project", "relative_path": ""}]
     assert service.export_relation_payload(other_scope)["relations"] == []
+
+
+def test_export_can_omit_relation_payload(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    order, order_item = import_sample(service, tmp_path)
+    service.create_relation(
+        source_table_id=str(order_item["id"]),
+        source_field_id=str(service.table_detail(str(order_item["id"]))["fields"][1]["id"]),
+        target_table_id=str(order["id"]),
+        target_field_id=str(service.table_detail(str(order["id"]))["fields"][1]["id"]),
+        name="FK_MANUAL",
+        cardinality="",
+        note="",
+    )
+    selections = [{"project_id": str(order["project_id"]), "type": "project", "relative_path": ""}]
+
+    without_relations, _ = service.export_backup(selections, relation_payload=None)
+    manifest = inspect_backup_archive(without_relations)
+    assert "relation_data" not in manifest
+    assert manifest["stats"]["relation_count"] == 0
+    assert extract_relation_payload(without_relations) is None
+
+    with_relations, _ = service.export_backup(
+        selections,
+        relation_payload=service.export_relation_payload(selections),
+    )
+    manifest_with = inspect_backup_archive(with_relations)
+    assert manifest_with["stats"]["relation_count"] == 1
+    assert extract_relation_payload(with_relations) is not None

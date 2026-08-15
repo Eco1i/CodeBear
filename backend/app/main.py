@@ -183,6 +183,7 @@ class BackupExportPayload(BaseModel):
     nodes: list[BackupExportNode] = Field(min_length=1, max_length=50_000)
     include_dictionaries: bool = False
     include_dictionary_bindings: bool = False
+    include_relations: bool = True
 
 
 class BackupImportNode(BaseModel):
@@ -491,7 +492,7 @@ def export_backup(payload: BackupExportPayload) -> FileResponse:
         include_dictionaries=payload.include_dictionaries,
         include_bindings=payload.include_dictionary_bindings,
     )
-    relation_payload = service.export_relation_payload(selections)
+    relation_payload = service.export_relation_payload(selections) if payload.include_relations else None
     archive_path, file_name = service.export_backup(
         selections,
         dictionary_payload=dictionary_payload,

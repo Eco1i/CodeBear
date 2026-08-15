@@ -36,6 +36,7 @@ interface TipState {
 export function RelationDrawer({ open, table, data, loading, onClose, onJump, onEdit, onCreate, onOpenGraph }: RelationDrawerProps) {
   const [tab, setTab] = useState<DirFilter>("all");
   const [search, setSearch] = useState("");
+  const [searchDraft, setSearchDraft] = useState("");
   const [collapsed, setCollapsed] = useState<{ in: boolean; out: boolean }>({ in: false, out: false });
   const [tip, setTip] = useState<TipState | null>(null);
 
@@ -176,13 +177,24 @@ export function RelationDrawer({ open, table, data, loading, onClose, onJump, on
                 </Button>
               </div>
               <div className="relation-list-search">
-                <SearchOutlined />
                 <Input
-                  aria-label="搜索关系"
-                  placeholder="搜索表代码 / 字段"
-                  value={search}
                   allowClear
-                  onChange={(event) => setSearch(event.target.value)}
+                  prefix={
+                    <button
+                      type="button"
+                      className="input-search-trigger"
+                      aria-label="搜索关系"
+                      title="搜索"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => setSearch(searchDraft.trim())}
+                    >
+                      <SearchOutlined />
+                    </button>
+                  }
+                  value={searchDraft}
+                  placeholder="搜索表代码 / 字段"
+                  onChange={(event) => setSearchDraft(event.target.value)}
+                  onPressEnter={() => setSearch(searchDraft.trim())}
                 />
               </div>
             </div>

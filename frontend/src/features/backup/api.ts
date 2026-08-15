@@ -9,12 +9,17 @@ import type {
 export const backupApi = {
   export: async (
     nodes: BackupExportNode[],
-    options: { includeDictionaries: boolean; includeDictionaryBindings: boolean },
+    options: {
+      includeDictionaries: boolean;
+      includeDictionaryBindings: boolean;
+      includeRelations: boolean;
+    },
   ): Promise<{ blob: Blob; fileName: string }> => {
     const response = await requireOk(await fetch("/api/backups/export", json("POST", {
       nodes,
       include_dictionaries: options.includeDictionaries,
       include_dictionary_bindings: options.includeDictionaryBindings,
+      include_relations: options.includeRelations,
     })));
     return {
       blob: await response.blob(),

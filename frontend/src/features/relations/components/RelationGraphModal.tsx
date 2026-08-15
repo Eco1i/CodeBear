@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Modal } from "antd";
+import { Button, Input, Modal } from "antd";
 import { MinusOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
 import { buildEdges, layoutGraph, otherTableCode, relationDisplayName } from "../model";
 import type { GraphEdge, GraphItem, GraphNode, Relation, RelationOptionTable } from "../types";
@@ -69,6 +69,7 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
   const [entering, setEntering] = useState(false);
   const [dirFilter, setDirFilter] = useState<"all" | "in" | "out">("all");
   const [search, setSearch] = useState("");
+  const [searchDraft, setSearchDraft] = useState("");
   const dragRef = useRef<DragState | null>(null);
   const panRef = useRef<PanState | null>(null);
   const enterTimer = useRef<number | null>(null);
@@ -296,19 +297,28 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
           <span><i className="dot normal" />相关表（代码在圆内）</span>
           <span><i />自动解析关系</span>
           <span><i className="manual" />手工维护关系</span>
-          <span className="focus-hint">点击圆 / 连线聚焦，其余变暗淡</span>
         </div>
         <div className="relation-graph-toolbar">
-          <div className="relation-graph-search">
-            <SearchOutlined />
-            <input
-              aria-label="过滤相关表"
-              placeholder="过滤表，如 TBND"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              style={{ border: "none", outline: "none", width: 118, fontSize: 11, background: "transparent" }}
-            />
-          </div>
+          <Input
+            allowClear
+            className="relation-graph-search"
+            prefix={
+              <button
+                type="button"
+                className="input-search-trigger"
+                aria-label="过滤相关表"
+                title="搜索"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => setSearch(searchDraft.trim())}
+              >
+                <SearchOutlined />
+              </button>
+            }
+            value={searchDraft}
+            placeholder="过滤表，如 TBND"
+            onChange={(event) => setSearchDraft(event.target.value)}
+            onPressEnter={() => setSearch(searchDraft.trim())}
+          />
           {DIR_OPTIONS.map((option) => (
             <Button
               key={option.key}
@@ -446,7 +456,7 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
           </g>
         </svg>
         <div className="relation-graph-tip">
-          点击圆 / 连线聚焦（其余变暗淡）· 悬停看详情 · 双击相关表切换中心 · 滚轮缩放 · 拖拽圆调整布局
+          悬停看详情 · 双击相关表切换中心 · 滚轮缩放 · 拖拽圆调整布局
         </div>
         {hoverTip ? (
           <div className="graph-hover-tip" style={{ left: hoverTip.x, top: hoverTip.y }}>
