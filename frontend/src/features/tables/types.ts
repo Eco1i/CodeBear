@@ -6,7 +6,6 @@ export interface TableSummary {
   code: string;
   comment: string;
   field_count: number;
-  kind: "table" | "view";
   project_id: string;
   project_name: string;
   pdm_id: string;

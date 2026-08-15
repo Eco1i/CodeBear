@@ -1011,7 +1011,6 @@ class WorkspaceService:
                     table.code,
                     table.comment,
                     len(table.fields),
-                    "table",
                 )
             )
             field_rows.extend(
@@ -1033,45 +1032,10 @@ class WorkspaceService:
                     for field in table.fields
                 )
             )
-        # 视图：与表同库存储（kind=view），字段只读
-        for view in parsed.views:
-            view_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"maxiong:{resolved_pdm_id}:view:{view.xml_id}"))
-            table_rows.append(
-                (
-                    view_id,
-                    resolved_pdm_id,
-                    view.xml_id,
-                    len(parsed.tables) + view.ordinal,
-                    view.name,
-                    view.code,
-                    view.comment,
-                    len(view.fields),
-                    "view",
-                )
-            )
-            field_rows.extend(
-                (
-                    (
-                        str(uuid.uuid5(uuid.NAMESPACE_URL, f"maxiong:{resolved_pdm_id}:viewfield:{field.xml_id}")),
-                        view_id,
-                        field.xml_id,
-                        field.ordinal,
-                        field.name,
-                        field.code,
-                        field.data_type,
-                        field.length,
-                        1 if field.nullable else 0,
-                        field.default_value,
-                        field.comment,
-                        0,
-                    )
-                    for field in view.fields
-                )
-            )
         connection.executemany(
             """
-            INSERT INTO model_tables(id, pdm_id, xml_id, ordinal, name, code, comment, field_count, kind)
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO model_tables(id, pdm_id, xml_id, ordinal, name, code, comment, field_count)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?)
             """,
             table_rows,
         )
@@ -1405,7 +1369,7 @@ class WorkspaceService:
                 "SELECT COUNT(*) FROM model_tables WHERE pdm_id = ?",
                 (str(existing["id"]),),
             ).fetchone()[0]
-        return int(count) == len(parsed.tables) + len(parsed.views)
+        return int(count) == len(parsed.tables)
 
     def _touch_skipped_pdm(self, existing_id: str, absolute: Path, parsed: ParsedPdm) -> None:
         """跳过重建时仍刷新解析时间与表关系，保证关系数据与 PDM 内容同步。"""
@@ -1940,7 +1904,7 @@ class WorkspaceService:
                 ).fetchone()
                 rows = connection.execute(
                     f"""
-                    SELECT t.id, t.name, t.code, t.comment, t.field_count, t.kind,
+                    SELECT t.id, t.name, t.code, t.comment, t.field_count,
                            p.id AS project_id, p.name AS project_name,
                            pf.id AS pdm_id, pf.relative_path, pf.source_hash
                     {base}
@@ -2073,7 +2037,7 @@ class WorkspaceService:
             incoming_rows = [self._relation_payload(row) for relation in incoming if (row := self._relation_row(connection, str(relation["id"]))) is not None]
             outgoing_rows = [self._relation_payload(row) for relation in outgoing if (row := self._relation_row(connection, str(relation["id"]))) is not None]
             option_tables = connection.execute(
-                "SELECT id, name, code FROM model_tables WHERE pdm_id = ? AND kind = 'table' ORDER BY ordinal",
+                "SELECT id, name, code FROM model_tables WHERE pdm_id = ? ORDER BY ordinal",
                 (pdm_id,),
             ).fetchall()
             option_fields = connection.execute(
@@ -2358,7 +2322,7 @@ class WorkspaceService:
 
             table_rows: list[Any] = []
             if include_tables and pdm_rows:
-                table_conditions = ["pf.project_id = ?", "t.kind = 'table'"]
+                table_conditions = ["pf.project_id = ?"]
                 table_parameters: list[Any] = [project_id]
                 if normalized_pdm_ids:
                     placeholders = ",".join("?" for _ in normalized_pdm_ids)
@@ -2428,21 +2392,6 @@ class WorkspaceService:
         if len(ordered_ids) > 5000:
             raise ServiceError(422, "单次最多生成 5000 张表", code="ddl_selection_too_large")
 
-        with self.database.connect() as connection:
-            view_ids = {
-                str(row["id"])
-                for row in connection.execute(
-                    f"SELECT id FROM model_tables WHERE kind = 'view' AND id IN ({','.join('?' for _ in ordered_ids)})",
-                    ordered_ids,
-                ).fetchall()
-            }
-        if view_ids:
-            raise ServiceError(
-                422,
-                f"视图不可用于生成建表脚本（{len(view_ids)} 个）",
-                code="ddl_view_not_supported",
-            )
-
         table_map: dict[str, dict[str, Any]] = {}
         fields_by_table: dict[str, list[dict[str, Any]]] = {}
         with self.database.connect() as connection:
@@ -2504,8 +2453,6 @@ class WorkspaceService:
     ) -> dict[str, Any]:
         with self._write_lock:
             detail = self.table_detail(table_id)
-            if str(detail.get("kind", "table")) == "view":
-                raise ServiceError(422, "视图只读，不可编辑字段", code="view_readonly")
             project = self.get_project(str(detail["project_id"]))
             path = resolve_relative(Path(project["root_path"]), str(detail["relative_path"]))
             current_hash = file_sha256(path)
