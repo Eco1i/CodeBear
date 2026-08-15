@@ -204,6 +204,7 @@ export function FieldPanel({
   };
 
   const startEditing = () => {
+    if (detail?.kind === "view") return;
     setDraft(cloneFields(detail?.fields || []));
     setDraftTable(tableMetadata(detail));
     setEditing(true);
@@ -255,15 +256,16 @@ export function FieldPanel({
               ) : (
                 <span className="table-heading">
                   <strong>{detail.name || detail.code}</strong>
+                  {detail.kind === "view" ? <span className="kind-badge">视图</span> : null}
                   <small>
                     <code
-                      className={onOpenRelations ? "rel-open-code" : undefined}
-                      title={onOpenRelations ? "点击查看表关系" : undefined}
-                      role={onOpenRelations ? "button" : undefined}
-                      tabIndex={onOpenRelations ? 0 : undefined}
-                      onClick={onOpenRelations}
+                      className={onOpenRelations && detail.kind !== "view" ? "rel-open-code" : undefined}
+                      title={onOpenRelations && detail.kind !== "view" ? "点击查看表关系" : undefined}
+                      role={onOpenRelations && detail.kind !== "view" ? "button" : undefined}
+                      tabIndex={onOpenRelations && detail.kind !== "view" ? 0 : undefined}
+                      onClick={detail.kind === "view" ? undefined : onOpenRelations}
                       onKeyDown={(event) => {
-                        if (onOpenRelations && (event.key === "Enter" || event.key === " ")) {
+                        if (onOpenRelations && detail.kind !== "view" && (event.key === "Enter" || event.key === " ")) {
                           event.preventDefault();
                           onOpenRelations();
                         }
@@ -354,6 +356,8 @@ export function FieldPanel({
                   保存修改
                 </Button>
               </>
+            ) : detail.kind === "view" ? (
+              <span className="view-readonly-hint">视图只读，来自数据库视图定义</span>
             ) : (
               <Button icon={<EditOutlined />} onClick={startEditing}>编辑字典</Button>
             )}

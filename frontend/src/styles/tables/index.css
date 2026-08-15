@@ -708,3 +708,25 @@ button.data-grid-row {
 .pk-empty {
   color: #c2ccd8;
 }
+
+.kind-badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: #b46b04;
+  background: #fff3df;
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+
+.table-heading .kind-badge {
+  margin-left: 8px;
+  vertical-align: 2px;
+}
+
+.view-readonly-hint {
+  color: #9aa8bc;
+  font-size: 11px;
+}

@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS model_tables (
     code TEXT NOT NULL DEFAULT '',
     comment TEXT NOT NULL DEFAULT '',
     field_count INTEGER NOT NULL DEFAULT 0,
+    kind TEXT NOT NULL DEFAULT 'table' CHECK(kind IN ('table', 'view')),
     UNIQUE(pdm_id, xml_id)
 );
 
@@ -275,6 +276,11 @@ class Database:
             if "index_version" not in pdm_columns:
                 connection.execute(
                     "ALTER TABLE pdm_files ADD COLUMN index_version TEXT NOT NULL DEFAULT '2'"
+                )
+            table_columns = {row[1] for row in connection.execute("PRAGMA table_info(model_tables)")}
+            if "kind" not in table_columns:
+                connection.execute(
+                    "ALTER TABLE model_tables ADD COLUMN kind TEXT NOT NULL DEFAULT 'table'"
                 )
             try:
                 connection.executescript(FTS_SCHEMA)

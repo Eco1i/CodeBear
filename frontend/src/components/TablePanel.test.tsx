@@ -9,6 +9,7 @@ const table = {
   code: "t_user",
   comment: "保存系统用户",
   field_count: 2,
+  kind: "table" as const,
   project_id: "project-1",
   project_name: "测试项目",
   pdm_id: "pdm-1",

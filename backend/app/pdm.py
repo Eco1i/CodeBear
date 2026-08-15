@@ -40,6 +40,16 @@ class ParsedTable:
 
 
 @dataclass(frozen=True)
+class ParsedView:
+    xml_id: str
+    ordinal: int
+    name: str
+    code: str
+    comment: str
+    fields: tuple[ParsedField, ...]
+
+
+@dataclass(frozen=True)
 class ParsedReferenceJoin:
     parent_column_xml_id: str
     child_column_xml_id: str
@@ -65,6 +75,7 @@ class ParsedPdm:
     target_db: str
     tables: tuple[ParsedTable, ...]
     references: tuple[ParsedReference, ...] = ()
+    views: tuple[ParsedView, ...] = ()
 
     @property
     def field_count(self) -> int:
@@ -201,6 +212,51 @@ def parse_pdm(path: Path) -> ParsedPdm:
             model_name = _attribute_texts(model_node).get("Name", "")
             break
 
+    # 视图：与表共用列结构，只读展示
+    views: list[ParsedView] = []
+    for view_node in root.iter(f"{O}View"):
+        view_xml_id = view_node.get("Id")
+        if not view_xml_id:
+            continue
+        fields: list[ParsedField] = []
+        columns_collection = view_node.find(f"{C}Columns")
+        if columns_collection is not None:
+            for column_node in columns_collection:
+                if column_node.tag != f"{O}Column" or not column_node.get("Id"):
+                    continue
+                xml_id = str(column_node.get("Id"))
+                attributes = _attribute_texts(column_node)
+                data_type, length = _split_data_type(
+                    attributes.get("DataType", ""),
+                    attributes.get("Length", ""),
+                    attributes.get("Precision", ""),
+                )
+                fields.append(
+                    ParsedField(
+                        xml_id=xml_id,
+                        ordinal=len(fields) + 1,
+                        name=attributes.get("Name", ""),
+                        code=attributes.get("Code", ""),
+                        data_type=data_type,
+                        length=length,
+                        nullable=True,
+                        default_value=attributes.get("DefaultValue", ""),
+                        comment=attributes.get("Comment", ""),
+                        is_primary_key=False,
+                    )
+                )
+        attributes = _attribute_texts(view_node)
+        views.append(
+            ParsedView(
+                xml_id=str(view_xml_id),
+                ordinal=len(views) + 1,
+                name=attributes.get("Name", ""),
+                code=attributes.get("Code", ""),
+                comment=attributes.get("Comment", ""),
+                fields=tuple(fields),
+            )
+        )
+
     table_xml_ids = {table.xml_id for table in tables}
     references: list[ParsedReference] = []
     for reference_node in root.iter(f"{O}Reference"):
@@ -254,6 +310,7 @@ def parse_pdm(path: Path) -> ParsedPdm:
         target_db=metadata.get("Target", ""),
         tables=tuple(tables),
         references=tuple(references),
+        views=tuple(views),
     )
 
 

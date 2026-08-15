@@ -195,6 +195,7 @@ export function TablePanel({
                   >
                     <span className="grid-index">{String(index + 1).padStart(2, "0")}</span>
                     <span className="code-cell" title={table.code}>
+                      {table.kind === "view" ? <span className="kind-badge">视图</span> : null}
                       <HighlightedText text={table.code || "—"} query={tableHighlightQuery} />
                     </span>
                     <span title={table.name || table.comment}>
