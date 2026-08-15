@@ -451,3 +451,20 @@
   color: #8a9ab0;
   font-size: 9px;
 }
+
+.refresh-progress-copy {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #3c506e;
+  font-size: 12px;
+}
+
+.refresh-progress-copy .refresh-progress-count {
+  flex: 0 0 auto;
+  color: #8696ad;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}

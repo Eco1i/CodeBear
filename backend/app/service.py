@@ -10,10 +10,11 @@ import tempfile
 import time
 import uuid
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from threading import RLock
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from lxml import etree
 
@@ -26,6 +27,10 @@ from .pdm import ParsedPdm, file_sha256, parse_pdm, update_pdm_dictionary
 
 
 logger = logging.getLogger("backend.app.service")
+
+# 索引语义版本：_index_parsed 写入 pdm_files.index_version。
+# 修改表/字段/关系的索引方式时必须递增，强制刷新才会对旧版本行做全量重建。
+INDEX_VERSION = "2"
 
 
 WINDOWS_RESERVED_NAMES = {
@@ -907,6 +912,23 @@ class WorkspaceService:
         )
         connection.execute("DELETE FROM model_tables WHERE pdm_id = ?", (pdm_id,))
 
+    @staticmethod
+    def _snapshot_manual_relations(connection: sqlite3.Connection, pdm_id: str) -> list[sqlite3.Row]:
+        return connection.execute(
+            """
+            SELECT tr.id, tr.name, tr.cardinality, tr.note, tr.created_at,
+                   st.xml_id AS source_table_xml, sf.xml_id AS source_field_xml,
+                   tt.xml_id AS target_table_xml, tf.xml_id AS target_field_xml
+            FROM table_relations tr
+            JOIN model_tables st ON st.id = tr.source_table_id
+            JOIN model_fields sf ON sf.id = tr.source_field_id
+            JOIN model_tables tt ON tt.id = tr.target_table_id
+            JOIN model_fields tf ON tf.id = tr.target_field_id
+            WHERE tr.source_type = 'manual' AND (st.pdm_id = ? OR tt.pdm_id = ?)
+            """,
+            (pdm_id, pdm_id),
+        ).fetchall()
+
     def _index_parsed(
         self,
         connection: sqlite3.Connection,
@@ -922,27 +944,15 @@ class WorkspaceService:
         ).fetchone()
         resolved_pdm_id = str(existing["id"]) if existing else (pdm_id or str(uuid.uuid4()))
         # 表/字段行会删除重建：先快照该 PDM 相关的手工关系，重建后恢复
-        manual_relations = connection.execute(
-            """
-            SELECT tr.id, tr.name, tr.cardinality, tr.note, tr.created_at,
-                   st.xml_id AS source_table_xml, sf.xml_id AS source_field_xml,
-                   tt.xml_id AS target_table_xml, tf.xml_id AS target_field_xml
-            FROM table_relations tr
-            JOIN model_tables st ON st.id = tr.source_table_id
-            JOIN model_fields sf ON sf.id = tr.source_field_id
-            JOIN model_tables tt ON tt.id = tr.target_table_id
-            JOIN model_fields tf ON tf.id = tr.target_field_id
-            WHERE tr.source_type = 'manual' AND (st.pdm_id = ? OR tt.pdm_id = ?)
-            """,
-            (resolved_pdm_id, resolved_pdm_id),
-        ).fetchall()
+        manual_relations = self._snapshot_manual_relations(connection, resolved_pdm_id)
         stat = absolute_path.stat()
         connection.execute(
             """
             INSERT INTO pdm_files(
                 id, project_id, relative_path, file_name, source_hash, file_size, mtime_ns,
-                model_name, pd_version, target_db, table_count, field_count, parsed_at, parse_error
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+                model_name, pd_version, target_db, table_count, field_count, parsed_at,
+                parse_error, index_version
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
             ON CONFLICT(id) DO UPDATE SET
                 project_id = excluded.project_id,
                 relative_path = excluded.relative_path,
@@ -956,7 +966,8 @@ class WorkspaceService:
                 table_count = excluded.table_count,
                 field_count = excluded.field_count,
                 parsed_at = excluded.parsed_at,
-                parse_error = NULL
+                parse_error = NULL,
+                index_version = excluded.index_version
             """,
             (
                 resolved_pdm_id,
@@ -972,6 +983,7 @@ class WorkspaceService:
                 len(parsed.tables),
                 parsed.field_count,
                 utc_now(),
+                INDEX_VERSION,
             ),
         )
         self._delete_pdm_rows(connection, resolved_pdm_id)
@@ -1292,15 +1304,16 @@ class WorkspaceService:
             """
             INSERT INTO pdm_files(
                 id, project_id, relative_path, file_name, source_hash, file_size, mtime_ns,
-                table_count, field_count, parsed_at, parse_error
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
+                table_count, field_count, parsed_at, parse_error, index_version
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 file_size = excluded.file_size,
                 mtime_ns = excluded.mtime_ns,
                 parsed_at = excluded.parsed_at,
                 parse_error = excluded.parse_error,
                 table_count = 0,
-                field_count = 0
+                field_count = 0,
+                index_version = excluded.index_version
             """,
             (
                 pdm_id,
@@ -1312,10 +1325,41 @@ class WorkspaceService:
                 stat.st_mtime_ns,
                 utc_now(),
                 error_message[:2000],
+                INDEX_VERSION,
             ),
         )
         self._delete_pdm_rows(connection, pdm_id)
         return pdm_id
+
+    def _can_skip_reindex(self, existing: sqlite3.Row, parsed: ParsedPdm) -> bool:
+        """强制刷新时，内容与索引语义都没变且行完整的 PDM 可跳过重建。"""
+        if existing["parse_error"]:
+            return False
+        if str(existing["index_version"]) != INDEX_VERSION:
+            return False
+        if str(existing["source_hash"]) != parsed.source_hash:
+            return False
+        with self.database.connect() as connection:
+            count = connection.execute(
+                "SELECT COUNT(*) FROM model_tables WHERE pdm_id = ?",
+                (str(existing["id"]),),
+            ).fetchone()[0]
+        return int(count) == len(parsed.tables)
+
+    def _touch_skipped_pdm(self, existing_id: str, absolute: Path, parsed: ParsedPdm) -> None:
+        """跳过重建时仍刷新解析时间与表关系，保证关系数据与 PDM 内容同步。"""
+        stat = absolute.stat()
+        with self.database.transaction() as connection:
+            connection.execute(
+                """
+                UPDATE pdm_files
+                SET parsed_at = ?, file_size = ?, mtime_ns = ?, parse_error = NULL
+                WHERE id = ?
+                """,
+                (utc_now(), stat.st_size, stat.st_mtime_ns, existing_id),
+            )
+            manual_relations = self._snapshot_manual_relations(connection, existing_id)
+            self._rebuild_table_relations(connection, existing_id, parsed, manual_relations)
 
     def index_file(self, project_id: str, relative_path: str, *, force: bool = False) -> dict[str, Any]:
         project = self.get_project(project_id)
@@ -1339,43 +1383,121 @@ class WorkspaceService:
             return {"relative_path": relative, "status": "unchanged", "pdm_id": existing["id"]}
         try:
             parsed = parse_pdm(absolute)
-            with self.database.transaction() as connection:
-                existing_pdm_ids = {str(existing["id"])} if existing is not None else set()
-                with self.database.defer_fts_updates(connection, existing_pdm_ids) as updated_pdm_ids:
-                    pdm_id = self._index_parsed(connection, project_id, relative, absolute, parsed)
-                    updated_pdm_ids.add(pdm_id)
-            return {
-                "relative_path": relative,
-                "status": "indexed",
-                "pdm_id": pdm_id,
-                "table_count": len(parsed.tables),
-                "field_count": parsed.field_count,
-            }
         except (etree.XMLSyntaxError, OSError, ValueError) as exc:  # type: ignore[name-defined]
             error_message = str(exc)
             with self.database.transaction() as connection:
                 self._index_parse_error(connection, project_id, relative, absolute, error_message)
             logger.warning("PDM 解析失败 %s: %s", relative, exc)
             return {"relative_path": relative, "status": "error", "error": "PDM 解析失败"}
+        return self._index_parsed_or_skip(project_id, relative, absolute, parsed, existing, force)
 
-    def refresh_project(self, project_id: str, *, force: bool = False) -> dict[str, Any]:
+    def _index_parsed_or_skip(
+        self,
+        project_id: str,
+        relative: str,
+        absolute: Path,
+        parsed: ParsedPdm,
+        existing: sqlite3.Row | None,
+        force: bool,
+    ) -> dict[str, Any]:
+        if force and existing is not None and self._can_skip_reindex(existing, parsed):
+            self._touch_skipped_pdm(str(existing["id"]), absolute, parsed)
+            return {"relative_path": relative, "status": "skipped", "pdm_id": str(existing["id"])}
+        with self.database.transaction() as connection:
+            existing_pdm_ids = {str(existing["id"])} if existing is not None else set()
+            with self.database.defer_fts_updates(connection, existing_pdm_ids) as updated_pdm_ids:
+                pdm_id = self._index_parsed(connection, project_id, relative, absolute, parsed)
+                updated_pdm_ids.add(pdm_id)
+        return {
+            "relative_path": relative,
+            "status": "indexed",
+            "pdm_id": pdm_id,
+            "table_count": len(parsed.tables),
+            "field_count": parsed.field_count,
+        }
+
+    def refresh_project(
+        self,
+        project_id: str,
+        *,
+        force: bool = False,
+        progress: Callable[[int, int, str], None] | None = None,
+    ) -> dict[str, Any]:
         project = self.get_project(project_id)
         root = Path(project["root_path"])
         root.mkdir(parents=True, exist_ok=True)
-        discovered: list[str] = []
+        discovered: list[Path] = []
         for path in root.rglob("*"):
             if any(part in INTERNAL_DIR_NAMES or part.startswith(".码熊") for part in path.relative_to(root).parts):
                 continue
             if path.is_file() and path.suffix.casefold() == ".pdm":
-                discovered.append(path.relative_to(root).as_posix())
-        discovered.sort(key=str.casefold)
-        results = [self.index_file(project_id, relative, force=force) for relative in discovered]
+                discovered.append(path)
+        discovered.sort(key=lambda p: p.as_posix().casefold())
+        total = len(discovered)
+
+        with self.database.connect() as connection:
+            existing_map = {
+                str(row["relative_path"]): row
+                for row in connection.execute(
+                    "SELECT * FROM pdm_files WHERE project_id = ?", (project_id,)
+                ).fetchall()
+            }
+
+        def report(processed: int, current_file: str) -> None:
+            if progress is not None:
+                progress(processed, total, current_file)
+
+        results: list[dict[str, Any]] = []
+        to_process: list[tuple[Path, sqlite3.Row | None]] = []
+        processed = 0
+        for path in discovered:
+            relative = path.relative_to(root).as_posix()
+            stat = path.stat()
+            existing = existing_map.get(relative)
+            if (
+                existing is not None
+                and not force
+                and int(existing["file_size"]) == stat.st_size
+                and int(existing["mtime_ns"]) == stat.st_mtime_ns
+                and not existing["parse_error"]
+            ):
+                results.append({"relative_path": relative, "status": "unchanged", "pdm_id": str(existing["id"])})
+                processed += 1
+                report(processed, relative)
+                continue
+            to_process.append((path, existing))
+
+        if to_process:
+            def parse_one(item: tuple[Path, sqlite3.Row | None]) -> ParsedPdm | Exception:
+                path, _existing = item
+                try:
+                    return parse_pdm(path)
+                except (etree.XMLSyntaxError, OSError, ValueError) as exc:
+                    return exc
+
+            workers = max(1, min(8, os.cpu_count() or 4))
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                parsed_list = list(pool.map(parse_one, to_process))
+            parsed_by_path = {path: parsed for (path, _existing), parsed in zip(to_process, parsed_list)}
+            for path, existing in to_process:
+                relative = path.relative_to(root).as_posix()
+                parsed = parsed_by_path[path]
+                if isinstance(parsed, Exception):
+                    with self.database.transaction() as connection:
+                        self._index_parse_error(connection, project_id, relative, path, str(parsed))
+                    logger.warning("PDM 解析失败 %s: %s", relative, parsed)
+                    results.append({"relative_path": relative, "status": "error", "error": "PDM 解析失败"})
+                else:
+                    results.append(self._index_parsed_or_skip(project_id, relative, path, parsed, existing, force))
+                processed += 1
+                report(processed, relative)
+
         with self.database.transaction() as connection:
             rows = connection.execute(
                 "SELECT id, relative_path FROM pdm_files WHERE project_id = ?",
                 (project_id,),
             ).fetchall()
-            discovered_folded = {value.casefold() for value in discovered}
+            discovered_folded = {path.relative_to(root).as_posix().casefold() for path in discovered}
             for row in rows:
                 if str(row["relative_path"]).casefold() not in discovered_folded:
                     self._delete_pdm_rows(connection, str(row["id"]))
@@ -1384,8 +1506,9 @@ class WorkspaceService:
             "project_id": project_id,
             "indexed": sum(1 for result in results if result["status"] == "indexed"),
             "unchanged": sum(1 for result in results if result["status"] == "unchanged"),
+            "skipped": sum(1 for result in results if result["status"] == "skipped"),
             "errors": [result for result in results if result["status"] == "error"],
-            "pdm_count": len(discovered),
+            "pdm_count": total,
         }
 
     def _backup_existing(self, project: dict[str, Any], source: Path, category: str) -> Path:

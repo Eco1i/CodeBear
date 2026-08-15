@@ -240,7 +240,8 @@ def test_duplicate_reference_pairs_deduped(tmp_path: Path) -> None:
     assert outgoing[0]["name"] == "FK_ITEM_ORDER"
 
     refreshed = service.refresh_project(str(project["id"]), force=True)
-    assert refreshed["indexed"] == 1
+    assert refreshed["skipped"] == 1
+    assert refreshed["indexed"] == 0
     assert len(service.list_table_relations(str(order_item["id"]))["outgoing"]) == 1
 
 

@@ -60,10 +60,19 @@ export interface RefreshResult {
   project_id: string;
   indexed: number;
   unchanged: number;
+  skipped: number;
   errors: Array<{
     relative_path: string;
     status: "error";
     error: string;
   }>;
   pdm_count: number;
+}
+
+export interface RefreshProgress {
+  state: "idle" | "running" | "done" | "error";
+  processed: number;
+  total: number;
+  current_file: string;
+  error?: string;
 }

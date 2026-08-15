@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { App as AntApp, Button, Tag } from "antd";
+import { App as AntApp, Button, Modal, Progress, Tag } from "antd";
 import {
   BookOutlined,
   CodeOutlined,
@@ -47,9 +47,19 @@ import type {
   TrashItem,
   WorkspaceNode,
 } from "./types";
+import type { RefreshProgress } from "./features/workspace/types";
 
 const TABLE_PAGE_SIZE = 100;
 const TABLE_PREFETCH_ROWS = 50;
+const REFRESH_MODAL_DELAY_MS = 600;
+const REFRESH_POLL_INTERVAL_MS = 400;
+
+interface RefreshProgressView {
+  force: boolean;
+  processed: number;
+  total: number;
+  currentFile: string;
+}
 
 interface TableQuery {
   projectId?: string;
@@ -69,6 +79,7 @@ export default function App() {
   const [selectedNode, setSelectedNode] = useState<WorkspaceNode | null>(null);
   const [navigationLoading, setNavigationLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState<RefreshProgressView | null>(null);
   const [tables, setTables] = useState<Array<TableSummary | undefined>>([]);
   const [tableTotal, setTableTotal] = useState(0);
   const [tableFieldTotal, setTableFieldTotal] = useState(0);
@@ -719,28 +730,44 @@ export default function App() {
   const runProjectRefresh = async (node: WorkspaceNode | null, force: boolean) => {
     const projectId = getProjectId(node) || projects[0]?.id;
     if (!projectId) return;
-    const key = force ? "project-force-refresh" : "project-refresh";
     setRefreshing(true);
-    message.loading({
-      key,
-      content: force ? "正在强制重新解析当前项目的全部 PDM…" : "正在扫描 PDM 文件变化…",
-      duration: 0,
-    });
+    let modalVisible = false;
+    const pending: RefreshProgressView = { force, processed: 0, total: 0, currentFile: "" };
+    const showTimer = window.setTimeout(() => {
+      modalVisible = true;
+      setRefreshProgress(pending);
+    }, REFRESH_MODAL_DELAY_MS);
+    const pollTimer = window.setInterval(() => {
+      workspaceApi
+        .refreshProgress(projectId)
+        .then((progress: RefreshProgress) => {
+          pending.processed = progress.processed ?? pending.processed;
+          pending.total = progress.total ?? pending.total;
+          pending.currentFile = progress.current_file ?? "";
+          if (modalVisible) setRefreshProgress({ ...pending });
+        })
+        .catch(() => {
+          // 进度轮询失败不阻塞刷新主流程
+        });
+    }, REFRESH_POLL_INTERVAL_MS);
     try {
       const result = await workspaceApi.refresh(projectId, force);
+      window.clearTimeout(showTimer);
+      window.clearInterval(pollTimer);
+      setRefreshProgress(null);
       await refreshAfterMutation(node);
       const summary = force
-        ? `强制重新解析完成：成功 ${result.indexed} 个，失败 ${result.errors.length} 个`
+        ? `强制重新解析完成：重新解析 ${result.indexed} 个，内容未变化跳过 ${result.skipped} 个，失败 ${result.errors.length} 个`
         : result.pdm_count === 0
           ? "扫描完成：当前项目没有 PDM"
           : `扫描完成：重新解析 ${result.indexed} 个，未变化 ${result.unchanged} 个，失败 ${result.errors.length} 个`;
       const notify = result.errors.length ? message.warning : message.success;
-      notify({
-        key,
-        content: summary,
-      });
+      notify({ content: summary, duration: 4 });
     } catch (error) {
-      message.error({ key, content: errorMessage(error) });
+      window.clearTimeout(showTimer);
+      window.clearInterval(pollTimer);
+      setRefreshProgress(null);
+      message.error(errorMessage(error));
     } finally {
       setRefreshing(false);
     }
@@ -758,7 +785,7 @@ export default function App() {
     const projectName = projects.find((project) => project.id === projectId)?.name || "当前项目";
     modal.confirm({
       title: "强制全部重新解析？",
-      content: `将忽略文件大小和修改时间，重新解析项目“${projectName}”中的全部 PDM。文件较多时可能需要等待一段时间。`,
+      content: `将忽略文件大小和修改时间，按内容重新解析项目“${projectName}”中的全部 PDM；内容未变化的会自动跳过重建。`,
       okText: "强制重新解析",
       cancelText: "取消",
       onOk: () => requestContextChange(() => void runProjectRefresh(node, true)),
@@ -1052,6 +1079,35 @@ export default function App() {
         onAiModeChange={changeAiLayoutMode}
         onOpenAiTable={openAiEvidenceTable}
       />
+
+      <Modal
+        open={refreshProgress !== null}
+        title={refreshProgress?.force ? "强制重新解析 PDM" : "扫描 PDM 文件"}
+        footer={null}
+        closable={false}
+        maskClosable={false}
+        keyboard={false}
+        centered
+        width={460}
+      >
+        <Progress
+          percent={
+            refreshProgress && refreshProgress.total > 0
+              ? Math.min(100, Math.round((refreshProgress.processed / refreshProgress.total) * 100))
+              : 0
+          }
+          status="active"
+          strokeColor={{ from: "#347ee8", to: "#23b99a" }}
+        />
+        <div className="refresh-progress-copy">
+          {refreshProgress?.currentFile
+            ? `正在解析 ${refreshProgress.currentFile}`
+            : "准备中…"}
+          <span className="refresh-progress-count">
+            {refreshProgress?.processed ?? 0} / {refreshProgress?.total ?? 0}
+          </span>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { json, request } from "../../shared/api/client";
 import type {
   ImportResult,
   Project,
+  RefreshProgress,
   RefreshResult,
   Settings,
   TrashItem,
@@ -19,6 +20,8 @@ export const workspaceApi = {
   tree: (projectId: string) => request<WorkspaceNode>(`/api/projects/${projectId}/tree`),
   refresh: (projectId: string, force = false) =>
     request<RefreshResult>(`/api/projects/${projectId}/refresh?force=${force}`, { method: "POST" }),
+  refreshProgress: (projectId: string) =>
+    request<RefreshProgress>(`/api/refresh-progress/${projectId}`, { cache: "no-store" }),
   createFolder: (project_id: string, parent_path: string, name: string) =>
     request<WorkspaceNode>("/api/folders", json("POST", { project_id, parent_path, name })),
   renameNode: (project_id: string, relative_path: string, name: string) =>

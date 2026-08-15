@@ -20,6 +20,7 @@ from .backup import MAX_ARCHIVE_BYTES, extract_dictionary_payload, extract_relat
 from .config import APP_NAME, APP_VERSION, AppPaths, SettingsStore, bundled_resource
 from .database import Database
 from .dictionaries import DictionaryService, MAX_EXCEL_BYTES
+from .progress import RefreshProgressStore
 from .security import LocalRequestGuardMiddleware
 from .service import ServiceError, WorkspaceService
 from .updates import CHECK_INTERVAL_SECONDS, UpdateService
@@ -41,6 +42,7 @@ dictionary_service = DictionaryService(database)
 ai_service = AiService(database, settings_store)
 ai_conversation_service = AiConversationService(database)
 update_service = UpdateService(paths.app_data / "update-check.json")
+progress_store = RefreshProgressStore()
 
 
 async def _update_check_loop() -> None:
@@ -398,7 +400,21 @@ def project_tree(project_id: str) -> dict:
 
 @app.post("/api/projects/{project_id}/refresh")
 def refresh_project(project_id: str, force: bool = False) -> dict:
-    return service.refresh_project(project_id, force=force)
+    def on_progress(processed: int, total: int, current_file: str) -> None:
+        progress_store.update(project_id, processed, total, current_file)
+
+    try:
+        result = service.refresh_project(project_id, force=force, progress=on_progress)
+    except Exception as exc:
+        progress_store.finish(project_id, error=str(exc))
+        raise
+    progress_store.finish(project_id)
+    return result
+
+
+@app.get("/api/refresh-progress/{project_id}")
+def refresh_progress(project_id: str) -> dict:
+    return progress_store.get(project_id)
 
 
 @app.post("/api/folders", status_code=201)

@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS pdm_files (
     field_count INTEGER NOT NULL DEFAULT 0,
     parsed_at TEXT NOT NULL,
     parse_error TEXT,
+    index_version TEXT NOT NULL DEFAULT '2',
     UNIQUE(project_id, relative_path)
 );
 
@@ -270,6 +271,11 @@ class Database:
     def initialize(self) -> None:
         with self.connect() as connection:
             connection.executescript(SCHEMA)
+            pdm_columns = {row[1] for row in connection.execute("PRAGMA table_info(pdm_files)")}
+            if "index_version" not in pdm_columns:
+                connection.execute(
+                    "ALTER TABLE pdm_files ADD COLUMN index_version TEXT NOT NULL DEFAULT '2'"
+                )
             try:
                 connection.executescript(FTS_SCHEMA)
                 row = connection.execute(

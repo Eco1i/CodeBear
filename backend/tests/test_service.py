@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import zipfile
 from pathlib import Path
 
@@ -439,10 +440,50 @@ def test_project_refresh_only_reindexes_changed_files_unless_forced(tmp_path: Pa
     assert unchanged_again["indexed"] == 0
     assert unchanged_again["unchanged"] == 1
 
+    # 强制刷新：内容未变化时跳过重建，不产生行级重建
     forced = service.refresh_project(project_id, force=True)
-    assert forced["indexed"] == 1
+    assert forced["indexed"] == 0
+    assert forced["skipped"] == 1
     assert forced["unchanged"] == 0
     assert forced["errors"] == []
+
+    # 内容变化但字节数相同并恢复修改时间：普通刷新按 mtime 跳过，强制刷新按内容哈希重建
+    original_stat = copied.stat()
+    current_content = copied.read_text(encoding="utf-8")
+    copied.write_text(
+        current_content.replace("保存系统用户", "保存系统甲户"),
+        encoding="utf-8",
+        newline="\n",
+    )
+    os.utime(copied, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+
+    hidden_change = service.refresh_project(project_id)
+    assert hidden_change["indexed"] == 0
+    assert hidden_change["unchanged"] == 1
+
+    forced_change = service.refresh_project(project_id, force=True)
+    assert forced_change["indexed"] == 1
+    assert forced_change["skipped"] == 0
+    assert forced_change["errors"] == []
+
+
+def test_force_refresh_reports_progress(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    source = write_sample(tmp_path / "进度样本.pdm")
+    project = service.create_project("进度测试")
+    project_id = str(project["id"])
+    imported = service.import_staged_files(project_id, "", [(source.name, source)], overwrite=False)
+    assert imported["errors"] == []
+
+    events: list[tuple[int, int, str]] = []
+    result = service.refresh_project(
+        project_id,
+        force=True,
+        progress=lambda processed, total, current: events.append((processed, total, current)),
+    )
+    assert result["pdm_count"] == 1
+    assert events and events[-1][0] == events[-1][1] == 1
+    assert events[-1][2].endswith(".pdm")
 
 
 def test_selective_backup_export_import_and_conflict_policies(tmp_path: Path) -> None:
