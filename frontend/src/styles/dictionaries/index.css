@@ -379,6 +379,14 @@
   border-radius: 0;
 }
 
+/* antd 表格容器伪元素自带顶角圆角，一并去掉，保持方角 */
+.dictionary-center-modal .ant-table-container::before,
+.dictionary-center-modal .ant-table-container::after,
+.dictionary-manage-modal .ant-table-container::before,
+.dictionary-manage-modal .ant-table-container::after {
+  border-radius: 0;
+}
+
 .dictionary-center-modal .ant-table-thead > tr > th,
 .dictionary-manage-modal .ant-table-thead > tr > th {
   height: 40px;
