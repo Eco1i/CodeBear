@@ -370,13 +370,32 @@
   font-size: 12px;
 }
 
-.dictionary-center-modal .ant-table-wrapper,
+/* 表格整体使用方角：容器、内外层 table、表头、表头单元格全部清零 */
 .dictionary-center-modal .ant-table,
 .dictionary-center-modal .ant-table-container,
-.dictionary-manage-modal .ant-table-wrapper,
+.dictionary-center-modal .ant-table-header,
+.dictionary-center-modal .ant-table-content,
+.dictionary-center-modal .ant-table-body,
+.dictionary-center-modal .ant-table-fixed,
+.dictionary-center-modal .ant-table-header table,
+.dictionary-center-modal .ant-table-body table,
+.dictionary-center-modal .ant-table-content table,
+.dictionary-center-modal .ant-table-fixed table,
+.dictionary-center-modal .ant-table-thead th,
+.dictionary-center-modal .ant-table-header th,
 .dictionary-manage-modal .ant-table,
-.dictionary-manage-modal .ant-table-container {
-  border-radius: 0;
+.dictionary-manage-modal .ant-table-container,
+.dictionary-manage-modal .ant-table-header,
+.dictionary-manage-modal .ant-table-content,
+.dictionary-manage-modal .ant-table-body,
+.dictionary-manage-modal .ant-table-fixed,
+.dictionary-manage-modal .ant-table-header table,
+.dictionary-manage-modal .ant-table-body table,
+.dictionary-manage-modal .ant-table-content table,
+.dictionary-manage-modal .ant-table-fixed table,
+.dictionary-manage-modal .ant-table-thead th,
+.dictionary-manage-modal .ant-table-header th {
+  border-radius: 0 !important;
 }
 
 /* antd 表格容器伪元素自带顶角圆角，一并去掉，保持方角 */
@@ -384,7 +403,7 @@
 .dictionary-center-modal .ant-table-container::after,
 .dictionary-manage-modal .ant-table-container::before,
 .dictionary-manage-modal .ant-table-container::after {
-  border-radius: 0;
+  border-radius: 0 !important;
 }
 
 .dictionary-center-modal .ant-table-thead > tr > th,
