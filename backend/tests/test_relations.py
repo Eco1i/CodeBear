@@ -198,6 +198,52 @@ def test_refresh_preserves_manual_and_rebuilds_auto(tmp_path: Path) -> None:
     assert str(manual["id"]) == outgoing["FK_MANUAL"]["id"]
 
 
+def test_duplicate_reference_pairs_deduped(tmp_path: Path) -> None:
+    """同一对 (表, 字段) 在多个 Reference 里重复出现时只保留一条，刷新不报错。"""
+    service = make_service(tmp_path)
+    dup_block = """          <o:Reference Id="o32">
+            <a:Name>重复外键 T_ORDER_ITEM.ORDER_ID -&gt; T_ORDER.ORDER_ID</a:Name>
+            <a:Code>FK_ITEM_ORDER_DUP</a:Code>
+            <a:Cardinality>1..1</a:Cardinality>
+            <c:ParentTable><o:Table Ref="o10" /></c:ParentTable>
+            <c:ChildTable><o:Table Ref="o20" /></c:ChildTable>
+            <c:Joins>
+              <o:ReferenceJoin Id="o33">
+                <c:Object1><o:Column Ref="o11" /></c:Object1>
+                <c:Object2><o:Column Ref="o22" /></c:Object2>
+              </o:ReferenceJoin>
+            </c:Joins>
+          </o:Reference>
+"""
+    duplicated = RELATION_SAMPLE_PDM.replace(
+        "          </o:Reference>\n        </c:References>",
+        "          </o:Reference>\n" + dup_block + "        </c:References>",
+    )
+    source = tmp_path / "重复关系样本.pdm"
+    source.write_text(duplicated, encoding="utf-8", newline="\n")
+    project = service.create_project("重复关系测试")
+    result = service.import_staged_files(str(project["id"]), "", [(source.name, source)], overwrite=False)
+    assert result["errors"] == []
+    tables = service.search_tables(
+        project_id=str(project["id"]),
+        scope_type="project",
+        scope_path="",
+        mode="table",
+        query="",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+    )["items"]
+    order_item = next(item for item in tables if str(item["code"]) == "t_order_item")
+    outgoing = service.list_table_relations(str(order_item["id"]))["outgoing"]
+    assert len(outgoing) == 1
+    assert outgoing[0]["name"] == "FK_ITEM_ORDER"
+
+    refreshed = service.refresh_project(str(project["id"]), force=True)
+    assert refreshed["indexed"] == 1
+    assert len(service.list_table_relations(str(order_item["id"]))["outgoing"]) == 1
+
+
 def test_backup_roundtrip_restores_manual_relations(tmp_path: Path) -> None:
     source_service = make_service(tmp_path / "source")
     order, order_item = import_sample(source_service, tmp_path / "source")

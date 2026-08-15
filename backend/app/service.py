@@ -1035,6 +1035,7 @@ class WorkspaceService:
             (pdm_id, pdm_id),
         )
         auto_rows: list[tuple[Any, ...]] = []
+        seen_keys: set[tuple[str, str, str, str]] = set()
         for reference in parsed.references:
             source_table_id = table_id_by_xml.get(reference.child_table_xml_id)
             target_table_id = table_id_by_xml.get(reference.parent_table_xml_id)
@@ -1047,6 +1048,11 @@ class WorkspaceService:
                 target_field_id = field_id_by_xml.get(join.parent_column_xml_id)
                 if not source_field_id or not target_field_id:
                     continue
+                key = (source_table_id, source_field_id, target_table_id, target_field_id)
+                if key in seen_keys:
+                    # 部分 PDM 里同一对字段会在多个 Reference 中重复出现，去重保留第一条
+                    continue
+                seen_keys.add(key)
                 auto_rows.append(
                     (
                         str(uuid.uuid4()),
@@ -1064,7 +1070,7 @@ class WorkspaceService:
                 )
         connection.executemany(
             """
-            INSERT INTO table_relations(
+            INSERT OR IGNORE INTO table_relations(
                 id, source_table_id, source_field_id, target_table_id, target_field_id,
                 name, cardinality, note, source_type, created_at, updated_at
             ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
