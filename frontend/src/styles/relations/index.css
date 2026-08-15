@@ -338,14 +338,21 @@
 }
 
 /* ===== 新增/编辑关系弹窗 ===== */
+.relation-form-modal .ant-modal-container {
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #d9e4f1;
+  border-radius: 10px;
+}
+
 .relation-form-modal .ant-modal-header {
   margin: 0;
-  padding: 15px 18px;
+  padding: 13px 16px;
   border-bottom: 1px solid #e2eaf3;
 }
 
 .relation-form-modal .ant-modal-body {
-  padding: 16px 18px 4px;
+  padding: 14px 16px 6px;
 }
 
 .relation-form-title {
@@ -355,7 +362,11 @@
 }
 
 .relation-form .ant-form-item {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+}
+
+.relation-form .ant-form-item-label {
+  padding-bottom: 4px;
 }
 
 .relation-form .ant-form-item-label > label {
@@ -365,7 +376,8 @@
 }
 
 .relation-form .ant-input,
-.relation-form .ant-select-selector {
+.relation-form .ant-select-selector,
+.relation-form .ant-select-selection-search-input {
   font-size: 12px;
 }
 
@@ -375,8 +387,12 @@
   column-gap: 14px;
 }
 
+.relation-form-full {
+  grid-column: 1 / -1;
+}
+
 .relation-form-hint {
-  margin: 2px 0 14px;
+  margin: 2px 0 12px;
   color: #9aa8bc;
   font-size: 11px;
   line-height: 1.7;
@@ -432,6 +448,22 @@
   color: #6c7e99;
   font-size: 11px;
   pointer-events: none;
+}
+
+.relation-graph-toolbar {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 2;
+  display: flex;
+  gap: 6px;
+}
+
+.relation-graph-toolbar .ant-btn {
+  height: 28px;
+  min-width: 32px;
+  padding: 0 8px;
+  font-size: 11px;
 }
 
 .relation-graph-legend span {

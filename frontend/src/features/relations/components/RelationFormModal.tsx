@@ -100,7 +100,7 @@ export function RelationFormModal({ open, tableId, editing, options, onClose, on
   return (
     <Modal
       open={open}
-      width={680}
+      width={600}
       centered
       onCancel={onClose}
       className="relation-form-modal"
@@ -111,10 +111,10 @@ export function RelationFormModal({ open, tableId, editing, options, onClose, on
       onOk={() => void save()}
     >
       <Form form={form} layout="vertical" className="relation-form">
-        <Form.Item label="关系名称" name="name" rules={[{ required: true, message: "请输入关系名称" }]}>
-          <Input maxLength={200} placeholder="例如：FK_PEND_TRADE" />
-        </Form.Item>
         <div className="relation-form-grid">
+          <Form.Item className="relation-form-full" label="关系名称" name="name" rules={[{ required: true, message: "请输入关系名称" }]}>
+            <Input maxLength={200} placeholder="例如：FK_PEND_TRADE" />
+          </Form.Item>
           <Form.Item label="源表（引用方）" name="source_table_id" rules={[{ required: true }]}>
             <Select
               showSearch
@@ -140,13 +140,10 @@ export function RelationFormModal({ open, tableId, editing, options, onClose, on
           <Form.Item label="基数" name="cardinality">
             <Select options={CARDINALITY_OPTIONS.map((value) => ({ value, label: value }))} />
           </Form.Item>
-          <Form.Item label="关系类型">
-            <Select value="manual" disabled options={[{ value: "manual", label: "手工维护" }]} />
+          <Form.Item label="说明" name="note">
+            <Input maxLength={1000} placeholder="可选，如：一条委托可分批成交" />
           </Form.Item>
         </div>
-        <Form.Item label="说明" name="note">
-          <Input maxLength={1000} placeholder="可选，如：一条委托可分批成交" />
-        </Form.Item>
         <p className="relation-form-hint">保存后关系立即出现在相关两张表的「表关系」抽屉与关系图中；同一对「源表.字段 → 目标表.字段」不可重复维护。</p>
       </Form>
     </Modal>
