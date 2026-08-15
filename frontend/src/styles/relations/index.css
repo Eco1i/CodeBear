@@ -1,20 +1,14 @@
-/* ===== 表关系：字段面板入口链接 ===== */
-.rel-open-code {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: #159d84;
+/* ===== 表关系：字段面板入口链接（仅变色，保持原有排版） ===== */
+.table-heading code.rel-open-code {
+  color: #d97706;
   cursor: pointer;
 }
 
-.rel-open-code:hover {
-  color: #087f6b;
+.table-heading code.rel-open-code:hover,
+.table-heading code.rel-open-code:focus-visible {
+  color: #b4630a;
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-.rel-open-code .anticon {
-  font-size: 10px;
 }
 
 /* ===== 表关系抽屉 ===== */

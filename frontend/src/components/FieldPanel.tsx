@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ApartmentOutlined,
   CheckOutlined,
   CloseOutlined,
   EditOutlined,
@@ -257,20 +256,21 @@ export function FieldPanel({
                 <span className="table-heading">
                   <strong>{detail.name || detail.code}</strong>
                   <small>
-                    {onOpenRelations ? (
-                      <button
-                        type="button"
-                        className="rel-open-code"
-                        aria-label="查看表关系"
-                        title="点击查看表关系"
-                        onClick={onOpenRelations}
-                      >
-                        <code>{detail.code}</code>
-                        <ApartmentOutlined />
-                      </button>
-                    ) : (
-                      <code>{detail.code}</code>
-                    )}
+                    <code
+                      className={onOpenRelations ? "rel-open-code" : undefined}
+                      title={onOpenRelations ? "点击查看表关系" : undefined}
+                      role={onOpenRelations ? "button" : undefined}
+                      tabIndex={onOpenRelations ? 0 : undefined}
+                      onClick={onOpenRelations}
+                      onKeyDown={(event) => {
+                        if (onOpenRelations && (event.key === "Enter" || event.key === " ")) {
+                          event.preventDefault();
+                          onOpenRelations();
+                        }
+                      }}
+                    >
+                      {detail.code}
+                    </code>
                     {detail.comment && <i>·</i>}
                     {detail.comment && (
                       <FullTextPopover title="表说明" text={detail.comment}>
