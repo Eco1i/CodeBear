@@ -11,6 +11,7 @@ import type {
 } from "../../types";
 import { AiLauncher } from "../../components/AiLauncher";
 import type { UpdateState } from "../updates/types";
+import type { RelationTableInfo } from "../relations/components/RelationDrawer";
 
 const AiAssistant = lazy(() =>
   import("../../components/AiAssistant").then((module) => ({ default: module.AiAssistant })),
@@ -29,6 +30,9 @@ const DictionaryCenterModal = lazy(() =>
 const UpdateModal = lazy(() =>
   import("../updates/components/UpdateModal").then((module) => ({ default: module.UpdateModal })),
 );
+const RelationCenter = lazy(() =>
+  import("../relations/components/RelationCenter").then((module) => ({ default: module.RelationCenter })),
+);
 
 interface LazyFeatureOverlaysProps {
   trees: WorkspaceNode[];
@@ -46,6 +50,9 @@ interface LazyFeatureOverlaysProps {
   updateOpen: boolean;
   updateState: UpdateState | null;
   updateChecking: boolean;
+  relationLoaded: boolean;
+  relationOpen: boolean;
+  relationTable: RelationTableInfo | null;
   aiLoaded: boolean;
   aiOpen: boolean;
   aiMode: AiLayoutMode;
@@ -59,6 +66,8 @@ interface LazyFeatureOverlaysProps {
   onCloseUpdate: () => void;
   onRefreshUpdate: () => void;
   onIgnoreUpdate: (version: string) => void;
+  onCloseRelation: () => void;
+  onRelationJump: (tableId: string) => void;
   onRequestContextChange: (action: () => void) => void;
   onOpenAi: () => void;
   onAiOpenChange: (open: boolean) => void;
@@ -116,6 +125,17 @@ export function LazyFeatureOverlays(props: LazyFeatureOverlaysProps) {
             onClose={props.onCloseUpdate}
             onRefresh={props.onRefreshUpdate}
             onIgnore={props.onIgnoreUpdate}
+          />
+        </Suspense>
+      ) : null}
+
+      {props.relationLoaded ? (
+        <Suspense fallback={<div className="feature-loading" role="status"><Spin size="small" /> 正在打开表关系…</div>}>
+          <RelationCenter
+            open={props.relationOpen}
+            table={props.relationTable}
+            onClose={props.onCloseRelation}
+            onJump={props.onRelationJump}
           />
         </Suspense>
       ) : null}

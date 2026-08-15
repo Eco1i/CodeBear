@@ -75,6 +75,24 @@ CREATE INDEX IF NOT EXISTS idx_fields_table ON model_fields(table_id, ordinal);
 CREATE INDEX IF NOT EXISTS idx_fields_code ON model_fields(code);
 CREATE INDEX IF NOT EXISTS idx_fields_name ON model_fields(name);
 
+CREATE TABLE IF NOT EXISTS table_relations (
+    id TEXT PRIMARY KEY,
+    source_table_id TEXT NOT NULL REFERENCES model_tables(id) ON DELETE CASCADE,
+    source_field_id TEXT NOT NULL REFERENCES model_fields(id) ON DELETE CASCADE,
+    target_table_id TEXT NOT NULL REFERENCES model_tables(id) ON DELETE CASCADE,
+    target_field_id TEXT NOT NULL REFERENCES model_fields(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    cardinality TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    source_type TEXT NOT NULL DEFAULT 'manual' CHECK(source_type IN ('auto', 'manual')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(source_table_id, source_field_id, target_table_id, target_field_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_table_relations_source ON table_relations(source_table_id);
+CREATE INDEX IF NOT EXISTS idx_table_relations_target ON table_relations(target_table_id);
+
 CREATE TABLE IF NOT EXISTS dictionaries (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL COLLATE NOCASE UNIQUE,

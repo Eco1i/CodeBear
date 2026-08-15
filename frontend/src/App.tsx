@@ -101,6 +101,8 @@ export default function App() {
   const [updateOpen, setUpdateOpen] = useState(false);
   const [updateFeatureLoaded, setUpdateFeatureLoaded] = useState(false);
   const [updateChecking, setUpdateChecking] = useState(false);
+  const [relationOpen, setRelationOpen] = useState(false);
+  const [relationFeatureLoaded, setRelationFeatureLoaded] = useState(false);
   const {
     open: aiAssistantOpen,
     loaded: aiFeatureLoaded,
@@ -190,6 +192,23 @@ export default function App() {
   const openUpdatePanel = () => {
     setUpdateFeatureLoaded(true);
     setUpdateOpen(true);
+  };
+
+  const openRelations = () => {
+    if (!detail) {
+      message.info("请先选择一张数据表");
+      return;
+    }
+    setRelationFeatureLoaded(true);
+    setRelationOpen(true);
+  };
+
+  const relationTable = detail
+    ? { id: detail.id, name: detail.name, code: detail.code, comment: detail.comment || "" }
+    : null;
+
+  const jumpRelationTable = (tableId: string) => {
+    requestContextChange(() => setSelectedTableId(tableId));
   };
 
   const refreshUpdates = async () => {
@@ -960,6 +979,7 @@ export default function App() {
               onSave={saveDictionary}
               onDirtyChange={handleDirtyChange}
               bindingRevision={dictionaryBindingRevision}
+              onOpenRelations={openRelations}
             />
           </div>
         </main>
@@ -1008,6 +1028,9 @@ export default function App() {
         updateOpen={updateOpen}
         updateState={updateState}
         updateChecking={updateChecking}
+        relationLoaded={relationFeatureLoaded}
+        relationOpen={relationOpen}
+        relationTable={relationTable}
         aiLoaded={aiFeatureLoaded}
         aiOpen={aiAssistantOpen}
         aiMode={aiLayoutMode}
@@ -1021,6 +1044,8 @@ export default function App() {
         onCloseUpdate={() => setUpdateOpen(false)}
         onRefreshUpdate={() => void refreshUpdates()}
         onIgnoreUpdate={(version: string) => void ignoreUpdate(version)}
+        onCloseRelation={() => setRelationOpen(false)}
+        onRelationJump={jumpRelationTable}
         onRequestContextChange={requestContextChange}
         onOpenAi={openAiAssistant}
         onAiOpenChange={changeAiAssistantOpen}

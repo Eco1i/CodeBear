@@ -414,6 +414,7 @@ class WorkspaceService:
         selections: list[dict[str, Any]],
         *,
         dictionary_payload: dict[str, Any] | None = None,
+        relation_payload: dict[str, Any] | None = None,
     ) -> tuple[Path, str]:
         if not selections:
             raise ServiceError(422, "请至少选择一个待导出节点", code="empty_backup_selection")
@@ -455,6 +456,7 @@ class WorkspaceService:
                 projects,
                 app_version=APP_VERSION,
                 dictionary_payload=dictionary_payload,
+                relation_payload=relation_payload,
             )
         except BackupFormatError as exc:
             archive_path.unlink(missing_ok=True)
@@ -887,6 +889,21 @@ class WorkspaceService:
             (project_id, relative_path),
         ).fetchone()
         resolved_pdm_id = str(existing["id"]) if existing else (pdm_id or str(uuid.uuid4()))
+        # 表/字段行会删除重建：先快照该 PDM 相关的手工关系，重建后恢复
+        manual_relations = connection.execute(
+            """
+            SELECT tr.id, tr.name, tr.cardinality, tr.note, tr.created_at,
+                   st.xml_id AS source_table_xml, sf.xml_id AS source_field_xml,
+                   tt.xml_id AS target_table_xml, tf.xml_id AS target_field_xml
+            FROM table_relations tr
+            JOIN model_tables st ON st.id = tr.source_table_id
+            JOIN model_fields sf ON sf.id = tr.source_field_id
+            JOIN model_tables tt ON tt.id = tr.target_table_id
+            JOIN model_fields tf ON tf.id = tr.target_field_id
+            WHERE tr.source_type = 'manual' AND (st.pdm_id = ? OR tt.pdm_id = ?)
+            """,
+            (resolved_pdm_id, resolved_pdm_id),
+        ).fetchall()
         stat = absolute_path.stat()
         connection.execute(
             """
@@ -977,7 +994,115 @@ class WorkspaceService:
             """,
             field_rows,
         )
+        self._rebuild_table_relations(connection, resolved_pdm_id, parsed, manual_relations)
         return resolved_pdm_id
+
+    @staticmethod
+    def _rebuild_table_relations(
+        connection: sqlite3.Connection,
+        pdm_id: str,
+        parsed: ParsedPdm,
+        manual_relations: list[sqlite3.Row],
+    ) -> None:
+        """重建该 PDM 的自动关系，并恢复快照的手工关系。"""
+        table_id_by_xml = {
+            str(row["xml_id"]): str(row["id"])
+            for row in connection.execute(
+                "SELECT id, xml_id FROM model_tables WHERE pdm_id = ?", (pdm_id,)
+            ).fetchall()
+        }
+        field_id_by_xml = {
+            str(row["xml_id"]): str(row["id"])
+            for row in connection.execute(
+                """
+                SELECT mf.id, mf.xml_id
+                FROM model_fields mf
+                JOIN model_tables mt ON mt.id = mf.table_id
+                WHERE mt.pdm_id = ?
+                """,
+                (pdm_id,),
+            ).fetchall()
+        }
+        now = utc_now()
+        connection.execute(
+            """
+            DELETE FROM table_relations
+            WHERE source_type = 'auto' AND (
+                source_table_id IN (SELECT id FROM model_tables WHERE pdm_id = ?)
+                OR target_table_id IN (SELECT id FROM model_tables WHERE pdm_id = ?)
+            )
+            """,
+            (pdm_id, pdm_id),
+        )
+        auto_rows: list[tuple[Any, ...]] = []
+        for reference in parsed.references:
+            source_table_id = table_id_by_xml.get(reference.child_table_xml_id)
+            target_table_id = table_id_by_xml.get(reference.parent_table_xml_id)
+            if not source_table_id or not target_table_id:
+                continue
+            name = reference.code or "FK"
+            note = reference.name if reference.code else ""
+            for join in reference.joins:
+                source_field_id = field_id_by_xml.get(join.child_column_xml_id)
+                target_field_id = field_id_by_xml.get(join.parent_column_xml_id)
+                if not source_field_id or not target_field_id:
+                    continue
+                auto_rows.append(
+                    (
+                        str(uuid.uuid4()),
+                        source_table_id,
+                        source_field_id,
+                        target_table_id,
+                        target_field_id,
+                        name,
+                        reference.cardinality,
+                        note,
+                        "auto",
+                        now,
+                        now,
+                    )
+                )
+        connection.executemany(
+            """
+            INSERT INTO table_relations(
+                id, source_table_id, source_field_id, target_table_id, target_field_id,
+                name, cardinality, note, source_type, created_at, updated_at
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            auto_rows,
+        )
+        manual_rows: list[tuple[Any, ...]] = []
+        for row in manual_relations:
+            source_table_id = table_id_by_xml.get(str(row["source_table_xml"]))
+            source_field_id = field_id_by_xml.get(str(row["source_field_xml"]))
+            target_table_id = table_id_by_xml.get(str(row["target_table_xml"]))
+            target_field_id = field_id_by_xml.get(str(row["target_field_xml"]))
+            if not all((source_table_id, source_field_id, target_table_id, target_field_id)):
+                continue
+            manual_rows.append(
+                (
+                    str(row["id"]),
+                    source_table_id,
+                    source_field_id,
+                    target_table_id,
+                    target_field_id,
+                    str(row["name"]),
+                    str(row["cardinality"]),
+                    str(row["note"]),
+                    "manual",
+                    str(row["created_at"]),
+                    utc_now(),
+                )
+            )
+        connection.executemany(
+            """
+            INSERT OR IGNORE INTO table_relations(
+                id, source_table_id, source_field_id, target_table_id, target_field_id,
+                name, cardinality, note, source_type, created_at, updated_at
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            manual_rows,
+        )
 
     @staticmethod
     def _update_saved_table_index(
@@ -1629,6 +1754,324 @@ class WorkspaceService:
             for field in fields
         ]
         return result
+
+    # ---- 表关系 ----
+
+    @staticmethod
+    def _relation_row(connection: sqlite3.Connection, relation_id: str) -> sqlite3.Row | None:
+        return connection.execute(
+            """
+            SELECT tr.*,
+                   st.code AS source_table_code, st.name AS source_table_name,
+                   sf.code AS source_field_code, sf.name AS source_field_name,
+                   tt.code AS target_table_code, tt.name AS target_table_name,
+                   tf.code AS target_field_code, tf.name AS target_field_name
+            FROM table_relations tr
+            JOIN model_tables st ON st.id = tr.source_table_id
+            JOIN model_fields sf ON sf.id = tr.source_field_id
+            JOIN model_tables tt ON tt.id = tr.target_table_id
+            JOIN model_fields tf ON tf.id = tr.target_field_id
+            WHERE tr.id = ?
+            """,
+            (relation_id,),
+        ).fetchone()
+
+    @staticmethod
+    def _relation_payload(row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "id": str(row["id"]),
+            "name": str(row["name"]),
+            "cardinality": str(row["cardinality"]),
+            "note": str(row["note"]),
+            "source_type": str(row["source_type"]),
+            "source_table": {
+                "id": str(row["source_table_id"]),
+                "name": str(row["source_table_name"]),
+                "code": str(row["source_table_code"]),
+            },
+            "source_field": {
+                "id": str(row["source_field_id"]),
+                "name": str(row["source_field_name"]),
+                "code": str(row["source_field_code"]),
+            },
+            "target_table": {
+                "id": str(row["target_table_id"]),
+                "name": str(row["target_table_name"]),
+                "code": str(row["target_table_code"]),
+            },
+            "target_field": {
+                "id": str(row["target_field_id"]),
+                "name": str(row["target_field_name"]),
+                "code": str(row["target_field_code"]),
+            },
+            "created_at": str(row["created_at"]),
+            "updated_at": str(row["updated_at"]),
+        }
+
+    def list_table_relations(self, table_id: str) -> dict[str, Any]:
+        with self.database.connect() as connection:
+            current = connection.execute("SELECT pdm_id FROM model_tables WHERE id = ?", (table_id,)).fetchone()
+            if current is None:
+                raise ServiceError(404, "数据表不存在或索引已更新", code="table_not_found")
+            pdm_id = str(current["pdm_id"])
+            incoming = connection.execute(
+                "SELECT id FROM table_relations WHERE target_table_id = ? ORDER BY source_type, name COLLATE NOCASE",
+                (table_id,),
+            ).fetchall()
+            outgoing = connection.execute(
+                "SELECT id FROM table_relations WHERE source_table_id = ? ORDER BY source_type, name COLLATE NOCASE",
+                (table_id,),
+            ).fetchall()
+            incoming_rows = [self._relation_payload(row) for relation in incoming if (row := self._relation_row(connection, str(relation["id"]))) is not None]
+            outgoing_rows = [self._relation_payload(row) for relation in outgoing if (row := self._relation_row(connection, str(relation["id"]))) is not None]
+            option_tables = connection.execute(
+                "SELECT id, name, code FROM model_tables WHERE pdm_id = ? ORDER BY ordinal",
+                (pdm_id,),
+            ).fetchall()
+            option_fields = connection.execute(
+                """
+                SELECT mf.id, mf.table_id, mf.code, mf.name
+                FROM model_fields mf
+                JOIN model_tables mt ON mt.id = mf.table_id
+                WHERE mt.pdm_id = ? ORDER BY mt.ordinal, mf.ordinal
+                """,
+                (pdm_id,),
+            ).fetchall()
+            fields_by_table: dict[str, list[dict[str, str]]] = {}
+            for field in option_fields:
+                fields_by_table.setdefault(str(field["table_id"]), []).append(
+                    {"id": str(field["id"]), "code": str(field["code"]), "name": str(field["name"])}
+                )
+            options = [
+                {
+                    "id": str(table["id"]),
+                    "name": str(table["name"]),
+                    "code": str(table["code"]),
+                    "fields": fields_by_table.get(str(table["id"]), []),
+                }
+                for table in option_tables
+            ]
+        return {"incoming": incoming_rows, "outgoing": outgoing_rows, "options": options}
+
+    def create_relation(
+        self,
+        *,
+        source_table_id: str,
+        source_field_id: str,
+        target_table_id: str,
+        target_field_id: str,
+        name: str,
+        cardinality: str,
+        note: str,
+    ) -> dict[str, Any]:
+        cleaned_name = name.strip()
+        if not cleaned_name or len(cleaned_name) > 200:
+            raise ServiceError(422, "关系名称不能为空且不超过 200 个字符", code="invalid_relation")
+        if len(cardinality) > 20:
+            raise ServiceError(422, "基数格式无效", code="invalid_relation")
+        relation_id = str(uuid.uuid4())
+        now = utc_now()
+        with self._write_lock, self.database.transaction() as connection:
+            for table_id, label in ((source_table_id, "源表"), (target_table_id, "目标表")):
+                if connection.execute("SELECT 1 FROM model_tables WHERE id = ?", (table_id,)).fetchone() is None:
+                    raise ServiceError(404, f"{label}不存在或索引已更新", code="table_not_found")
+            for field_id, table_id, label in (
+                (source_field_id, source_table_id, "源字段"),
+                (target_field_id, target_table_id, "目标字段"),
+            ):
+                if connection.execute(
+                    "SELECT 1 FROM model_fields WHERE id = ? AND table_id = ?",
+                    (field_id, table_id),
+                ).fetchone() is None:
+                    raise ServiceError(422, f"{label}不属于所选表", code="invalid_relation")
+            if connection.execute(
+                """
+                SELECT 1 FROM table_relations
+                WHERE source_table_id = ? AND source_field_id = ? AND target_table_id = ? AND target_field_id = ?
+                """,
+                (source_table_id, source_field_id, target_table_id, target_field_id),
+            ).fetchone() is not None:
+                raise ServiceError(409, "同一对「源表.字段 → 目标表.字段」已存在", code="relation_exists")
+            connection.execute(
+                """
+                INSERT INTO table_relations(
+                    id, source_table_id, source_field_id, target_table_id, target_field_id,
+                    name, cardinality, note, source_type, created_at, updated_at
+                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?)
+                """,
+                (relation_id, source_table_id, source_field_id, target_table_id, target_field_id, cleaned_name, cardinality.strip(), note.strip(), now, now),
+            )
+            row = self._relation_row(connection, relation_id)
+        return self._relation_payload(row)
+
+    def update_relation(
+        self,
+        relation_id: str,
+        *,
+        name: str,
+        cardinality: str,
+        note: str,
+    ) -> dict[str, Any]:
+        cleaned_name = name.strip()
+        if not cleaned_name or len(cleaned_name) > 200:
+            raise ServiceError(422, "关系名称不能为空且不超过 200 个字符", code="invalid_relation")
+        if len(cardinality) > 20:
+            raise ServiceError(422, "基数格式无效", code="invalid_relation")
+        with self._write_lock, self.database.transaction() as connection:
+            row = self._relation_row(connection, relation_id)
+            if row is None:
+                raise ServiceError(404, "关系不存在", code="relation_not_found")
+            if row["source_type"] != "manual":
+                raise ServiceError(422, "自动解析的关系不可编辑，可删除后手工重建", code="relation_readonly")
+            connection.execute(
+                """
+                UPDATE table_relations SET name = ?, cardinality = ?, note = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (cleaned_name, cardinality.strip(), note.strip(), utc_now(), relation_id),
+            )
+            row = self._relation_row(connection, relation_id)
+        return self._relation_payload(row)
+
+    def delete_relation(self, relation_id: str) -> dict[str, bool]:
+        with self._write_lock, self.database.transaction() as connection:
+            row = self._relation_row(connection, relation_id)
+            if row is None:
+                raise ServiceError(404, "关系不存在", code="relation_not_found")
+            if row["source_type"] != "manual":
+                raise ServiceError(422, "自动解析的关系不可删除，重新解析 PDM 时自动同步", code="relation_readonly")
+            connection.execute("DELETE FROM table_relations WHERE id = ?", (relation_id,))
+        return {"deleted": True}
+
+    @staticmethod
+    def _endpoint_in_selection(project_id: str, pdm_path: str, selections: list[dict[str, Any]]) -> bool:
+        for item in selections:
+            if str(item.get("project_id")) != project_id:
+                continue
+            node_type = item.get("type")
+            relative = str(item.get("relative_path") or "")
+            if node_type == "project":
+                return True
+            if node_type == "pdm" and pdm_path.casefold() == relative.casefold():
+                return True
+            if node_type == "folder" and (
+                pdm_path.casefold() == relative.casefold()
+                or pdm_path.casefold().startswith(f"{relative.casefold()}/")
+            ):
+                return True
+        return False
+
+    def export_relation_payload(self, selections: list[dict[str, Any]]) -> dict[str, Any]:
+        """导出手工关系（引用方与被引用方都在选择范围内）。"""
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT tr.*,
+                       sp.relative_path AS source_pdm_path, sp.project_id AS source_project_id,
+                       st.xml_id AS source_table_xml, sf.xml_id AS source_field_xml,
+                       tp.relative_path AS target_pdm_path, tp.project_id AS target_project_id,
+                       tt.xml_id AS target_table_xml, tf.xml_id AS target_field_xml
+                FROM table_relations tr
+                JOIN model_tables st ON st.id = tr.source_table_id
+                JOIN model_fields sf ON sf.id = tr.source_field_id
+                JOIN pdm_files sp ON sp.id = st.pdm_id
+                JOIN model_tables tt ON tt.id = tr.target_table_id
+                JOIN model_fields tf ON tf.id = tr.target_field_id
+                JOIN pdm_files tp ON tp.id = tt.pdm_id
+                WHERE tr.source_type = 'manual'
+                ORDER BY tr.name COLLATE NOCASE
+                """,
+            ).fetchall()
+        relations: list[dict[str, Any]] = []
+        for row in rows:
+            source_in = self._endpoint_in_selection(str(row["source_project_id"]), str(row["source_pdm_path"]), selections)
+            target_in = self._endpoint_in_selection(str(row["target_project_id"]), str(row["target_pdm_path"]), selections)
+            if not (source_in and target_in):
+                continue
+            relations.append(
+                {
+                    "name": str(row["name"]),
+                    "cardinality": str(row["cardinality"]),
+                    "note": str(row["note"]),
+                    "source_project_key": str(row["source_project_id"]),
+                    "source_pdm_path": str(row["source_pdm_path"]),
+                    "source_table_xml": str(row["source_table_xml"]),
+                    "source_field_xml": str(row["source_field_xml"]),
+                    "target_project_key": str(row["target_project_id"]),
+                    "target_pdm_path": str(row["target_pdm_path"]),
+                    "target_table_xml": str(row["target_table_xml"]),
+                    "target_field_xml": str(row["target_field_xml"]),
+                }
+            )
+        return {"version": 1, "relations": relations}
+
+    def import_relation_payload(
+        self,
+        payload: dict[str, Any],
+        project_mapping: dict[str, str],
+    ) -> dict[str, int]:
+        relations = payload.get("relations")
+        if payload.get("version") != 1 or not isinstance(relations, list):
+            raise ServiceError(422, "关系备份内容格式无效", code="invalid_backup")
+        if len(relations) > 100_000:
+            raise ServiceError(422, "关系备份内容数量异常", code="invalid_backup")
+        imported = 0
+        with self._write_lock, self.database.transaction() as connection:
+            for raw in relations:
+                if not isinstance(raw, dict):
+                    raise ServiceError(422, "关系备份内容格式无效", code="invalid_backup")
+
+                def resolve_field(project_key: str, pdm_path: str, table_xml: str, field_xml: str):
+                    project_id = project_mapping.get(project_key, project_key) if project_key else ""
+                    return connection.execute(
+                        """
+                        SELECT mf.id, mf.table_id
+                        FROM model_fields mf
+                        JOIN model_tables mt ON mt.id = mf.table_id
+                        JOIN pdm_files pf ON pf.id = mt.pdm_id
+                        WHERE pf.project_id = ? AND pf.relative_path = ? AND mt.xml_id = ? AND mf.xml_id = ?
+                        """,
+                        (project_id, str(pdm_path), str(table_xml), str(field_xml)),
+                    ).fetchone()
+
+                source = resolve_field(
+                    str(raw.get("source_project_key", "")),
+                    raw.get("source_pdm_path", ""),
+                    raw.get("source_table_xml", ""),
+                    raw.get("source_field_xml", ""),
+                )
+                target = resolve_field(
+                    str(raw.get("target_project_key", "")),
+                    raw.get("target_pdm_path", ""),
+                    raw.get("target_table_xml", ""),
+                    raw.get("target_field_xml", ""),
+                )
+                if source is None or target is None:
+                    continue
+                name = str(raw.get("name", "")).strip()[:200] or "FK"
+                now = utc_now()
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO table_relations(
+                        id, source_table_id, source_field_id, target_table_id, target_field_id,
+                        name, cardinality, note, source_type, created_at, updated_at
+                    ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?)
+                    """,
+                    (
+                        str(uuid.uuid4()),
+                        str(source["table_id"]),
+                        str(source["id"]),
+                        str(target["table_id"]),
+                        str(target["id"]),
+                        name,
+                        str(raw.get("cardinality", ""))[:20],
+                        str(raw.get("note", ""))[:1000],
+                        now,
+                        now,
+                    ),
+                )
+                imported += 1
+        return {"relation_count": imported}
 
     def ddl_options(self) -> dict[str, Any]:
         return build_ddl_options()

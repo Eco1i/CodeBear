@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ApartmentOutlined,
   CheckOutlined,
   CloseOutlined,
   EditOutlined,
@@ -25,6 +26,7 @@ interface FieldPanelProps {
   onSave: (table: TableMetadataUpdate, fields: FieldDefinition[]) => Promise<void>;
   onDirtyChange: (dirty: boolean) => void;
   bindingRevision?: number;
+  onOpenRelations?: () => void;
 }
 
 const cloneFields = (fields: FieldDefinition[]): FieldDefinition[] => fields.map((field) => ({ ...field }));
@@ -83,6 +85,7 @@ export function FieldPanel({
   onSave,
   onDirtyChange,
   bindingRevision = 0,
+  onOpenRelations,
 }: FieldPanelProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<FieldDefinition[]>([]);
@@ -254,7 +257,20 @@ export function FieldPanel({
                 <span className="table-heading">
                   <strong>{detail.name || detail.code}</strong>
                   <small>
-                    <code>{detail.code}</code>
+                    {onOpenRelations ? (
+                      <button
+                        type="button"
+                        className="rel-open-code"
+                        aria-label="查看表关系"
+                        title="点击查看表关系"
+                        onClick={onOpenRelations}
+                      >
+                        <code>{detail.code}</code>
+                        <ApartmentOutlined />
+                      </button>
+                    ) : (
+                      <code>{detail.code}</code>
+                    )}
                     {detail.comment && <i>·</i>}
                     {detail.comment && (
                       <FullTextPopover title="表说明" text={detail.comment}>

@@ -16,7 +16,7 @@ from starlette.background import BackgroundTask
 
 from .ai import AiService
 from .ai_history import AiConversationService
-from .backup import MAX_ARCHIVE_BYTES, extract_dictionary_payload
+from .backup import MAX_ARCHIVE_BYTES, extract_dictionary_payload, extract_relation_payload
 from .config import APP_NAME, APP_VERSION, AppPaths, SettingsStore, bundled_resource
 from .database import Database
 from .dictionaries import DictionaryService, MAX_EXCEL_BYTES
@@ -475,9 +475,11 @@ def export_backup(payload: BackupExportPayload) -> FileResponse:
         include_dictionaries=payload.include_dictionaries,
         include_bindings=payload.include_dictionary_bindings,
     )
+    relation_payload = service.export_relation_payload(selections)
     archive_path, file_name = service.export_backup(
         selections,
         dictionary_payload=dictionary_payload,
+        relation_payload=relation_payload,
     )
     return FileResponse(
         archive_path,
@@ -524,6 +526,7 @@ def inspect_legacy_data(payload: LegacyDataPayload) -> dict:
 def import_backup(payload: BackupImportPayload) -> dict:
     archive_path = service._staged_backup_path(payload.token)
     dictionary_payload = extract_dictionary_payload(archive_path)
+    relation_payload = extract_relation_payload(archive_path)
     result = service.import_backup(
         payload.token,
         [node.model_dump() for node in payload.nodes],
@@ -533,6 +536,11 @@ def import_backup(payload: BackupImportPayload) -> dict:
     if dictionary_payload is not None:
         result["dictionary_import"] = dictionary_service.import_backup_payload(
             dictionary_payload,
+            project_mapping,
+        )
+    if relation_payload is not None:
+        result["relation_import"] = service.import_relation_payload(
+            relation_payload,
             project_mapping,
         )
     return result
@@ -772,6 +780,55 @@ def updates_ignore(payload: IgnoreUpdatePayload) -> dict:
 @app.get("/api/tables/{table_id}")
 def table_detail(table_id: str) -> dict:
     return service.table_detail(table_id)
+
+
+class RelationCreatePayload(BaseModel):
+    source_table_id: str = Field(min_length=1, max_length=100)
+    source_field_id: str = Field(min_length=1, max_length=100)
+    target_table_id: str = Field(min_length=1, max_length=100)
+    target_field_id: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    cardinality: str = Field(default="", max_length=20)
+    note: str = Field(default="", max_length=1000)
+
+
+class RelationUpdatePayload(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    cardinality: str = Field(default="", max_length=20)
+    note: str = Field(default="", max_length=1000)
+
+
+@app.get("/api/tables/{table_id}/relations")
+def table_relations(table_id: str) -> dict:
+    return service.list_table_relations(table_id)
+
+
+@app.post("/api/relations")
+def create_relation(payload: RelationCreatePayload) -> dict:
+    return service.create_relation(
+        source_table_id=payload.source_table_id,
+        source_field_id=payload.source_field_id,
+        target_table_id=payload.target_table_id,
+        target_field_id=payload.target_field_id,
+        name=payload.name,
+        cardinality=payload.cardinality,
+        note=payload.note,
+    )
+
+
+@app.put("/api/relations/{relation_id}")
+def update_relation(relation_id: str, payload: RelationUpdatePayload) -> dict:
+    return service.update_relation(
+        relation_id,
+        name=payload.name,
+        cardinality=payload.cardinality,
+        note=payload.note,
+    )
+
+
+@app.delete("/api/relations/{relation_id}")
+def delete_relation(relation_id: str) -> dict[str, bool]:
+    return service.delete_relation(relation_id)
 
 
 @app.put("/api/tables/{table_id}/fields")

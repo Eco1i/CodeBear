@@ -14,11 +14,13 @@ BACKUP_FORMAT = "codebear-backup"
 BACKUP_FORMAT_VERSION = 1
 MANIFEST_NAME = "manifest.json"
 DICTIONARY_DATA_NAME = "dictionary-data.json"
+RELATION_DATA_NAME = "relation-data.json"
 MAX_ARCHIVE_BYTES = 2 * 1024 * 1024 * 1024
 MAX_UNCOMPRESSED_BYTES = 4 * 1024 * 1024 * 1024
 MAX_ARCHIVE_MEMBERS = 50_000
 MAX_MANIFEST_BYTES = 8 * 1024 * 1024
 MAX_DICTIONARY_BYTES = 64 * 1024 * 1024
+MAX_RELATION_BYTES = 64 * 1024 * 1024
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 WINDOWS_INVALID_SEGMENT = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 WINDOWS_RESERVED_NAMES = {
@@ -92,6 +94,7 @@ def create_backup_archive(
     *,
     app_version: str,
     dictionary_payload: dict[str, Any] | None = None,
+    relation_payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     destination.parent.mkdir(parents=True, exist_ok=True)
     manifest_projects: list[dict[str, Any]] = []
@@ -165,6 +168,19 @@ def create_backup_archive(
             }
             archive.writestr(DICTIONARY_DATA_NAME, dictionary_bytes)
 
+        relation_meta: dict[str, Any] | None = None
+        if relation_payload is not None:
+            relation_bytes = json.dumps(relation_payload, ensure_ascii=False, indent=2).encode("utf-8")
+            if len(relation_bytes) > MAX_RELATION_BYTES:
+                raise BackupFormatError("关系备份内容超过 64 MB 限制", code="backup_too_large")
+            relation_meta = {
+                "archive_path": RELATION_DATA_NAME,
+                "size": len(relation_bytes),
+                "sha256": hashlib.sha256(relation_bytes).hexdigest(),
+                "relation_count": len(relation_payload.get("relations", [])),
+            }
+            archive.writestr(RELATION_DATA_NAME, relation_bytes)
+
         manifest = {
             "format": BACKUP_FORMAT,
             "format_version": BACKUP_FORMAT_VERSION,
@@ -178,10 +194,13 @@ def create_backup_archive(
                 "total_bytes": total_bytes,
                 "dictionary_count": int(dictionary_meta["dictionary_count"]) if dictionary_meta else 0,
                 "binding_count": int(dictionary_meta["binding_count"]) if dictionary_meta else 0,
+                "relation_count": int(relation_meta["relation_count"]) if relation_meta else 0,
             },
         }
         if dictionary_meta is not None:
             manifest["dictionary_data"] = dictionary_meta
+        if relation_meta is not None:
+            manifest["relation_data"] = relation_meta
         archive.writestr(
             MANIFEST_NAME,
             json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"),
@@ -370,6 +389,50 @@ def inspect_backup_archive(path: Path) -> dict[str, Any]:
                 "binding_count": binding_count,
             }
 
+        relation_data = manifest.get("relation_data")
+        relation_count = 0
+        normalized_relation_meta: dict[str, Any] | None = None
+        if relation_data is not None:
+            if not isinstance(relation_data, dict):
+                raise BackupFormatError("关系备份清单格式错误")
+            archive_path = _safe_archive_path(relation_data.get("archive_path"), label="关系归档路径")
+            size = relation_data.get("size")
+            sha256 = relation_data.get("sha256")
+            relation_count = relation_data.get("relation_count", 0)
+            if (
+                not isinstance(size, int)
+                or size < 0
+                or size > MAX_RELATION_BYTES
+                or not isinstance(sha256, str)
+                or not SHA256_PATTERN.fullmatch(sha256)
+                or not isinstance(relation_count, int)
+                or relation_count < 0
+            ):
+                raise BackupFormatError("关系备份清单格式错误")
+            info = info_by_name.get(archive_path)
+            if info is None or info.file_size != size:
+                raise BackupFormatError("关系备份内容缺失或大小不一致")
+            payload_bytes = archive.read(info)
+            if hashlib.sha256(payload_bytes).hexdigest() != sha256:
+                raise BackupFormatError("关系备份内容校验失败", code="backup_checksum_failed")
+            try:
+                payload = json.loads(payload_bytes.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise BackupFormatError("关系备份内容无法读取") from exc
+            if not isinstance(payload, dict) or payload.get("version") != 1:
+                raise BackupFormatError("关系备份内容格式无效")
+            if not isinstance(payload.get("relations"), list):
+                raise BackupFormatError("关系备份内容格式无效")
+            if len(payload["relations"]) != relation_count:
+                raise BackupFormatError("关系备份统计不一致")
+            referenced_members.add(archive_path)
+            normalized_relation_meta = {
+                "archive_path": archive_path,
+                "size": size,
+                "sha256": sha256,
+                "relation_count": relation_count,
+            }
+
         if set(info_by_name) != referenced_members:
             raise BackupFormatError("备份包包含未登记的文件")
 
@@ -386,16 +449,30 @@ def inspect_backup_archive(path: Path) -> dict[str, Any]:
                 "total_bytes": total_bytes,
                 "dictionary_count": dictionary_count,
                 "binding_count": binding_count,
+                "relation_count": relation_count,
             },
         }
         if normalized_dictionary_meta is not None:
             result["dictionary_data"] = normalized_dictionary_meta
+        if normalized_relation_meta is not None:
+            result["relation_data"] = normalized_relation_meta
         return result
 
 
 def extract_dictionary_payload(path: Path) -> dict[str, Any] | None:
     manifest = inspect_backup_archive(path)
     metadata = manifest.get("dictionary_data")
+    if not isinstance(metadata, dict):
+        return None
+    with zipfile.ZipFile(path, mode="r") as archive:
+        raw = archive.read(str(metadata["archive_path"]))
+    payload = json.loads(raw.decode("utf-8"))
+    return payload if isinstance(payload, dict) else None
+
+
+def extract_relation_payload(path: Path) -> dict[str, Any] | None:
+    manifest = inspect_backup_archive(path)
+    metadata = manifest.get("relation_data")
     if not isinstance(metadata, dict):
         return None
     with zipfile.ZipFile(path, mode="r") as archive:

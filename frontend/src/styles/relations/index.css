@@ -1,0 +1,538 @@
+/* ===== 表关系：字段面板入口链接 ===== */
+.rel-open-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #159d84;
+  cursor: pointer;
+}
+
+.rel-open-code:hover {
+  color: #087f6b;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rel-open-code .anticon {
+  font-size: 10px;
+}
+
+/* ===== 表关系抽屉 ===== */
+.relation-drawer .ant-drawer-header {
+  min-height: 64px;
+  padding: 13px 16px;
+  border-bottom: 1px solid #e1e9f3;
+}
+
+.relation-drawer .ant-drawer-body {
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.relation-drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.relation-title-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid #bfe9df;
+  border-radius: 9px;
+  color: #159d84;
+  background: #eaf9f5;
+  font-size: 16px;
+}
+
+.relation-drawer-title > span:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.relation-drawer-title b {
+  overflow: hidden;
+  color: #203550;
+  font-size: 15px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relation-drawer-title small {
+  color: #8494aa;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.relation-context {
+  min-height: 44px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #e2eaf3;
+  background: #f8fafc;
+}
+
+.relation-context-route {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: #7b8ba1;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relation-context-route code {
+  color: #416583;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.relation-status {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #05786d;
+  background: #e9faf7;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.relation-centered {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: #8797aa;
+  font-size: 12px;
+}
+
+.relation-empty-hint {
+  color: #9aa8bc;
+  font-size: 11px;
+}
+
+.relation-list {
+  min-height: 0;
+  flex: 1;
+  padding: 12px 14px 16px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.relation-group {
+  margin-bottom: 12px;
+  border: 1px solid #e2eaf3;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.relation-group:last-child {
+  margin-bottom: 0;
+}
+
+.relation-group-head {
+  height: 36px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #e2eaf3;
+  color: #5b6f8a;
+  background: #f4f8fc;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.rel-dir {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.rel-dir.in {
+  background: var(--green);
+}
+
+.rel-dir.out {
+  background: var(--blue);
+}
+
+.relation-group-count {
+  color: #8b9bb0;
+  font-weight: 500;
+}
+
+.rel-entry {
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.rel-entry:last-child {
+  border-bottom: 0;
+}
+
+.rel-entry:hover {
+  background: #f5fcfa;
+}
+
+.rel-entry-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.rel-entry-row1 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.rel-name {
+  overflow: hidden;
+  color: #355d91;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rel-source-badge {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rel-source-badge.auto {
+  color: #05786d;
+  background: #ddf6f1;
+}
+
+.rel-source-badge.manual {
+  color: #b46b04;
+  background: #fff7e8;
+}
+
+.rel-cardinality {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border-radius: 5px;
+  color: #47637f;
+  background: #eef3f8;
+  font-family: "JetBrains Mono", inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.rel-entry-row2 {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: #4d6280;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.rel-entry-row2 code {
+  overflow: hidden;
+  color: #3d587e;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.rel-arrow {
+  flex: 0 0 auto;
+  color: #a7b6ca;
+}
+
+.rel-entry-row3 {
+  overflow: hidden;
+  color: #8b9bb0;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rel-entry-side {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.rel-jump {
+  color: #159d84;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.rel-jump code {
+  color: #159d84;
+  font-family: inherit;
+  font-weight: 700;
+}
+
+.rel-jump:hover code {
+  color: #087f6b;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rel-row-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.rel-row-actions .ant-btn {
+  height: 22px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+
+.rel-auto-hint {
+  color: #c3ccd9;
+  font-size: 10px;
+}
+
+.relation-drawer-footer {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #e2eaf3;
+  background: #fbfdff;
+}
+
+.relation-drawer-footer > span:first-child {
+  color: #8393a8;
+  font-size: 11px;
+}
+
+.relation-footer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ===== 新增/编辑关系弹窗 ===== */
+.relation-form-modal .ant-modal-header {
+  margin: 0;
+  padding: 15px 18px;
+  border-bottom: 1px solid #e2eaf3;
+}
+
+.relation-form-modal .ant-modal-body {
+  padding: 16px 18px 4px;
+}
+
+.relation-form-title {
+  color: #243955;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.relation-form .ant-form-item {
+  margin-bottom: 14px;
+}
+
+.relation-form .ant-form-item-label > label {
+  color: #5d718c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.relation-form .ant-input,
+.relation-form .ant-select-selector {
+  font-size: 12px;
+}
+
+.relation-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 14px;
+}
+
+.relation-form-hint {
+  margin: 2px 0 14px;
+  color: #9aa8bc;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+/* ===== 关系图 ===== */
+.relation-graph-modal .ant-modal-container {
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #d9e4f1;
+  border-radius: 11px;
+}
+
+.relation-graph-modal .ant-modal-header {
+  margin: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e2eaf3;
+}
+
+.relation-graph-modal .ant-modal-body {
+  padding: 0;
+  position: relative;
+}
+
+.relation-graph-title {
+  color: #243955;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.relation-graph-wrap {
+  position: relative;
+  height: min(560px, calc(100vh - 220px));
+  background: #fbfcfe;
+  overflow: hidden;
+}
+
+.relation-graph-wrap svg {
+  display: block;
+}
+
+.relation-graph-legend {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 2;
+  padding: 9px 13px;
+  display: grid;
+  gap: 6px;
+  border: 1px solid #dce6f2;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #6c7e99;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.relation-graph-legend span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.relation-graph-legend i {
+  width: 18px;
+  height: 0;
+  display: inline-block;
+  border-top: 2px solid var(--blue);
+}
+
+.relation-graph-legend i.manual {
+  border-top-style: dashed;
+  border-top-color: #d9972d;
+}
+
+.relation-graph-tip {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 6px 14px;
+  border: 1px solid #dce6f2;
+  border-radius: 999px;
+  color: #6c7e99;
+  background: rgba(255, 255, 255, 0.94);
+  font-size: 11px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.graph-node {
+  cursor: pointer;
+}
+
+.graph-node rect {
+  fill: #fff;
+  stroke: #c9d8ea;
+  stroke-width: 1.2;
+  rx: 9;
+}
+
+.graph-node:hover rect {
+  stroke: #9fc6ff;
+}
+
+.graph-node.selected rect {
+  stroke: var(--blue);
+  stroke-width: 2;
+  fill: #f0f7ff;
+}
+
+.graph-node-name {
+  font-size: 12px;
+  font-weight: 700;
+  fill: #31445f;
+}
+
+.graph-node-code {
+  font-size: 10px;
+  fill: #6481a6;
+  font-family: "JetBrains Mono", inherit;
+}
+
+.graph-node-meta {
+  font-size: 9px;
+  fill: #94a3b8;
+}
+
+.graph-edge {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 1.6;
+}
+
+.graph-edge.manual {
+  stroke: #d9972d;
+  stroke-dasharray: 5 4;
+}
+
+.graph-edge-label {
+  font-size: 9px;
+  fill: #6c7e99;
+  font-family: "JetBrains Mono", inherit;
+}
+
+.graph-arrow {
+  fill: var(--blue);
+}
+
+.graph-arrow.manual {
+  fill: #d9972d;
+}

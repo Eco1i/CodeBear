@@ -40,6 +40,23 @@ class ParsedTable:
 
 
 @dataclass(frozen=True)
+class ParsedReferenceJoin:
+    parent_column_xml_id: str
+    child_column_xml_id: str
+
+
+@dataclass(frozen=True)
+class ParsedReference:
+    xml_id: str
+    name: str
+    code: str
+    cardinality: str
+    parent_table_xml_id: str
+    child_table_xml_id: str
+    joins: tuple[ParsedReferenceJoin, ...]
+
+
+@dataclass(frozen=True)
 class ParsedPdm:
     source_hash: str
     file_size: int
@@ -47,6 +64,7 @@ class ParsedPdm:
     pd_version: str
     target_db: str
     tables: tuple[ParsedTable, ...]
+    references: tuple[ParsedReference, ...] = ()
 
     @property
     def field_count(self) -> int:
@@ -183,6 +201,50 @@ def parse_pdm(path: Path) -> ParsedPdm:
             model_name = _attribute_texts(model_node).get("Name", "")
             break
 
+    table_xml_ids = {table.xml_id for table in tables}
+    references: list[ParsedReference] = []
+    for reference_node in root.iter(f"{O}Reference"):
+        reference_xml_id = reference_node.get("Id")
+        if not reference_xml_id:
+            continue
+        parent_node = reference_node.find(f"{C}ParentTable/{O}Table")
+        child_node = reference_node.find(f"{C}ChildTable/{O}Table")
+        parent_table_xml_id = parent_node.get("Ref") if parent_node is not None else None
+        child_table_xml_id = child_node.get("Ref") if child_node is not None else None
+        if not parent_table_xml_id or not child_table_xml_id:
+            continue
+        if parent_table_xml_id not in table_xml_ids or child_table_xml_id not in table_xml_ids:
+            continue
+        joins: list[ParsedReferenceJoin] = []
+        joins_collection = reference_node.find(f"{C}Joins")
+        if joins_collection is not None:
+            for join_node in joins_collection:
+                if join_node.tag != f"{O}ReferenceJoin":
+                    continue
+                object1 = join_node.find(f"{C}Object1/{O}Column")
+                object2 = join_node.find(f"{C}Object2/{O}Column")
+                parent_column_xml_id = object1.get("Ref") if object1 is not None else None
+                child_column_xml_id = object2.get("Ref") if object2 is not None else None
+                if parent_column_xml_id and child_column_xml_id:
+                    joins.append(
+                        ParsedReferenceJoin(
+                            parent_column_xml_id=str(parent_column_xml_id),
+                            child_column_xml_id=str(child_column_xml_id),
+                        )
+                    )
+        attributes = _attribute_texts(reference_node)
+        references.append(
+            ParsedReference(
+                xml_id=str(reference_xml_id),
+                name=attributes.get("Name", ""),
+                code=attributes.get("Code", ""),
+                cardinality=attributes.get("Cardinality", ""),
+                parent_table_xml_id=str(parent_table_xml_id),
+                child_table_xml_id=str(child_table_xml_id),
+                joins=tuple(joins),
+            )
+        )
+
     stat = path.stat()
     return ParsedPdm(
         source_hash=file_sha256(path),
@@ -191,6 +253,7 @@ def parse_pdm(path: Path) -> ParsedPdm:
         pd_version=metadata.get("version", ""),
         target_db=metadata.get("Target", ""),
         tables=tuple(tables),
+        references=tuple(references),
     )
 
 
