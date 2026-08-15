@@ -1,14 +1,14 @@
 .update-chip {
-  height: 25.5px;
-  padding: 0 9px;
+  height: 34px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   border: 1px solid #dbe5f1;
-  border-radius: 5px;
+  border-radius: 7px;
   color: #657792;
   background: #fff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
