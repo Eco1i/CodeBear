@@ -460,7 +460,19 @@
 }
 
 .relation-form-modal .ant-modal-body {
-  padding: 14px 16px 6px;
+  padding: 16px 18px 6px;
+}
+
+.relation-form-modal .ant-modal-footer {
+  height: 62px;
+  min-height: 62px;
+  margin: 0;
+  padding: 13px 18px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #dfe8f3;
 }
 
 .relation-form-title {
@@ -470,11 +482,11 @@
 }
 
 .relation-form .ant-form-item {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .relation-form .ant-form-item-label {
-  padding-bottom: 4px;
+  padding-bottom: 6px;
 }
 
 .relation-form .ant-form-item-label > label {
@@ -518,7 +530,7 @@
 }
 
 .relation-form-hint {
-  margin: 2px 0 12px;
+  margin: 4px 0 8px;
   color: #9aa8bc;
   font-size: 11px;
   line-height: 1.7;
