@@ -1447,6 +1447,9 @@ class WorkspaceService:
             if progress is not None:
                 progress(processed, total, current_file)
 
+        # 立即上报总数，前端可在解析阶段就显示 0/total 进度
+        report(0, "")
+
         results: list[dict[str, Any]] = []
         to_process: list[tuple[Path, sqlite3.Row | None]] = []
         processed = 0

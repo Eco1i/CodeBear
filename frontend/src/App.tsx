@@ -731,27 +731,31 @@ export default function App() {
     const projectId = getProjectId(node) || projects[0]?.id;
     if (!projectId) return;
     setRefreshing(true);
-    let modalVisible = false;
     const pending: RefreshProgressView = { force, processed: 0, total: 0, currentFile: "" };
-    const showTimer = window.setTimeout(() => {
-      modalVisible = true;
-      setRefreshProgress(pending);
-    }, REFRESH_MODAL_DELAY_MS);
-    const pollTimer = window.setInterval(() => {
+    const refreshPromise = workspaceApi.refresh(projectId, force);
+    const pollProgress = () => {
       workspaceApi
         .refreshProgress(projectId)
         .then((progress: RefreshProgress) => {
           pending.processed = progress.processed ?? pending.processed;
           pending.total = progress.total ?? pending.total;
           pending.currentFile = progress.current_file ?? "";
-          if (modalVisible) setRefreshProgress({ ...pending });
+          setRefreshProgress((current) => (current ? { ...pending } : current));
         })
         .catch(() => {
           // 进度轮询失败不阻塞刷新主流程
         });
-    }, REFRESH_POLL_INTERVAL_MS);
+    };
+    let modalVisible = false;
+    const showTimer = window.setTimeout(() => {
+      modalVisible = true;
+      setRefreshProgress({ ...pending });
+      pollProgress();
+    }, REFRESH_MODAL_DELAY_MS);
+    pollProgress();
+    const pollTimer = window.setInterval(pollProgress, REFRESH_POLL_INTERVAL_MS);
     try {
-      const result = await workspaceApi.refresh(projectId, force);
+      const result = await refreshPromise;
       window.clearTimeout(showTimer);
       window.clearInterval(pollTimer);
       setRefreshProgress(null);
