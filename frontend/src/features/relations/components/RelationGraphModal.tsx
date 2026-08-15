@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "antd";
 import { buildEdges, layoutGraph, NODE_SIZE } from "../model";
 import type { GraphEdge, GraphNode, Relation, RelationOptionTable } from "../types";
@@ -33,17 +33,20 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
     setCenterId(centerTableId);
   }, [open, centerTableId]);
 
+  const measure = useCallback(() => {
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (rect && rect.width > 0 && rect.height > 0) {
+      setSize({ width: Math.round(rect.width), height: Math.round(rect.height) });
+    }
+  }, []);
+
   useEffect(() => {
-    if (!open || !wrapRef.current) return;
-    const measure = () => {
-      const rect = wrapRef.current?.getBoundingClientRect();
-      if (rect) setSize({ width: Math.round(rect.width), height: Math.round(rect.height) });
-    };
+    if (!open) return;
     measure();
     const observer = new ResizeObserver(measure);
     if (wrapRef.current) observer.observe(wrapRef.current);
     return () => observer.disconnect();
-  }, [open]);
+  }, [open, measure]);
 
   useEffect(() => {
     if (!open || size.width <= 0 || size.height <= 0) return;
@@ -104,6 +107,9 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
       className="relation-graph-modal"
       title={<span className="relation-graph-title">表关系图</span>}
       footer={null}
+      afterOpenChange={(nextOpen) => {
+        if (nextOpen) measure();
+      }}
     >
       <div className="relation-graph-wrap" ref={wrapRef}>
         <div className="relation-graph-legend">
