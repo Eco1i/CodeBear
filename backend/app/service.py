@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import os
 import json
+import logging
+import os
 import re
 import shutil
 import sqlite3
@@ -22,6 +23,9 @@ from .database import Database
 from .ddl import ddl_options as build_ddl_options
 from .ddl import generate_ddl as render_ddl
 from .pdm import ParsedPdm, file_sha256, parse_pdm, update_pdm_dictionary
+
+
+logger = logging.getLogger("backend.app.service")
 
 
 WINDOWS_RESERVED_NAMES = {
@@ -457,7 +461,8 @@ class WorkspaceService:
             raise ServiceError(422, str(exc), code=exc.code) from exc
         except OSError as exc:
             archive_path.unlink(missing_ok=True)
-            raise ServiceError(500, f"无法创建备份包：{exc}", code="backup_export_failed") from exc
+            logger.exception("创建备份包失败")
+            raise ServiceError(500, "无法创建备份包，请查看服务日志", code="backup_export_failed") from exc
         return archive_path, file_name
 
     def _inspection_payload(
@@ -489,7 +494,8 @@ class WorkspaceService:
             raise ServiceError(422, str(exc), code=exc.code) from exc
         except OSError as exc:
             target.unlink(missing_ok=True)
-            raise ServiceError(422, f"无法读取备份包：{exc}", code="invalid_backup") from exc
+            logger.exception("读取备份包失败")
+            raise ServiceError(422, "无法读取备份包，请确认文件完整且可读", code="invalid_backup") from exc
         return self._inspection_payload(
             manifest,
             token=token,
@@ -562,7 +568,8 @@ class WorkspaceService:
             raise ServiceError(422, str(exc), code=exc.code) from exc
         except OSError as exc:
             target.unlink(missing_ok=True)
-            raise ServiceError(500, f"无法读取旧版数据：{exc}", code="legacy_migration_failed") from exc
+            logger.exception("读取旧版数据失败")
+            raise ServiceError(500, "无法读取旧版数据，请查看服务日志", code="legacy_migration_failed") from exc
         return self._inspection_payload(
             manifest,
             token=token,
@@ -792,11 +799,12 @@ class WorkspaceService:
                                         absolute_path,
                                         error_message,
                                     )
+                                    logger.warning("备份导入 PDM 解析失败 %s: %s", relative_path, exc)
                                     parse_errors.append(
                                         {
                                             "relative_path": relative_path,
                                             "status": "error",
-                                            "error": error_message,
+                                            "error": "PDM 解析失败",
                                         }
                                     )
                                 updated_pdm_ids.add(pdm_id)
@@ -837,7 +845,8 @@ class WorkspaceService:
                     raise
                 if isinstance(exc, BackupFormatError):
                     raise ServiceError(422, str(exc), code=exc.code) from exc
-                raise ServiceError(500, f"导入备份失败：{exc}", code="backup_import_failed") from exc
+                logger.exception("导入备份失败")
+                raise ServiceError(500, "导入备份失败，请查看服务日志", code="backup_import_failed") from exc
 
         return {
             "projects": [
@@ -1180,7 +1189,8 @@ class WorkspaceService:
             error_message = str(exc)
             with self.database.transaction() as connection:
                 self._index_parse_error(connection, project_id, relative, absolute, error_message)
-            return {"relative_path": relative, "status": "error", "error": error_message}
+            logger.warning("PDM 解析失败 %s: %s", relative, exc)
+            return {"relative_path": relative, "status": "error", "error": "PDM 解析失败"}
 
     def refresh_project(self, project_id: str, *, force: bool = False) -> dict[str, Any]:
         project = self.get_project(project_id)
@@ -1273,7 +1283,13 @@ class WorkspaceService:
                         }
                     )
                 except Exception as exc:
-                    errors.append({"name": file_name, "error": str(exc)})
+                    if isinstance(exc, (etree.XMLSyntaxError, ValueError)):
+                        message = "PDM 解析失败"
+                        logger.warning("导入 PDM 解析失败 %s: %s", file_name, exc)
+                    else:
+                        message = "导入失败"
+                        logger.exception("导入 PDM 失败 %s", file_name)
+                    errors.append({"name": file_name, "error": message})
         return {"imported": imported, "errors": errors}
 
     def rename_node(self, project_id: str, relative_path: str, name: str) -> dict[str, Any]:

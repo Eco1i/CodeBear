@@ -46,9 +46,19 @@ def build_log_config() -> dict:
     if getattr(sys, "frozen", False):
         config["loggers"]["uvicorn"]["handlers"] = ["file"]
         config["loggers"]["uvicorn.access"]["handlers"] = ["file"]
+        config["loggers"]["backend"] = {
+            "handlers": ["file"],
+            "level": "INFO",
+            "propagate": False,
+        }
     else:
         config["loggers"]["uvicorn"]["handlers"].append("file")
         config["loggers"]["uvicorn.access"]["handlers"].append("file")
+        config["loggers"]["backend"] = {
+            "handlers": ["default", "file"],
+            "level": "INFO",
+            "propagate": False,
+        }
     return config
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import zipfile
 from pathlib import Path
@@ -685,12 +686,13 @@ def test_backup_batch_import_rolls_back_files_database_and_fts_triggers(
         raise RuntimeError("模拟批量索引失败")
 
     monkeypatch.setattr(target_service, "_index_parsed", fail_index)
-    with pytest.raises(ServiceError, match="模拟批量索引失败"):
+    with pytest.raises(ServiceError, match="导入备份失败") as exc_info:
         target_service.import_backup(
             inspection["token"],
             [{"project_key": project_key, "type": "project", "relative_path": ""}],
             "rename",
         )
+    assert exc_info.value.code == "backup_import_failed"
 
     assert target_service.list_projects() == []
     assert not (target_service.workspace_root / "回滚验证项目").exists()
@@ -731,3 +733,61 @@ def test_backup_rejects_internal_workspace_paths(tmp_path: Path) -> None:
 
     with pytest.raises(BackupFormatError, match="Windows 不允许"):
         inspect_backup_archive(archive_path)
+
+
+def test_import_error_messages_do_not_leak_exception_details(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    project = service.create_project("异常样本")
+    malformed = tmp_path / "坏文件.pdm"
+    malformed.write_text("<Model><unclosed>", encoding="utf-8")
+    result = service.import_staged_files(
+        str(project["id"]),
+        "",
+        [(malformed.name, malformed)],
+        overwrite=False,
+    )
+    assert [item["name"] for item in result["errors"]] == ["坏文件.pdm"]
+    assert result["errors"][0]["error"] == "PDM 解析失败"
+
+
+def test_backup_import_parse_errors_are_generic(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    malformed = b"<Model><unclosed>"
+    digest = hashlib.sha256(malformed).hexdigest()
+    manifest = {
+        "format": "codebear-backup",
+        "format_version": 1,
+        "app_version": "1.1.1",
+        "created_at": "2026-08-15T00:00:00+00:00",
+        "projects": [
+            {
+                "key": "project-1",
+                "name": "异常项目",
+                "entries": [
+                    {
+                        "type": "pdm",
+                        "path": "坏文件.pdm",
+                        "archive_path": "content/0/坏文件.pdm",
+                        "size": len(malformed),
+                        "sha256": digest,
+                    }
+                ],
+            }
+        ],
+    }
+    archive_path = tmp_path / "坏备份.cbbak"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False))
+        archive.writestr("content/0/坏文件.pdm", malformed)
+
+    inspection = service.stage_backup_file(archive_path, archive_path.name)
+    project_key = str(inspection["projects"][0]["key"])
+    result = service.import_backup(
+        inspection["token"],
+        [{"project_key": project_key, "type": "project", "relative_path": ""}],
+        "rename",
+    )
+    assert result["parse_errors"][0]["relative_path"] == "坏文件.pdm"
+    assert result["parse_errors"][0]["error"] == "PDM 解析失败"
+    serialized = json.dumps(result, ensure_ascii=False)
+    assert "unclosed" not in serialized

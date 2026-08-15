@@ -4,7 +4,7 @@
 
 码熊是一个面向 PowerDesigner PDM 的本地数据字典工作台。它在本机解析、索引和管理 PDM 副本，让你可以快速浏览表与字段、搜索数据字典、安全修订字段，并生成多种数据库的建表脚本。
 
-> 当前稳定版本：`v1.1.0` · 主要支持平台：Windows 10/11 x64
+> 当前稳定版本：`v1.1.2` · 主要支持平台：Windows 10/11 x64
 
 ## 功能
 
@@ -54,11 +54,11 @@
 
 ### Windows 绿色版
 
-从 GitHub Releases 下载 `CodeBear-v1.1.0-win-x64.zip`。同名 `.sha256` 文件用于可选的完整性校验：
+从 GitHub Releases 下载 `CodeBear-v1.1.2-win-x64.zip`。同名 `.sha256` 文件用于可选的完整性校验：
 
 ```powershell
-Get-FileHash .\CodeBear-v1.1.0-win-x64.zip -Algorithm SHA256
-Get-Content .\CodeBear-v1.1.0-win-x64.zip.sha256
+Get-FileHash .\CodeBear-v1.1.2-win-x64.zip -Algorithm SHA256
+Get-Content .\CodeBear-v1.1.2-win-x64.zip.sha256
 ```
 
 确认两处哈希值一致后完整解压 ZIP，双击 `CodeBear.exe`。默认浏览器将打开 `http://127.0.0.1:8765`。

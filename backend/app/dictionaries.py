@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sqlite3
 import uuid
 from pathlib import Path
@@ -10,6 +11,9 @@ from openpyxl import load_workbook
 
 from .database import Database
 from .service import ServiceError, normalize_relative_path, utc_now
+
+
+logger = logging.getLogger("backend.app.dictionaries")
 
 
 MAX_DICTIONARY_ITEMS = 100_000
@@ -203,7 +207,8 @@ class DictionaryService:
         try:
             return load_workbook(source, read_only=True, data_only=True)
         except Exception as exc:
-            raise ServiceError(422, f"无法读取 Excel：{exc}", code="invalid_dictionary_excel") from exc
+            logger.warning("读取 Excel 失败: %s", exc)
+            raise ServiceError(422, "无法读取 Excel 文件，请确认文件未损坏且格式正确", code="invalid_dictionary_excel") from exc
 
     def inspect_excel(self, source: BinaryIO, file_name: str) -> dict[str, Any]:
         if Path(file_name).suffix.casefold() not in {".xlsx", ".xlsm"}:
