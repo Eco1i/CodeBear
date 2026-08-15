@@ -141,16 +141,24 @@ export function buildEdges(
 ): GraphEdge[] {
   const center = nodes[centerTableId];
   if (!center) return [];
+  // 同一对表的多条关系在端点上错开，避免曲线完全重叠
+  const counts = new Map<string, number>();
+  items.forEach((item) => counts.set(item.nodeId, (counts.get(item.nodeId) || 0) + 1));
+  const seen = new Map<string, number>();
   return items
     .filter((item) => nodes[item.nodeId])
     .map((item) => {
       const node = nodes[item.nodeId];
       const half = node.mode === "bubble" ? node.width / 2 : 7.5;
       const centerHalf = center.mode === "bubble" ? center.width / 2 : 12;
+      const total = counts.get(item.nodeId) || 1;
+      const index = seen.get(item.nodeId) || 0;
+      seen.set(item.nodeId, index + 1);
+      const offset = (index - (total - 1) / 2) * 7;
       const x1 = item.side < 0 ? node.x + half : center.x + centerHalf;
-      const y1 = item.side < 0 ? node.y : center.y;
+      const y1 = item.side < 0 ? node.y + offset : center.y + offset;
       const x2 = item.side < 0 ? center.x - centerHalf : node.x - half;
-      const y2 = item.side < 0 ? center.y : node.y;
+      const y2 = item.side < 0 ? center.y + offset : node.y + offset;
       return {
         relation: item.relation,
         sourceTableId: item.relation.source_table.id,

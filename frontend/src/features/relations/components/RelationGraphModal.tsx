@@ -72,6 +72,7 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
   const dragRef = useRef<DragState | null>(null);
   const panRef = useRef<PanState | null>(null);
   const enterTimer = useRef<number | null>(null);
+  const lastClickRef = useRef<{ id: string; time: number } | null>(null);
 
   const tableById = (id: string) => tables.find((item) => item.id === id);
   const centerCode = tableById(centerId)?.code || "";
@@ -232,14 +233,19 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
       const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
       const clickedId = drag.id;
       dragRef.current = null;
-      if (moved < 5 && clickedId !== centerId) {
+      if (moved < 5) {
+        // pointerdown 的 preventDefault 会吞掉原生 dblclick，这里按点击间隔手动识别双击
+        const now = performance.now();
+        const last = lastClickRef.current;
+        if (last && last.id === clickedId && now - last.time < 350) {
+          lastClickRef.current = null;
+          if (clickedId !== centerId) jumpToCenter(clickedId);
+          return;
+        }
+        lastClickRef.current = { id: clickedId, time: now };
         // 单击相关表：聚焦该表，其余变暗淡；再点取消
         setFocus((current) =>
           current?.kind === "node" && current.id === clickedId ? null : { kind: "node", id: clickedId },
-        );
-      } else if (moved < 5 && clickedId === centerId) {
-        setFocus((current) =>
-          current?.kind === "node" && current.id === centerId ? null : { kind: "node", id: centerId },
         );
       }
     } else if (panRef.current) {
@@ -415,9 +421,6 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
                   onMouseLeave={() => {
                     setHoveredNodeId(null);
                     setHoverTip(null);
-                  }}
-                  onDoubleClick={() => {
-                    if (!isCenter) jumpToCenter(node.id);
                   }}
                 >
                   {node.mode === "bubble" ? (

@@ -61,6 +61,19 @@ describe("relations model", () => {
     expect(layout.edges).toHaveLength(17);
   });
 
+  it("offsets edges when several relations share the same table pair", () => {
+    const first = child("t-child", "T_CHILD");
+    const second = relation({
+      id: "r2",
+      source_table: { id: "t-child", name: "T_CHILD", code: "T_CHILD" },
+      source_field: { id: "f3", name: "备用编号", code: "ALT_ID" },
+    });
+    const layout = layoutGraph("t-parent", "T_PARENT", [first, second], 1000, 600);
+    expect(layout.nodes).toHaveProperty("t-child");
+    expect(layout.edges).toHaveLength(2);
+    expect(layout.edges[0].y1).not.toBe(layout.edges[1].y1);
+  });
+
   it("sizes bubbles by code length with a cap", () => {
     expect(bubbleWidth("T")).toBeGreaterThanOrEqual(34);
     expect(bubbleWidth("T_VERY_LONG_CODE")).toBeLessThanOrEqual(92);
