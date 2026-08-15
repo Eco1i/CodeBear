@@ -51,12 +51,26 @@ export interface GraphNode {
   id: string;
   x: number;
   y: number;
+  width: number;
+  mode: "bubble" | "dot";
+}
+
+export interface GraphItem {
+  nodeId: string;
+  side: -1 | 1;
+  relation: Relation;
+  x: number;
+  y: number;
+  width: number;
+  mode: "bubble" | "dot";
 }
 
 export interface GraphEdge {
   relation: Relation;
   sourceTableId: string;
   targetTableId: string;
+  nodeId: string;
+  side: -1 | 1;
   x1: number;
   y1: number;
   x2: number;

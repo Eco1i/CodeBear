@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardinalityText, CARDINALITY_OPTIONS, layoutGraph, relationDisplayName } from "./model";
+import { bubbleWidth, cardinalityText, CARDINALITY_OPTIONS, layoutGraph, relationDisplayName } from "./model";
 import type { Relation } from "./types";
 
 const relation = (overrides: Partial<Relation> = {}): Relation => ({
@@ -17,18 +17,58 @@ const relation = (overrides: Partial<Relation> = {}): Relation => ({
   ...overrides,
 });
 
+const child = (id = "t-child", code = "T_CHILD") =>
+  relation({
+    id: `r-${id}`,
+    source_table: { id, name: code, code },
+    target_table: { id: "t-parent", name: "T_PARENT", code: "T_PARENT" },
+  });
+
 describe("relations model", () => {
-  it("layouts center plus one-hop neighbors", () => {
-    const layout = layoutGraph("t-parent", [relation()], 1000, 600);
+  it("layouts center bubble plus one-hop neighbor bubbles", () => {
+    const layout = layoutGraph("t-parent", "T_PARENT", [relation()], 1000, 600);
     expect(Object.keys(layout.nodes).sort()).toEqual(["t-child", "t-parent"]);
-    expect(layout.nodes["t-parent"]).toEqual({ id: "t-parent", x: 500, y: 300 });
-    expect(layout.neighborIds).toEqual(["t-child"]);
+    expect(layout.nodes["t-parent"]).toEqual({ id: "t-parent", x: 500, y: 300, width: expect.any(Number), mode: "bubble" });
+    expect(layout.nodes["t-child"].mode).toBe("bubble");
+    expect(layout.items).toHaveLength(1);
     expect(layout.edges).toHaveLength(1);
     expect(layout.edges[0].sourceTableId).toBe("t-child");
+    expect(layout.edges[0].side).toBe(-1);
+  });
+
+  it("places incoming on the left and outgoing on the right of the center", () => {
+    const incoming = child("t-in", "T_IN");
+    const outgoing = relation({
+      id: "r-out",
+      source_table: { id: "t-parent", name: "T_PARENT", code: "T_PARENT" },
+      target_table: { id: "t-out", name: "T_OUT", code: "T_OUT" },
+      target_field: { id: "f2", name: "编号", code: "ID" },
+    });
+    const layout = layoutGraph("t-parent", "T_PARENT", [incoming, outgoing], 1000, 600);
+    expect(layout.nodes["t-in"].x).toBeLessThan(500);
+    expect(layout.nodes["t-out"].x).toBeGreaterThan(500);
+    const inEdge = layout.edges.find((edge) => edge.nodeId === "t-in");
+    const outEdge = layout.edges.find((edge) => edge.nodeId === "t-out");
+    expect(inEdge?.side).toBe(-1);
+    expect(outEdge?.side).toBe(1);
+  });
+
+  it("falls back to dots when there are more than 16 relations", () => {
+    const many = Array.from({ length: 17 }, (_, index) => child(`t-${index}`, `T_${index}`));
+    const layout = layoutGraph("t-parent", "T_PARENT", many, 1000, 600);
+    expect(Object.values(layout.nodes).every((node) => node.mode === "dot")).toBe(true);
+    expect(layout.items).toHaveLength(17);
+    expect(layout.edges).toHaveLength(17);
+  });
+
+  it("sizes bubbles by code length with a cap", () => {
+    expect(bubbleWidth("T")).toBeGreaterThanOrEqual(34);
+    expect(bubbleWidth("T_VERY_LONG_CODE")).toBeLessThanOrEqual(92);
+    expect(bubbleWidth("T_VERY_LONG_CODE")).toBeGreaterThan(bubbleWidth("T"));
   });
 
   it("returns empty layout for missing dimensions", () => {
-    expect(layoutGraph("t-parent", [relation()], 0, 0).edges).toEqual([]);
+    expect(layoutGraph("t-parent", "T_PARENT", [relation()], 0, 0).edges).toEqual([]);
   });
 
   it("formats names and cardinality", () => {
