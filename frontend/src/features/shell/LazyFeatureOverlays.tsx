@@ -10,6 +10,7 @@ import type {
   WorkspaceNode,
 } from "../../types";
 import { AiLauncher } from "../../components/AiLauncher";
+import type { UpdateState } from "../updates/types";
 
 const AiAssistant = lazy(() =>
   import("../../components/AiAssistant").then((module) => ({ default: module.AiAssistant })),
@@ -25,6 +26,9 @@ const DdlExportModal = lazy(() =>
 const DictionaryCenterModal = lazy(() =>
   import("../../components/DictionaryCenterModal").then((module) => ({ default: module.DictionaryCenterModal })),
 );
+const UpdateModal = lazy(() =>
+  import("../updates/components/UpdateModal").then((module) => ({ default: module.UpdateModal })),
+);
 
 interface LazyFeatureOverlaysProps {
   trees: WorkspaceNode[];
@@ -38,6 +42,10 @@ interface LazyFeatureOverlaysProps {
   ddlOpen: boolean;
   dictionaryLoaded: boolean;
   dictionaryOpen: boolean;
+  updateLoaded: boolean;
+  updateOpen: boolean;
+  updateState: UpdateState | null;
+  updateChecking: boolean;
   aiLoaded: boolean;
   aiOpen: boolean;
   aiMode: AiLayoutMode;
@@ -48,6 +56,9 @@ interface LazyFeatureOverlaysProps {
   onCloseDdl: () => void;
   onCloseDictionary: () => void;
   onDictionaryBindingsChanged: () => void;
+  onCloseUpdate: () => void;
+  onRefreshUpdate: () => void;
+  onIgnoreUpdate: (version: string) => void;
   onRequestContextChange: (action: () => void) => void;
   onOpenAi: () => void;
   onAiOpenChange: (open: boolean) => void;
@@ -92,6 +103,19 @@ export function LazyFeatureOverlays(props: LazyFeatureOverlaysProps) {
             selectedNode={props.selectedNode}
             onClose={props.onCloseDictionary}
             onBindingsChanged={props.onDictionaryBindingsChanged}
+          />
+        </Suspense>
+      ) : null}
+
+      {props.updateLoaded ? (
+        <Suspense fallback={<div className="feature-loading" role="status"><Spin size="small" /> 正在打开更新面板…</div>}>
+          <UpdateModal
+            open={props.updateOpen}
+            state={props.updateState}
+            checking={props.updateChecking}
+            onClose={props.onCloseUpdate}
+            onRefresh={props.onRefreshUpdate}
+            onIgnore={props.onIgnoreUpdate}
           />
         </Suspense>
       ) : null}

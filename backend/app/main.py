@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -21,11 +22,15 @@ from .database import Database
 from .dictionaries import DictionaryService, MAX_EXCEL_BYTES
 from .security import LocalRequestGuardMiddleware
 from .service import ServiceError, WorkspaceService
+from .updates import CHECK_INTERVAL_SECONDS, UpdateService
 
 
 MAX_PDM_FILES = 500
 MAX_PDM_FILE_BYTES = 512 * 1024 * 1024
 MAX_PDM_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
+
+
+logger = logging.getLogger("backend.app.main")
 
 
 paths = AppPaths.create()
@@ -35,13 +40,32 @@ service = WorkspaceService(database, settings_store)
 dictionary_service = DictionaryService(database)
 ai_service = AiService(database, settings_store)
 ai_conversation_service = AiConversationService(database)
+update_service = UpdateService(paths.app_data / "update-check.json")
+
+
+async def _update_check_loop() -> None:
+    """启动后先查一次，之后每 6 小时查一次；失败静默。"""
+    try:
+        await asyncio.sleep(5)
+        while True:
+            try:
+                await asyncio.to_thread(update_service.check_now)
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # pragma: no cover - 兜底，避免检查任务退出
+                logger.exception("后台更新检查失败")
+            await asyncio.sleep(CHECK_INTERVAL_SECONDS)
+    except asyncio.CancelledError:
+        pass
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     database.initialize()
     settings_store.read()
+    update_task = asyncio.create_task(_update_check_loop())
     yield
+    update_task.cancel()
 
 
 app = FastAPI(title=f"{APP_NAME} API", version=APP_VERSION, lifespan=lifespan)
@@ -724,6 +748,25 @@ def ddl_catalog(
 @app.post("/api/ddl/generate")
 def generate_ddl(payload: DdlGeneratePayload) -> dict:
     return service.generate_ddl(payload.table_ids, payload.config.model_dump(by_alias=True))
+
+
+class IgnoreUpdatePayload(BaseModel):
+    version: str = Field(min_length=1, max_length=100)
+
+
+@app.get("/api/updates/check")
+def updates_check() -> dict:
+    return update_service.current_state()
+
+
+@app.post("/api/updates/check")
+def updates_refresh() -> dict:
+    return update_service.check_now()
+
+
+@app.post("/api/updates/ignore")
+def updates_ignore(payload: IgnoreUpdatePayload) -> dict:
+    return update_service.ignore_version(payload.version)
 
 
 @app.get("/api/tables/{table_id}")

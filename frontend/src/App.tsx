@@ -8,6 +8,9 @@ import {
 } from "@ant-design/icons";
 import { tablesApi } from "./features/tables/api";
 import { workspaceApi } from "./features/workspace/api";
+import { updatesApi } from "./features/updates/api";
+import { UpdateIndicator } from "./features/updates/components/UpdateIndicator";
+import type { UpdateState } from "./features/updates/types";
 import { ApiError } from "./shared/api/client";
 import { FieldPanel } from "./components/FieldPanel";
 import { ProjectNavigator } from "./components/ProjectNavigator";
@@ -94,6 +97,10 @@ export default function App() {
   const [dictionaryOpen, setDictionaryOpen] = useState(false);
   const [dictionaryFeatureLoaded, setDictionaryFeatureLoaded] = useState(false);
   const [dictionaryBindingRevision, setDictionaryBindingRevision] = useState(0);
+  const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [updateFeatureLoaded, setUpdateFeatureLoaded] = useState(false);
+  const [updateChecking, setUpdateChecking] = useState(false);
   const {
     open: aiAssistantOpen,
     loaded: aiFeatureLoaded,
@@ -167,6 +174,42 @@ export default function App() {
   useEffect(() => {
     void loadWorkspace();
   }, [loadWorkspace]);
+
+  useEffect(() => {
+    updatesApi.check().then(setUpdateState).catch(() => {
+      // 更新检查失败保持未知状态，不打扰用户。
+    });
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("update")) {
+      window.history.replaceState(null, "", window.location.pathname);
+      setUpdateFeatureLoaded(true);
+      setUpdateOpen(true);
+    }
+  }, []);
+
+  const openUpdatePanel = () => {
+    setUpdateFeatureLoaded(true);
+    setUpdateOpen(true);
+  };
+
+  const refreshUpdates = async () => {
+    setUpdateChecking(true);
+    try {
+      setUpdateState(await updatesApi.refresh());
+    } catch {
+      // 保留原有状态。
+    } finally {
+      setUpdateChecking(false);
+    }
+  };
+
+  const ignoreUpdate = async (version: string) => {
+    try {
+      setUpdateState(await updatesApi.ignore(version));
+    } catch {
+      // 保留原有状态。
+    }
+  };
 
   const handleExternalWorkspaceChange = useCallback(
     (nextSettings: Settings): boolean => {
@@ -834,6 +877,7 @@ export default function App() {
           >
             字典中心
           </Button>
+          <UpdateIndicator state={updateState} onClick={openUpdatePanel} />
         </div>
       </header>
       <div className="app-body">
@@ -960,6 +1004,10 @@ export default function App() {
         ddlOpen={ddlExportOpen}
         dictionaryLoaded={dictionaryFeatureLoaded}
         dictionaryOpen={dictionaryOpen}
+        updateLoaded={updateFeatureLoaded}
+        updateOpen={updateOpen}
+        updateState={updateState}
+        updateChecking={updateChecking}
         aiLoaded={aiFeatureLoaded}
         aiOpen={aiAssistantOpen}
         aiMode={aiLayoutMode}
@@ -970,6 +1018,9 @@ export default function App() {
         onCloseDdl={() => setDdlExportOpen(false)}
         onCloseDictionary={() => setDictionaryOpen(false)}
         onDictionaryBindingsChanged={() => setDictionaryBindingRevision((current) => current + 1)}
+        onCloseUpdate={() => setUpdateOpen(false)}
+        onRefreshUpdate={() => void refreshUpdates()}
+        onIgnoreUpdate={(version: string) => void ignoreUpdate(version)}
         onRequestContextChange={requestContextChange}
         onOpenAi={openAiAssistant}
         onAiOpenChange={changeAiAssistantOpen}

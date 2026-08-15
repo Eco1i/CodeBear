@@ -212,6 +212,9 @@ def run_with_tray(server: uvicorn.Server, port: int, data_dir: Path, open_browse
     def open_app(_: pystray.Icon | None = None, __: Any = None) -> None:
         webbrowser.open(url_for(port))
 
+    def open_updates(_: pystray.Icon | None = None, __: Any = None) -> None:
+        webbrowser.open(f"{url_for(port)}?update=1")
+
     def open_data(_: pystray.Icon | None = None, __: Any = None) -> None:
         data_dir.mkdir(parents=True, exist_ok=True)
         if sys.platform == "win32":
@@ -228,7 +231,7 @@ def run_with_tray(server: uvicorn.Server, port: int, data_dir: Path, open_browse
             app_icon,
             "码熊 · PDM 数据字典工作台",
             menu=pystray.Menu(pystray.MenuItem("打开码熊", open_app, default=True)),
-            popup_actions=(lambda: open_app(), lambda: open_data(), lambda: exit_app(icon)),
+            popup_actions=(lambda: open_app(), lambda: open_data(), lambda: open_updates(), lambda: exit_app(icon)),
         )
     else:
         icon = pystray.Icon(
@@ -238,6 +241,7 @@ def run_with_tray(server: uvicorn.Server, port: int, data_dir: Path, open_browse
             menu=pystray.Menu(
                 pystray.MenuItem("打开码熊", open_app, default=True),
                 pystray.MenuItem("打开数据目录", open_data),
+                pystray.MenuItem("检查更新", open_updates),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("退出码熊", exit_app),
             ),

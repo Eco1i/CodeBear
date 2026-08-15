@@ -14,7 +14,7 @@ from ctypes import wintypes
 
 
 APP_NAME = "码熊"
-APP_VERSION = "1.1.2"
+APP_VERSION = "1.2.0"
 INTERNAL_DIR_NAMES = {".码熊回收站", ".码熊备份"}
 AI_PROVIDER = "deepseek"
 AI_MODEL = "deepseek-v4-flash"

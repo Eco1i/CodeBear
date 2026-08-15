@@ -16,19 +16,22 @@ class MenuMetrics:
 
     @property
     def height(self) -> int:
-        return self.padding * 2 + self.row_height * 3 + self.divider_height
+        return self.padding * 2 + self.row_height * 4 + self.divider_height
 
     def row_at(self, y: int) -> int | None:
-        first_start = self.padding
-        first_end = first_start + self.row_height
+        first_end = self.padding + self.row_height
         second_end = first_end + self.row_height
-        third_start = second_end + self.divider_height
-        if first_start <= y < first_end:
+        third_end = second_end + self.row_height
+        fourth_start = third_end + self.divider_height
+        fourth_end = fourth_start + self.row_height
+        if self.padding <= y < first_end:
             return 0
         if first_end <= y < second_end:
             return 1
-        if third_start <= y < third_start + self.row_height:
+        if second_end <= y < third_end:
             return 2
+        if fourth_start <= y < fourth_end:
+            return 3
         return None
 
 
@@ -217,7 +220,7 @@ class TrayPopupMenu:
 
     def __init__(
         self,
-        actions: tuple[Callable[[], None], Callable[[], None], Callable[[], None]],
+        actions: tuple[Callable[[], None], Callable[[], None], Callable[[], None], Callable[[], None]],
     ):
         if sys.platform != "win32":
             raise RuntimeError("TrayPopupMenu is available on Windows only")
@@ -374,12 +377,13 @@ class TrayPopupMenu:
             client = RECT()
             user32.GetClientRect(self.hwnd, ctypes.byref(client))
             self._fill(hdc, client, "#FFFFFF")
-            divider_top = self.metrics.padding + self.metrics.row_height * 2
-            third_top = divider_top + self.metrics.divider_height
+            divider_top = self.metrics.padding + self.metrics.row_height * 3
+            fourth_top = divider_top + self.metrics.divider_height
             rows = (
                 (self.metrics.padding, "打开码熊"),
                 (self.metrics.padding + self.metrics.row_height, "打开数据目录"),
-                (third_top, "退出码熊"),
+                (self.metrics.padding + self.metrics.row_height * 2, "检查更新"),
+                (fourth_top, "退出码熊"),
             )
             for index, (top, label) in enumerate(rows):
                 if self.hovered == index:
