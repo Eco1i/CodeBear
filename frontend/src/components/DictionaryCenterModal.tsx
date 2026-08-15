@@ -688,7 +688,7 @@ export function DictionaryCenterModal({
           loading={manageLoading}
           columns={draftColumns}
           dataSource={draftItems}
-          scroll={{ y: 350 }}
+          scroll={{ y: 338 }}
         />
       </Modal>
 

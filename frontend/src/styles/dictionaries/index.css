@@ -517,9 +517,13 @@
 .dictionary-manage-modal .ant-table-tbody .ant-input { height: 30px; font-size: 12px; }
 .dictionary-manage-modal .ant-table-body { height: 350px; }
 
-.dictionary-center-modal .ant-pagination,
-.dictionary-manage-modal .ant-pagination {
+.dictionary-center-modal .ant-pagination {
   margin: 10px 12px !important;
+  font-size: 11px;
+}
+
+.dictionary-manage-modal .ant-pagination {
+  margin: 8px 12px 10px !important;
   font-size: 11px;
 }
 
