@@ -294,7 +294,7 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
       <div className="relation-graph-wrap" ref={wrapRef}>
         <div className="relation-graph-legend">
           <span><i className="dot center" />当前表</span>
-          <span><i className="dot normal" />相关表（代码在圆内）</span>
+          <span><i className="dot normal" />相关表</span>
           <span><i />自动解析关系</span>
           <span><i className="manual" />手工维护关系</span>
         </div>
