@@ -57,6 +57,25 @@ def workbook_bytes() -> BytesIO:
     return stream
 
 
+def test_refresh_preserves_field_bindings(tmp_path: Path) -> None:
+    workspace, dictionaries = make_services(tmp_path)
+    project, detail = import_sample(workspace, tmp_path)
+    created = dictionaries.create_dictionary("O32 业务标志", "O32 业务类型")
+    field_id = str(detail["fields"][0]["id"])
+    assert dictionaries.bind_fields(str(created["id"]), [field_id]) == 1
+
+    # 修改 PDM 内容，确保强制刷新走全量重建路径
+    pdm_path = Path(project["root_path"]) / "字典项目.pdm"
+    content = pdm_path.read_text(encoding="utf-8")
+    pdm_path.write_text(content.replace("</Model>", "  <!-- binding keep -->\n</Model>"), encoding="utf-8", newline="\n")
+
+    result = workspace.refresh_project(str(project["id"]), force=True)
+    assert result["indexed"] == 1
+    bindings = dictionaries.field_bindings(str(detail["id"]))
+    assert len(bindings) == 1
+    assert bindings[0]["dictionary_name"] == "O32 业务标志"
+
+
 def test_dictionary_crud_excel_and_batch_binding(tmp_path: Path) -> None:
     workspace, dictionaries = make_services(tmp_path)
     project, detail = import_sample(workspace, tmp_path)

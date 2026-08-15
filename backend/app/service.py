@@ -943,8 +943,18 @@ class WorkspaceService:
             (project_id, relative_path),
         ).fetchone()
         resolved_pdm_id = str(existing["id"]) if existing else (pdm_id or str(uuid.uuid4()))
-        # 表/字段行会删除重建：先快照该 PDM 相关的手工关系，重建后恢复
+        # 表/字段行会删除重建：先快照该 PDM 相关的手工关系与字典字段绑定，重建后恢复
         manual_relations = self._snapshot_manual_relations(connection, resolved_pdm_id)
+        binding_rows = connection.execute(
+            """
+            SELECT db.field_id, db.dictionary_id, db.created_at
+            FROM dictionary_field_bindings db
+            JOIN model_fields mf ON mf.id = db.field_id
+            JOIN model_tables mt ON mt.id = mf.table_id
+            WHERE mt.pdm_id = ?
+            """,
+            (resolved_pdm_id,),
+        ).fetchall()
         stat = absolute_path.stat()
         connection.execute(
             """
@@ -1039,6 +1049,21 @@ class WorkspaceService:
             field_rows,
         )
         self._rebuild_table_relations(connection, resolved_pdm_id, parsed, manual_relations)
+        # 恢复字典字段绑定（字段 id 确定，仅保留本次解析仍存在的字段）
+        valid_field_ids = {str(row[0]) for row in field_rows}
+        restore_bindings = [
+            (str(row["field_id"]), str(row["dictionary_id"]), str(row["created_at"]))
+            for row in binding_rows
+            if str(row["field_id"]) in valid_field_ids
+        ]
+        if restore_bindings:
+            connection.executemany(
+                """
+                INSERT OR IGNORE INTO dictionary_field_bindings(field_id, dictionary_id, created_at)
+                VALUES(?, ?, ?)
+                """,
+                restore_bindings,
+            )
         return resolved_pdm_id
 
     @staticmethod
