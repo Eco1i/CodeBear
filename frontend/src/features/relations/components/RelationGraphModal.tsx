@@ -21,6 +21,13 @@ interface DragState {
   lastY: number;
 }
 
+interface PanState {
+  startX: number;
+  startY: number;
+  startTx: number;
+  startTy: number;
+}
+
 interface ViewState {
   scale: number;
   tx: number;
@@ -40,6 +47,7 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [view, setView] = useState<ViewState>({ scale: 1, tx: 0, ty: 0 });
   const dragRef = useRef<DragState | null>(null);
+  const panRef = useRef<PanState | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -111,40 +119,55 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
   const relCount = (id: string) => relations.filter((relation) => relation.source_table.id === id || relation.target_table.id === id).length;
 
   const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+    event.preventDefault();
     const target = (event.target as Element).closest(".graph-node") as SVGGElement | null;
-    if (!target?.dataset.id) return;
-    const id = target.dataset.id;
-    if (!nodes[id]) return;
-    dragRef.current = { id, startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY };
+    if (target?.dataset.id && nodes[target.dataset.id]) {
+      const id = target.dataset.id;
+      dragRef.current = { id, startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY };
+    } else {
+      panRef.current = { startX: event.clientX, startY: event.clientY, startTx: view.tx, startTy: view.ty };
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     const drag = dragRef.current;
-    if (!drag) return;
-    const deltaX = (event.clientX - drag.lastX) / view.scale;
-    const deltaY = (event.clientY - drag.lastY) / view.scale;
-    drag.lastX = event.clientX;
-    drag.lastY = event.clientY;
-    setNodes((current) => {
-      const node = current[drag.id];
-      if (!node) return current;
-      const next = { ...current, [drag.id]: { ...node, x: node.x + deltaX, y: node.y + deltaY } };
-      setEdges(buildEdges(next, relations));
-      return next;
-    });
+    if (drag) {
+      const deltaX = (event.clientX - drag.lastX) / view.scale;
+      const deltaY = (event.clientY - drag.lastY) / view.scale;
+      drag.lastX = event.clientX;
+      drag.lastY = event.clientY;
+      setNodes((current) => {
+        const node = current[drag.id];
+        if (!node) return current;
+        const next = { ...current, [drag.id]: { ...node, x: node.x + deltaX, y: node.y + deltaY } };
+        setEdges(buildEdges(next, relations));
+        return next;
+      });
+      return;
+    }
+    const pan = panRef.current;
+    if (pan) {
+      setView((current) => ({
+        ...current,
+        tx: pan.startTx + (event.clientX - pan.startX),
+        ty: pan.startTy + (event.clientY - pan.startY),
+      }));
+    }
   };
 
   const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
     const drag = dragRef.current;
-    if (!drag) return;
-    const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
-    const clickedId = drag.id;
-    dragRef.current = null;
-    if (moved < 5 && clickedId !== centerId) {
-      setCenterId(clickedId);
-      onJump(clickedId);
+    if (drag) {
+      const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+      const clickedId = drag.id;
+      dragRef.current = null;
+      if (moved < 5 && clickedId !== centerId) {
+        setCenterId(clickedId);
+        onJump(clickedId);
+      }
     }
+    panRef.current = null;
   };
 
   return (

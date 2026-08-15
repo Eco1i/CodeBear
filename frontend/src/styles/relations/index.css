@@ -376,9 +376,27 @@
 }
 
 .relation-form .ant-input,
-.relation-form .ant-select-selector,
-.relation-form .ant-select-selection-search-input {
+.relation-form .ant-input::placeholder {
   font-size: 12px;
+}
+
+.relation-form .ant-select {
+  height: 32px;
+  font-size: 12px;
+}
+
+.relation-form .ant-select .ant-select-content,
+.relation-form .ant-select .ant-select-input,
+.relation-form .ant-select .ant-select-placeholder {
+  font-size: 12px;
+}
+
+.relation-form .ant-input {
+  height: 32px;
+}
+
+.relation-form .ant-input::placeholder {
+  color: #aab6c6;
 }
 
 .relation-form-grid {
@@ -432,6 +450,14 @@
 
 .relation-graph-wrap svg {
   display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.relation-graph-wrap svg:active {
+  cursor: grabbing;
 }
 
 .relation-graph-legend {
