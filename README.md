@@ -4,7 +4,7 @@
 
 码熊是一个面向 PowerDesigner PDM 的本地数据字典工作台。它在本机解析、索引和管理 PDM 副本，让你可以快速浏览表与字段、搜索数据字典、安全修订字段，并生成多种数据库的建表脚本。
 
-> 当前稳定版本：`v1.2.1` · 主要支持平台：Windows 10/11 x64
+> 当前稳定版本：`v1.3.0` · 主要支持平台：Windows 10/11 x64
 
 ## 功能
 
@@ -15,6 +15,7 @@
 - 提供回收站、`.cbbak` 选择性备份，以及旧版 `data` 目录迁移。
 - 生成 MySQL、Oracle、达梦、TDSQL MySQL 版和 Apache Ignite 建表脚本。
 - 内置字典中心：手工维护数据字典，或从 Excel 批量导入（字典值列可多选组成唯一组合键），并将字典绑定到字段快速查询。
+- 内置表关系浏览：自动解析 PDM 外键并支持手工维护关系，抽屉列表与关系图（聚焦高亮、悬停查看外键、双击切换中心）随 `.cbbak` 备份迁移。
 - 内置更新检查：自动查询 GitHub Releases，发现新版本在顶栏提示，更新面板提供发布说明、SHA-256 校验与升级迁移引导。
 - 可选 DeepSeek AI 助手，用自然语言查询本地数据字典。
 - Windows 托盘运行，提供开箱即用的 x64 绿色版。
@@ -55,11 +56,11 @@
 
 ### Windows 绿色版
 
-从 GitHub Releases 下载 `CodeBear-v1.2.1-win-x64.zip`。同名 `.sha256` 文件用于可选的完整性校验：
+从 GitHub Releases 下载 `CodeBear-v1.3.0-win-x64.zip`。同名 `.sha256` 文件用于可选的完整性校验：
 
 ```powershell
-Get-FileHash .\CodeBear-v1.2.1-win-x64.zip -Algorithm SHA256
-Get-Content .\CodeBear-v1.2.1-win-x64.zip.sha256
+Get-FileHash .\CodeBear-v1.3.0-win-x64.zip -Algorithm SHA256
+Get-Content .\CodeBear-v1.3.0-win-x64.zip.sha256
 ```
 
 确认两处哈希值一致后完整解压 ZIP，双击 `CodeBear.exe`。默认浏览器将打开 `http://127.0.0.1:8765`。
