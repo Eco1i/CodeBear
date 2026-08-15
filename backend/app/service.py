@@ -875,6 +875,38 @@ class WorkspaceService:
         relative = target.relative_to(Path(project["root_path"]).resolve()).as_posix()
         return {"type": "folder", "name": folder_name, "relative_path": relative}
 
+    @staticmethod
+    def _delete_pdm_rows(connection: sqlite3.Connection, pdm_id: str) -> None:
+        """按子表→父表顺序显式删除该 PDM 的表/字段行。
+
+        依赖外键级联会让 SQLite 对每个被删行做逐行子表扫描，
+        大 PDM(上万字段)单次删除可达 10 秒以上；显式批量删除可降至毫秒级。
+        """
+        connection.execute(
+            """
+            DELETE FROM table_relations
+            WHERE source_table_id IN (SELECT id FROM model_tables WHERE pdm_id = ?)
+               OR target_table_id IN (SELECT id FROM model_tables WHERE pdm_id = ?)
+            """,
+            (pdm_id, pdm_id),
+        )
+        connection.execute(
+            """
+            DELETE FROM dictionary_field_bindings
+            WHERE field_id IN (
+                SELECT mf.id FROM model_fields mf
+                JOIN model_tables mt ON mt.id = mf.table_id
+                WHERE mt.pdm_id = ?
+            )
+            """,
+            (pdm_id,),
+        )
+        connection.execute(
+            "DELETE FROM model_fields WHERE table_id IN (SELECT id FROM model_tables WHERE pdm_id = ?)",
+            (pdm_id,),
+        )
+        connection.execute("DELETE FROM model_tables WHERE pdm_id = ?", (pdm_id,))
+
     def _index_parsed(
         self,
         connection: sqlite3.Connection,
@@ -942,7 +974,7 @@ class WorkspaceService:
                 utc_now(),
             ),
         )
-        connection.execute("DELETE FROM model_tables WHERE pdm_id = ?", (resolved_pdm_id,))
+        self._delete_pdm_rows(connection, resolved_pdm_id)
         table_rows: list[tuple[Any, ...]] = []
         field_rows: list[tuple[Any, ...]] = []
         for table in parsed.tables:
@@ -1282,7 +1314,7 @@ class WorkspaceService:
                 error_message[:2000],
             ),
         )
-        connection.execute("DELETE FROM model_tables WHERE pdm_id = ?", (pdm_id,))
+        self._delete_pdm_rows(connection, pdm_id)
         return pdm_id
 
     def index_file(self, project_id: str, relative_path: str, *, force: bool = False) -> dict[str, Any]:
@@ -1308,7 +1340,10 @@ class WorkspaceService:
         try:
             parsed = parse_pdm(absolute)
             with self.database.transaction() as connection:
-                pdm_id = self._index_parsed(connection, project_id, relative, absolute, parsed)
+                existing_pdm_ids = {str(existing["id"])} if existing is not None else set()
+                with self.database.defer_fts_updates(connection, existing_pdm_ids) as updated_pdm_ids:
+                    pdm_id = self._index_parsed(connection, project_id, relative, absolute, parsed)
+                    updated_pdm_ids.add(pdm_id)
             return {
                 "relative_path": relative,
                 "status": "indexed",
@@ -1343,6 +1378,7 @@ class WorkspaceService:
             discovered_folded = {value.casefold() for value in discovered}
             for row in rows:
                 if str(row["relative_path"]).casefold() not in discovered_folded:
+                    self._delete_pdm_rows(connection, str(row["id"]))
                     connection.execute("DELETE FROM pdm_files WHERE id = ?", (row["id"],))
         return {
             "project_id": project_id,
@@ -1403,7 +1439,14 @@ class WorkspaceService:
                     os.replace(sibling_temp, target)
                     relative = target.relative_to(root).as_posix()
                     with self.database.transaction() as connection:
-                        pdm_id = self._index_parsed(connection, project_id, relative, target, parsed)
+                        existing_row = connection.execute(
+                            "SELECT id FROM pdm_files WHERE project_id = ? AND relative_path = ?",
+                            (project_id, relative),
+                        ).fetchone()
+                        existing_pdm_ids = {str(existing_row["id"])} if existing_row is not None else set()
+                        with self.database.defer_fts_updates(connection, existing_pdm_ids) as updated_pdm_ids:
+                            pdm_id = self._index_parsed(connection, project_id, relative, target, parsed)
+                            updated_pdm_ids.add(pdm_id)
                     imported.append(
                         {
                             "name": file_name,
@@ -1541,12 +1584,24 @@ class WorkspaceService:
                     if kind == "project":
                         connection.execute("DELETE FROM projects WHERE id = ?", (project_id,))
                     elif kind == "pdm":
+                        pdm_rows = connection.execute(
+                            "SELECT id FROM pdm_files WHERE project_id = ? AND relative_path = ?",
+                            (project_id, relative),
+                        ).fetchall()
+                        for pdm_row in pdm_rows:
+                            self._delete_pdm_rows(connection, str(pdm_row["id"]))
                         connection.execute(
                             "DELETE FROM pdm_files WHERE project_id = ? AND relative_path = ?",
                             (project_id, relative),
                         )
                     else:
                         prefix = f"{_like_escape(relative)}/%"
+                        pdm_rows = connection.execute(
+                            "SELECT id FROM pdm_files WHERE project_id = ? AND relative_path LIKE ? ESCAPE '\\'",
+                            (project_id, prefix),
+                        ).fetchall()
+                        for pdm_row in pdm_rows:
+                            self._delete_pdm_rows(connection, str(pdm_row["id"]))
                         connection.execute(
                             "DELETE FROM pdm_files WHERE project_id = ? AND relative_path LIKE ? ESCAPE '\\'",
                             (project_id, prefix),

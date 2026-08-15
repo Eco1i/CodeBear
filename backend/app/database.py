@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS table_relations (
 
 CREATE INDEX IF NOT EXISTS idx_table_relations_source ON table_relations(source_table_id);
 CREATE INDEX IF NOT EXISTS idx_table_relations_target ON table_relations(target_table_id);
+CREATE INDEX IF NOT EXISTS idx_table_relations_source_field ON table_relations(source_field_id);
+CREATE INDEX IF NOT EXISTS idx_table_relations_target_field ON table_relations(target_field_id);
 
 CREATE TABLE IF NOT EXISTS dictionaries (
     id TEXT PRIMARY KEY,
