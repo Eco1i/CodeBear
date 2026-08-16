@@ -19,6 +19,7 @@ coverage.xml
 .vscode/
 output/
 data/
+pdm文件/
 .env
 .env.*
 *.db
