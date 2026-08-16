@@ -199,6 +199,29 @@ def test_workspace_ddl_catalog_and_generation_use_indexed_tables(tmp_path: Path)
     assert "`user_name` VARCHAR(64)" in result["script"]
 
 
+def test_ddl_generate_payload_accepts_large_table_selection() -> None:
+    """导出全项目建表脚本时单次选表上限应高于 5000（历史 422 回归）。"""
+    from backend.app.main import DdlConfigPayload, DdlGeneratePayload
+
+    payload = DdlGeneratePayload(
+        table_ids=[f"t{i}" for i in range(7309)],
+        config=DdlConfigPayload(database="mysql", version="8.4"),
+    )
+    assert len(payload.table_ids) == 7309
+
+
+def test_ddl_generate_service_cap_is_high_enough_for_full_project(tmp_path: Path) -> None:
+    """全项目 7309 张表不应触发 5000 上限，应走到表不存在校验。"""
+    from backend.app.service import ServiceError
+
+    service = make_service(tmp_path)
+    try:
+        service.generate_ddl([f"t{i}" for i in range(7309)], base_config("mysql", "8.4"))
+    except ServiceError as error:
+        assert error.code != "ddl_selection_too_large"
+        assert error.code == "ddl_table_not_found"
+
+
 def test_workspace_ddl_catalog_supports_lazy_groups_and_submitted_search(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     source = write_sample(tmp_path / "用户模型.pdm")

@@ -2389,8 +2389,8 @@ class WorkspaceService:
         ordered_ids = list(dict.fromkeys(str(table_id) for table_id in table_ids if str(table_id).strip()))
         if not ordered_ids:
             raise ServiceError(422, "请至少选择一张数据表", code="ddl_empty_selection")
-        if len(ordered_ids) > 5000:
-            raise ServiceError(422, "单次最多生成 5000 张表", code="ddl_selection_too_large")
+        if len(ordered_ids) > 50_000:
+            raise ServiceError(422, "单次最多生成 50000 张表", code="ddl_selection_too_large")
 
         table_map: dict[str, dict[str, Any]] = {}
         fields_by_table: dict[str, list[dict[str, Any]]] = {}

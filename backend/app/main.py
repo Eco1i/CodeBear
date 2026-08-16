@@ -169,7 +169,7 @@ class DdlConfigPayload(BaseModel):
 
 
 class DdlGeneratePayload(BaseModel):
-    table_ids: list[str] = Field(min_length=1, max_length=5000)
+    table_ids: list[str] = Field(min_length=1, max_length=50_000)
     config: DdlConfigPayload
 
 
