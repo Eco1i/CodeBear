@@ -2,6 +2,17 @@
 
 本项目遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## 1.4.0-dev.1 - 2026-08-20
+
+### 开发中
+
+- 新增 macOS Apple Silicon 桌面版：PyInstaller 生成独立 `CodeBear.app`，ad-hoc 签名后封装为 DMG，并执行签名、镜像和本机服务启动验收。
+- macOS 从菜单栏运行，数据写入 `~/Library/Application Support/CodeBear`，API Key 使用当前用户的登录钥匙串保存。
+- 新增跨平台单实例锁、Finder 数据目录入口、macOS 原生错误提示和平台中性的工作区路径比较。
+- 更新检查按当前系统和 CPU 架构选择 Windows ZIP 或 macOS DMG，并直接展示 GitHub Release 提供的 SHA-256 摘要。
+- GitHub Actions CI 扩展到 Windows 与原生 Apple Silicon macOS；发布流程分别构建 Windows ZIP 和 macOS DMG，再汇总到同一个 Release。
+- 新增统一版本管理命令，集中校验或更新 `VERSION`、后端与前端版本字段。
+
 ## 1.3.1 - 2026-08-16
 
 ### 修复

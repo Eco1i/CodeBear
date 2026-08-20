@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import json
 import os
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -17,6 +19,9 @@ import pystray
 import uvicorn
 from PIL import Image, ImageDraw
 
+from backend.instance_lock import SingleInstance
+from backend.platform_support import default_data_dir, reveal_directory
+
 if sys.platform == "win32":
     from pystray import _win32 as pystray_win32
     from pystray._util import win32 as pystray_win32_api
@@ -26,9 +31,6 @@ if sys.platform == "win32":
 
 APP_HOST = "127.0.0.1"
 APP_PORT = 8765
-ERROR_ALREADY_EXISTS = 183
-
-
 if sys.platform == "win32":
     class CodeBearTrayIcon(pystray_win32.Icon):
         """Use the normal tray icon but replace the shell context menu."""
@@ -55,11 +57,9 @@ def executable_root() -> Path:
 
 
 def configure_portable_data_dir() -> Path:
-    data_dir = executable_root() / "data"
-    if getattr(sys, "frozen", False):
-        os.environ["MAXIONG_APP_DATA_DIR"] = str(data_dir)
-    else:
-        os.environ.setdefault("MAXIONG_APP_DATA_DIR", str(data_dir))
+    override = os.environ.get("MAXIONG_APP_DATA_DIR")
+    data_dir = Path(override).expanduser().resolve() if override else default_data_dir(executable_root())
+    os.environ["MAXIONG_APP_DATA_DIR"] = str(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 
@@ -70,6 +70,14 @@ def show_message(title: str, message: str, *, error: bool = False) -> None:
     if sys.platform == "win32":
         flags = 0x10 if error else 0x40
         ctypes.windll.user32.MessageBoxW(None, message, title, flags)
+        return
+    if sys.platform == "darwin":
+        style = "critical" if error else "informational"
+        script = (
+            f"display alert {json.dumps(title, ensure_ascii=False)} "
+            f"message {json.dumps(message, ensure_ascii=False)} as {style}"
+        )
+        subprocess.run(["osascript", "-e", script], check=False)
         return
     print(f"{title}: {message}", file=sys.stderr if error else sys.stdout)
 
@@ -84,28 +92,6 @@ def write_launcher_error(data_dir: Path) -> None:
             stream.write("\n")
     except OSError:
         pass
-
-
-class WindowsSingleInstance:
-    def __init__(self, port: int):
-        self.handle: int | None = None
-        self.already_exists = False
-        if sys.platform != "win32":
-            return
-
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
-        kernel32.CreateMutexW.restype = ctypes.c_void_p
-        self._kernel32 = kernel32
-        self.handle = kernel32.CreateMutexW(None, False, f"Local\\MaxiongPortable-{port}")
-        if not self.handle:
-            raise OSError(ctypes.get_last_error(), "无法创建码熊单实例锁")
-        self.already_exists = ctypes.get_last_error() == ERROR_ALREADY_EXISTS
-
-    def close(self) -> None:
-        if self.handle and sys.platform == "win32":
-            self._kernel32.CloseHandle(self.handle)
-            self.handle = None
 
 
 def create_app_icon(size: int = 256) -> Image.Image:
@@ -203,7 +189,8 @@ def run_with_tray(server: uvicorn.Server, port: int, data_dir: Path, open_browse
     if not wait_until_listening(port):
         server.should_exit = True
         server_thread.join(timeout=3)
-        show_message("码熊启动失败", f"本机服务未能在端口 {port} 启动，请查看 data\\logs\\server.log。", error=True)
+        log_path = data_dir / "logs" / "server.log"
+        show_message("码熊启动失败", f"本机服务未能在端口 {port} 启动，请查看 {log_path}。", error=True)
         return 1
 
     if open_browser:
@@ -217,8 +204,7 @@ def run_with_tray(server: uvicorn.Server, port: int, data_dir: Path, open_browse
 
     def open_data(_: pystray.Icon | None = None, __: Any = None) -> None:
         data_dir.mkdir(parents=True, exist_ok=True)
-        if sys.platform == "win32":
-            os.startfile(data_dir)  # type: ignore[attr-defined]
+        reveal_directory(data_dir)
 
     def exit_app(icon: pystray.Icon, _: Any = None) -> None:
         server.should_exit = True
@@ -249,7 +235,7 @@ def run_with_tray(server: uvicorn.Server, port: int, data_dir: Path, open_browse
 
     try:
         icon.run()
-    except Exception as exc:  # pragma: no cover - depends on the Windows shell
+    except Exception as exc:  # pragma: no cover - depends on the desktop shell
         show_message("码熊托盘启动失败", str(exc), error=True)
         return_code = 1
     else:
@@ -266,14 +252,14 @@ def run_with_tray(server: uvicorn.Server, port: int, data_dir: Path, open_browse
 def main() -> int:
     if sys.platform == "win32":
         enable_high_dpi()
-    parser = argparse.ArgumentParser(description="启动码熊绿色版")
+    parser = argparse.ArgumentParser(description="启动码熊桌面版")
     parser.add_argument("--port", type=int, default=APP_PORT)
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--no-tray", action="store_true", help=argparse.SUPPRESS)
     arguments = parser.parse_args()
 
     data_dir = configure_portable_data_dir()
-    instance = WindowsSingleInstance(arguments.port)
+    instance = SingleInstance(arguments.port, data_dir)
     try:
         if instance.already_exists:
             ready = wait_until_listening(arguments.port)

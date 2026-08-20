@@ -17,6 +17,7 @@ export function UpdateModal({ open, state, checking, onClose, onRefresh, onIgnor
   const available = state?.status === "update_available" && state.latest;
   const latest = state?.latest || null;
   const notesHtml = latest?.notes ? releaseNotesHtml(latest.notes) : "";
+  const isMac = state?.target.startsWith("mac-") ?? false;
 
   const copySha = async () => {
     if (!latest?.sha256) return;
@@ -50,11 +51,19 @@ export function UpdateModal({ open, state, checking, onClose, onRefresh, onIgnor
 
           <div className="update-steps">
             <small>升级步骤</small>
-            <ol>
-              <li><b>01</b>下载下方安装包，并用官方 SHA-256 校验完整性</li>
-              <li><b>02</b>先从托盘右键退出旧版码熊，将新版完整解压到新目录后启动</li>
-              <li><b>03</b>在新版右上角「备份迁移」读取旧版 data 目录完成迁移，旧目录不会被修改</li>
-            </ol>
+            {isMac ? (
+              <ol>
+                <li><b>01</b>下载 DMG，并用官方 SHA-256 校验完整性</li>
+                <li><b>02</b>从菜单栏退出旧版码熊，将新版拖入“应用程序”并替换旧版</li>
+                <li><b>03</b>重新打开码熊；工作区数据继续保存在当前用户的 Application Support 中</li>
+              </ol>
+            ) : (
+              <ol>
+                <li><b>01</b>下载 ZIP，并用官方 SHA-256 校验完整性</li>
+                <li><b>02</b>先从托盘右键退出旧版码熊，将新版完整解压到新目录后启动</li>
+                <li><b>03</b>在新版右上角「备份迁移」读取旧版 data 目录完成迁移，旧目录不会被修改</li>
+              </ol>
+            )}
           </div>
 
           <div className="update-notes">
@@ -66,10 +75,12 @@ export function UpdateModal({ open, state, checking, onClose, onRefresh, onIgnor
             )}
           </div>
 
-          <div className="update-sha-row">
-            <code title={latest!.sha256}>{latest!.sha256}</code>
-            <Button size="small" icon={<CopyOutlined />} onClick={() => void copySha()}>复制 SHA-256</Button>
-          </div>
+          {latest!.sha256 ? (
+            <div className="update-sha-row">
+              <code title={latest!.sha256}>{latest!.sha256}</code>
+              <Button size="small" icon={<CopyOutlined />} onClick={() => void copySha()}>复制 SHA-256</Button>
+            </div>
+          ) : null}
         </div>
       ) : state.status === "unknown" ? (
         <div className="update-centered">
@@ -97,7 +108,7 @@ export function UpdateModal({ open, state, checking, onClose, onRefresh, onIgnor
             <Button
               type="primary"
               icon={<DownloadOutlined />}
-              href={latest!.zip_url || latest!.release_url}
+              href={latest!.download_url || latest!.release_url}
               target="_blank"
               rel="noreferrer"
             >

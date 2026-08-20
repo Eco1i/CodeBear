@@ -12,14 +12,20 @@ from typing import Any
 
 from ctypes import wintypes
 
+from backend.platform_support import default_data_dir
+
 
 APP_NAME = "码熊"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.4.0-dev.1"
 INTERNAL_DIR_NAMES = {".码熊回收站", ".码熊备份"}
 AI_PROVIDER = "deepseek"
 AI_MODEL = "deepseek-v4-flash"
 AI_BASE_URL = "https://api.deepseek.com"
 AI_KEY_ENVIRONMENT_VARIABLE = "DEEPSEEK_API_KEY"
+AI_KEYCHAIN_SERVICE = "com.eco1i.codebear"
+AI_KEYCHAIN_ACCOUNT = "deepseek-api-key"
+DPAPI_PREFIX = "dpapi:v1:"
+KEYCHAIN_PREFIX = "keychain:v1:"
 DEFAULT_AI_ASSISTANT_NAME = "小码"
 DEFAULT_AI_ASSISTANT_ACCESSORY = "none"
 AI_ASSISTANT_ACCESSORIES = frozenset({
@@ -110,19 +116,68 @@ def _windows_dpapi(data: bytes, *, protect: bool) -> bytes:
 
 
 def protect_secret(value: str) -> str:
-    encrypted = _windows_dpapi(value.encode("utf-8"), protect=True)
-    return "dpapi:v1:" + base64.b64encode(encrypted).decode("ascii")
+    if sys.platform == "win32":
+        encrypted = _windows_dpapi(value.encode("utf-8"), protect=True)
+        return DPAPI_PREFIX + base64.b64encode(encrypted).decode("ascii")
+    if sys.platform == "darwin":
+        try:
+            import keyring
+
+            keyring.set_password(AI_KEYCHAIN_SERVICE, AI_KEYCHAIN_ACCOUNT, value)
+        except Exception as exc:  # pragma: no cover - depends on the login Keychain
+            raise SecretProtectionError("无法将 API Key 保存到 macOS 钥匙串") from exc
+        return KEYCHAIN_PREFIX + AI_KEYCHAIN_ACCOUNT
+    raise SecretProtectionError("当前系统不支持安全保存 API Key，请使用环境变量")
 
 
 def unprotect_secret(value: str) -> str:
-    prefix = "dpapi:v1:"
-    if not value.startswith(prefix):
-        raise SecretProtectionError("API Key 的本机加密格式无效")
+    if value.startswith(DPAPI_PREFIX):
+        try:
+            encrypted = base64.b64decode(value[len(DPAPI_PREFIX) :], validate=True)
+            return _windows_dpapi(encrypted, protect=False).decode("utf-8")
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise SecretProtectionError("API Key 的本机加密内容已损坏") from exc
+    if value.startswith(KEYCHAIN_PREFIX):
+        if sys.platform != "darwin":
+            raise SecretProtectionError("当前系统无法读取 macOS 钥匙串中的 API Key")
+        account = value[len(KEYCHAIN_PREFIX) :]
+        if account != AI_KEYCHAIN_ACCOUNT:
+            raise SecretProtectionError("API Key 的钥匙串引用无效")
+        try:
+            import keyring
+
+            secret = keyring.get_password(AI_KEYCHAIN_SERVICE, account)
+        except Exception as exc:  # pragma: no cover - depends on the login Keychain
+            raise SecretProtectionError("无法从 macOS 钥匙串读取 API Key") from exc
+        if not secret:
+            raise SecretProtectionError("macOS 钥匙串中找不到已保存的 API Key")
+        return secret
+    raise SecretProtectionError("API Key 的本机加密格式无效")
+
+
+def delete_protected_secret(value: str) -> None:
+    if not value.startswith(KEYCHAIN_PREFIX):
+        return
+    if sys.platform != "darwin":
+        raise SecretProtectionError("当前系统无法修改 macOS 钥匙串")
+    account = value[len(KEYCHAIN_PREFIX) :]
+    if account != AI_KEYCHAIN_ACCOUNT:
+        raise SecretProtectionError("API Key 的钥匙串引用无效")
     try:
-        encrypted = base64.b64decode(value[len(prefix) :], validate=True)
-        return _windows_dpapi(encrypted, protect=False).decode("utf-8")
-    except (ValueError, UnicodeDecodeError) as exc:
-        raise SecretProtectionError("API Key 的本机加密内容已损坏") from exc
+        import keyring
+
+        if keyring.get_password(AI_KEYCHAIN_SERVICE, account) is not None:
+            keyring.delete_password(AI_KEYCHAIN_SERVICE, account)
+    except Exception as exc:  # pragma: no cover - depends on the login Keychain
+        raise SecretProtectionError("无法从 macOS 钥匙串移除 API Key") from exc
+
+
+def protected_secret_storage(value: str) -> str:
+    if value.startswith(DPAPI_PREFIX):
+        return "windows_dpapi"
+    if value.startswith(KEYCHAIN_PREFIX):
+        return "macos_keychain"
+    return "none"
 
 
 def program_root() -> Path:
@@ -143,7 +198,7 @@ def default_app_data_dir() -> Path:
     override = os.environ.get("MAXIONG_APP_DATA_DIR")
     if override:
         return Path(override).expanduser().resolve()
-    return (program_root() / "data").resolve()
+    return default_data_dir(program_root())
 
 
 @dataclass(frozen=True)
@@ -241,13 +296,19 @@ class SettingsStore:
         if key:
             source = "environment"
         else:
+            protected_key = ""
+            with self._lock:
+                payload = self._read_unlocked()
+                ai_payload = payload.get("ai")
+                if isinstance(ai_payload, dict):
+                    protected_key = str(ai_payload.get("api_key_protected") or "")
             try:
-                key = self.get_ai_api_key() or ""
+                key = unprotect_secret(protected_key) if protected_key else ""
             except SecretProtectionError as exc:
                 error = str(exc)
                 key = ""
             if key:
-                source = "windows_dpapi"
+                source = protected_secret_storage(protected_key)
         hint = ""
         if key:
             visible_prefix = key[:3] if len(key) > 7 else key[:1]
@@ -318,6 +379,9 @@ class SettingsStore:
             payload = self._read_unlocked()
             ai_payload = payload.get("ai")
             if isinstance(ai_payload, dict):
+                protected_key = str(ai_payload.get("api_key_protected") or "")
+                if protected_key:
+                    delete_protected_secret(protected_key)
                 ai_payload.pop("api_key_protected", None)
                 payload["ai"] = ai_payload
                 self._write_unlocked(payload)

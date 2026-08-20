@@ -42,6 +42,7 @@ describe("workspace model", () => {
 
   it("normalizes workspace paths without changing business paths", () => {
     expect(pathParent("domain/订单模型.pdm")).toBe("domain");
-    expect(normalizeWorkspacePath(" D:/Data/CodeBear/// ")).toBe("d:\\data\\codebear");
+    expect(normalizeWorkspacePath(" D:\\Data\\CodeBear/// ")).toBe("D:/Data/CodeBear");
+    expect(normalizeWorkspacePath(" /Users/codebear/Workspace/// ")).toBe("/Users/codebear/Workspace");
   });
 });

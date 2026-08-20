@@ -469,7 +469,7 @@ export function BackupMigrationModal({
               disabled={inspecting || importing}
               onChange={(event) => setLegacyPath(event.target.value)}
               onPressEnter={() => void inspectLegacy()}
-              placeholder="例如 D:\\Program Files (x86)\\CodeBear-v0.2.1-win-x64\\data"
+              placeholder="输入旧版本 data 目录的完整路径"
             />
             <Button
               type="primary"

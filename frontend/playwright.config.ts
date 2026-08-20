@@ -5,7 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const frontendRoot = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(frontendRoot, "..");
-const bundledPython = path.join(repositoryRoot, ".venv", "Scripts", "python.exe");
+const bundledPython = process.platform === "win32"
+  ? path.join(repositoryRoot, ".venv", "Scripts", "python.exe")
+  : path.join(repositoryRoot, ".venv", "bin", "python");
 const python = existsSync(bundledPython) ? bundledPython : "python";
 const appData = path.join(repositoryRoot, "output", "playwright", `app-data-${process.pid}`);
 

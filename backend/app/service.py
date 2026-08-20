@@ -69,11 +69,11 @@ def validate_name(name: str, *, kind: str = "节点") -> str:
     if not cleaned:
         raise ServiceError(422, f"{kind}名称不能为空", code="invalid_name")
     if cleaned in {".", ".."} or INVALID_NAME.search(cleaned):
-        raise ServiceError(422, f"{kind}名称包含 Windows 不允许的字符", code="invalid_name")
+        raise ServiceError(422, f"{kind}名称包含不支持的字符", code="invalid_name")
     if cleaned.endswith((".", " ")):
         raise ServiceError(422, f"{kind}名称不能以点或空格结尾", code="invalid_name")
     if cleaned.split(".", 1)[0].upper() in WINDOWS_RESERVED_NAMES:
-        raise ServiceError(422, f"{kind}名称是 Windows 保留名称", code="invalid_name")
+        raise ServiceError(422, f"{kind}名称是系统保留名称", code="invalid_name")
     if cleaned in INTERNAL_DIR_NAMES:
         raise ServiceError(422, f"{kind}名称为码熊内部保留名称", code="invalid_name")
     return cleaned
