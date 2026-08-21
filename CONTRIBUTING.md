@@ -4,7 +4,7 @@
 
 ## 本地环境
 
-- Windows 10/11 x64
+- Windows 10/11 x64 或 macOS 13+ arm64
 - Python 3.12+
 - Node.js 20+
 
@@ -16,6 +16,8 @@ Set-Location frontend
 npm run build
 ```
 
+macOS 使用 `.venv/bin/python`，其余测试命令相同。平台相关修改必须通过 Windows 与 macOS CI；发布脚本分别生成 Windows ZIP 和 macOS DMG，不得把两个平台的二进制混装到同一发布包。
+
 ## 提交要求
 
 - 一个 Pull Request 聚焦一个主题。
@@ -26,4 +28,3 @@ npm run build
 - 提交信息建议使用 `feat:`、`fix:`、`docs:`、`test:`、`refactor:`、`build:` 等前缀。
 
 提交 Pull Request 前，请确认后端测试和前端构建均通过，并在说明中写明验证方式。
-

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -48,6 +50,22 @@ VSVersionInfo(
 """
 
 
+def create_macos_icon(create_app_icon, output: Path) -> None:
+    iconset = output / "maxiong.iconset"
+    if iconset.exists():
+        shutil.rmtree(iconset)
+    iconset.mkdir(parents=True)
+    for logical_size in (16, 32, 128, 256, 512):
+        create_app_icon(logical_size).save(iconset / f"icon_{logical_size}x{logical_size}.png")
+        double_size = logical_size * 2
+        create_app_icon(double_size).save(iconset / f"icon_{logical_size}x{logical_size}@2x.png")
+    subprocess.run(
+        ["iconutil", "-c", "icns", str(iconset), "-o", str(output / "maxiong.icns")],
+        check=True,
+    )
+    shutil.rmtree(iconset)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
@@ -72,6 +90,8 @@ def main() -> None:
         encoding="utf-8",
         newline="\n",
     )
+    if sys.platform == "darwin":
+        create_macos_icon(create_app_icon, output)
 
 
 if __name__ == "__main__":

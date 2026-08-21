@@ -772,7 +772,7 @@ def test_backup_rejects_internal_workspace_paths(tmp_path: Path) -> None:
     with zipfile.ZipFile(archive_path, "w") as archive:
         archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False))
 
-    with pytest.raises(BackupFormatError, match="Windows 不允许"):
+    with pytest.raises(BackupFormatError, match="跨平台备份不支持"):
         inspect_backup_archive(archive_path)
 
 

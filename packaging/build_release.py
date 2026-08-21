@@ -4,7 +4,6 @@ import argparse
 import hashlib
 import json
 import os
-import re
 import shutil
 import socket
 import subprocess
@@ -16,6 +15,9 @@ import venv
 import zipfile
 from datetime import datetime
 from pathlib import Path
+
+from versioning import verify_version_sync
+from release_privacy import verify_archive_members, verify_release_tree, verify_tracked_sources
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,30 +40,6 @@ def safe_remove(path: Path, parent: Path) -> None:
         shutil.rmtree(resolved)
     elif resolved.exists():
         resolved.unlink()
-
-
-def read_version() -> str:
-    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-    if not re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", version):
-        raise RuntimeError(f"VERSION 格式无效：{version}")
-    return version
-
-
-def verify_version_sync(version: str) -> None:
-    config = (ROOT / "backend" / "app" / "config.py").read_text(encoding="utf-8")
-    match = re.search(r'^APP_VERSION\s*=\s*"([^"]+)"', config, re.MULTILINE)
-    package = json.loads((ROOT / "frontend" / "package.json").read_text(encoding="utf-8"))
-    lock = json.loads((ROOT / "frontend" / "package-lock.json").read_text(encoding="utf-8"))
-    values = {
-        "VERSION": version,
-        "backend/app/config.py": match.group(1) if match else "<missing>",
-        "frontend/package.json": package.get("version"),
-        "frontend/package-lock.json": lock.get("version"),
-        "frontend/package-lock.json packages['']": lock.get("packages", {}).get("", {}).get("version"),
-    }
-    mismatches = {key: value for key, value in values.items() if value != version}
-    if mismatches:
-        raise RuntimeError(f"版本号未同步：{mismatches}")
 
 
 def venv_python(environment: Path) -> Path:
@@ -197,8 +175,7 @@ def verify_release(archive_path: Path, version: str) -> None:
         temp = Path(temp_name)
         with zipfile.ZipFile(archive_path) as archive:
             names = archive.namelist()
-            if any("/data/" in name.replace("\\", "/") for name in names):
-                raise RuntimeError("发布包意外包含 data 目录")
+            verify_archive_members(names)
             archive.extractall(temp)
 
         executable = next(temp.glob("*/CodeBear.exe"), None)
@@ -252,8 +229,8 @@ def main() -> None:
     parser.add_argument("--check-version-only", action="store_true", help="仅校验各端版本号是否与 VERSION 一致")
     arguments = parser.parse_args()
 
-    version = read_version()
-    verify_version_sync(version)
+    version = verify_version_sync()
+    verify_tracked_sources(ROOT)
     if arguments.check_version_only:
         print(f"版本号同步校验通过：{version}", flush=True)
         return
@@ -276,6 +253,7 @@ def main() -> None:
 
     shutil.copytree(executable_dir, package_dir)
     write_release_documents(package_dir, version, build_python)
+    verify_release_tree(package_dir)
     make_zip(package_dir, archive_path)
     digest = hashlib.sha256(archive_path.read_bytes()).hexdigest()
     checksum_path.write_text(f"{digest}  {archive_path.name}\n", encoding="ascii", newline="\n")

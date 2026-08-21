@@ -3,13 +3,21 @@ from __future__ import annotations
 import base64
 import json
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from backend.app.ai import AI_MODEL, AiService, PdmKnowledgeRetriever, extract_search_terms
-from backend.app.config import AppPaths, SettingsStore, protect_secret, unprotect_secret
+from backend.app.config import (
+    AppPaths,
+    SettingsStore,
+    delete_protected_secret,
+    protect_secret,
+    protected_secret_storage,
+    unprotect_secret,
+)
 from backend.app.database import Database
 from backend.app.service import WorkspaceService
 from backend.tests.test_pdm import write_sample
@@ -50,6 +58,26 @@ def test_windows_dpapi_round_trip_does_not_expose_plaintext() -> None:
     assert protected.startswith("dpapi:v1:")
     assert plaintext not in protected
     assert unprotect_secret(protected) == plaintext
+
+
+def test_macos_keychain_round_trip_uses_reference_only(monkeypatch: Any) -> None:
+    values: dict[tuple[str, str], str] = {}
+    fake_keyring = SimpleNamespace(
+        set_password=lambda service, account, value: values.__setitem__((service, account), value),
+        get_password=lambda service, account: values.get((service, account)),
+        delete_password=lambda service, account: values.pop((service, account)),
+    )
+    monkeypatch.setattr("backend.app.config.sys.platform", "darwin")
+    monkeypatch.setitem(sys.modules, "keyring", fake_keyring)
+
+    protected = protect_secret("sk-macos-secret")
+
+    assert protected == "keychain:v1:deepseek-api-key"
+    assert "sk-macos-secret" not in protected
+    assert protected_secret_storage(protected) == "macos_keychain"
+    assert unprotect_secret(protected) == "sk-macos-secret"
+    delete_protected_secret(protected)
+    assert values == {}
 
 
 def test_ai_key_is_protected_and_workspace_update_preserves_it(

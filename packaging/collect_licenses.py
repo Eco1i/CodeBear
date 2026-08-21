@@ -5,6 +5,7 @@ import importlib.metadata
 import json
 import re
 import shutil
+import sys
 from collections import deque
 from pathlib import Path
 
@@ -22,6 +23,8 @@ PYTHON_ROOTS = {
     "pystray": set(),
     "pillow": set(),
 }
+if sys.platform == "darwin":
+    PYTHON_ROOTS["keyring"] = set()
 LICENSE_PREFIXES = ("license", "copying", "notice", "authors")
 FALLBACK_LICENSES = {
     ("@ant-design/icons-svg", "MIT"): """MIT LICENSE

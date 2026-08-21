@@ -19,7 +19,7 @@ export interface AiSettingsStatus {
   assistant_accessory: AiAccessory;
   configured: boolean;
   key_hint: string;
-  storage: "none" | "environment" | "windows_dpapi";
+  storage: "none" | "environment" | "windows_dpapi" | "macos_keychain";
   error: string;
 }
 

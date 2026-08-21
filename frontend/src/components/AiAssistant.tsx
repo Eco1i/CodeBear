@@ -1538,7 +1538,7 @@ export function AiAssistant({
               />
             </label>
             <p className="ai-privacy-note">
-              正式版只发送问题和命中的表、字段结构，不上传原始 PDM 文件。密钥由 Windows DPAPI 加密。
+              正式版只发送问题和命中的表、字段结构，不上传原始 PDM 文件。密钥由操作系统安全存储保护。
             </p>
             {settings?.error ? <p className="ai-settings-error">{settings.error}</p> : null}
             <div className="ai-settings-actions">

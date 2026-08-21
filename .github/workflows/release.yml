@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "v*"
@@ -25,19 +26,75 @@ jobs:
         shell: pwsh
         run: |
           $version = (Get-Content -Encoding UTF8 VERSION).Trim()
-          if ("v$version" -ne "${{ github.ref_name }}") {
+          if ("${{ github.ref_type }}" -eq "tag" -and "v$version" -ne "${{ github.ref_name }}") {
             throw "Tag ${{ github.ref_name }} does not match VERSION $version"
           }
           ./build-release.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-windows
+          path: |
+            release/*.zip
+            release/*.sha256
+          if-no-files-found: error
+
+  build-macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Verify tag and build release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '\r\n' < VERSION)"
+          if [[ "${{ github.ref_type }}" == "tag" && "v${version}" != "${{ github.ref_name }}" ]]; then
+            echo "Tag ${{ github.ref_name }} does not match VERSION ${version}" >&2
+            exit 1
+          fi
+          ./build-release.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-macos-arm64
+          path: |
+            release/*.dmg
+            release/*.sha256
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
       - name: Create GitHub release
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
         run: |
-          $tag = "${{ github.ref_name }}"
-          if (gh release view $tag 2>$null) {
-            gh release upload $tag release/*.zip release/*.sha256 --clobber
-          }
-          else {
-            gh release create $tag release/*.zip release/*.sha256 --generate-notes --title "码熊 $tag"
-          }
+          set -euo pipefail
+          tag="${{ github.ref_name }}"
+          notes_file="docs/releases/${tag}.md"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" release/* --clobber
+            if [[ -f "$notes_file" ]]; then
+              gh release edit "$tag" --title "码熊 $tag" --notes-file "$notes_file"
+            fi
+          elif [[ -f "$notes_file" ]]; then
+            gh release create "$tag" release/* --notes-file "$notes_file" --title "码熊 $tag"
+          else
+            gh release create "$tag" release/* --generate-notes --title "码熊 $tag"
+          fi

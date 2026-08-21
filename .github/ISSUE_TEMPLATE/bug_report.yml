@@ -17,7 +17,7 @@ body:
     id: installation
     attributes:
       label: 运行方式
-      options: [Windows 绿色版, 从源码运行]
+      options: [Windows 绿色版, macOS 桌面版, 从源码运行]
     validations:
       required: true
   - type: textarea
@@ -38,4 +38,3 @@ body:
       label: 实际行为
     validations:
       required: true
-

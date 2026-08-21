@@ -4,7 +4,7 @@
 
 码熊是一个面向 PowerDesigner PDM 的本地数据字典工作台。它在本机解析、索引和管理 PDM 副本，让你可以快速浏览表与字段、搜索数据字典、安全修订字段，并生成多种数据库的建表脚本。
 
-> 当前稳定版本：`v1.3.0` · 主要支持平台：Windows 10/11 x64
+> 当前稳定版本：`v1.4.0` · 支持 Windows 10/11 x64 与 macOS 13+ Apple Silicon
 
 ## 功能
 
@@ -18,7 +18,7 @@
 - 内置表关系浏览：自动解析 PDM 外键并支持手工维护关系，抽屉列表与关系图（聚焦高亮、悬停查看外键、双击切换中心）随 `.cbbak` 备份迁移。
 - 内置更新检查：自动查询 GitHub Releases，发现新版本在顶栏提示，更新面板提供发布说明、SHA-256 校验与升级迁移引导。
 - 可选 DeepSeek AI 助手，用自然语言查询本地数据字典。
-- Windows 托盘运行，提供开箱即用的 x64 绿色版。
+- Windows 托盘和 macOS 菜单栏运行，分别提供独立的 Windows x64 ZIP 与 macOS arm64 DMG。
 
 ## 界面预览
 
@@ -62,20 +62,33 @@
 
 ### Windows 绿色版
 
-从 GitHub Releases 下载 `CodeBear-v1.3.0-win-x64.zip`。同名 `.sha256` 文件用于可选的完整性校验：
+从 GitHub Releases 下载 `CodeBear-v1.4.0-win-x64.zip`。同名 `.sha256` 文件用于完整性校验：
 
 ```powershell
-Get-FileHash .\CodeBear-v1.3.0-win-x64.zip -Algorithm SHA256
-Get-Content .\CodeBear-v1.3.0-win-x64.zip.sha256
+Get-FileHash .\CodeBear-v1.4.0-win-x64.zip -Algorithm SHA256
+Get-Content .\CodeBear-v1.4.0-win-x64.zip.sha256
 ```
 
 确认两处哈希值一致后完整解压 ZIP，双击 `CodeBear.exe`。默认浏览器将打开 `http://127.0.0.1:8765`。
 
 程序只监听 `127.0.0.1`。数据、设置和 PDM 工作副本保存在程序同级的 `data` 目录；发布包本身不包含任何用户数据。
 
+### macOS 桌面版
+
+macOS 与 Windows 使用同一套业务源码，但发布为独立安装包。Apple Silicon 版本文件名为 `CodeBear-v1.4.0-mac-arm64.dmg`；不会在 Mac 包中包含 Windows 可执行文件。可使用以下命令和同名 `.sha256` 文件校验下载内容：
+
+```bash
+shasum -a 256 CodeBear-v1.4.0-mac-arm64.dmg
+cat CodeBear-v1.4.0-mac-arm64.dmg.sha256
+```
+
+打开 DMG 后将 `CodeBear.app` 拖入“应用程序”。当前版本采用 ad-hoc 签名且未经过 Apple 公证，首次启动请在 Finder 中右键应用并选择“打开”；若仍被拦截，请前往“系统设置 > 隐私与安全性”选择仍要打开。应用从菜单栏运行，工作区、数据库和设置保存在 `~/Library/Application Support/CodeBear`。
+
+当前 macOS 包仅支持 Apple Silicon（M 系列芯片），暂不支持 Intel Mac。
+
 ### 从源码运行
 
-要求：Windows 10/11、Python 3.12+、Node.js 20+。
+要求：Windows 10/11 或 macOS 13+、Python 3.12+、Node.js 20+。
 
 ```powershell
 git clone https://github.com/Eco1i/CodeBear.git
@@ -85,6 +98,15 @@ Set-Location CodeBear
 ```
 
 也可以双击 `start.bat`。停止服务可在启动窗口按 `Ctrl+C`，或运行 `./stop.ps1`。
+
+macOS 源码运行：
+
+```bash
+python3 -m venv .venv
+./.venv/bin/python -m pip install -r backend/requirements.txt
+(cd frontend && npm ci && npm run build)
+./.venv/bin/python -X utf8 -m backend.launch
+```
 
 ## 开发
 
@@ -111,7 +133,9 @@ npm run test:e2e
 
 测试或源码运行时，可通过 `MAXIONG_APP_DATA_DIR` 指定隔离的数据目录。
 
-## 构建绿色版
+## 构建发布包
+
+Windows x64 绿色版只能在 Windows 上构建：
 
 ```powershell
 ./build-release.ps1
@@ -119,15 +143,31 @@ npm run test:e2e
 
 脚本会执行前端构建、PyInstaller 打包、ZIP 与 SHA-256 生成，并在临时目录中完成一次解压启动验收。输出位于 `release/`。
 
+macOS arm64 桌面版只能在 Apple Silicon macOS 或对应的 GitHub Actions runner 上构建：
+
+```bash
+./build-release.sh
+```
+
+macOS 流程会生成 `CodeBear.app`，执行 ad-hoc 签名和启动健康检查，再输出 DMG 与 SHA-256。Windows ZIP 和 macOS DMG 始终是两个独立发布物。
+
+开发分支使用预发布版本号。统一检查或更新所有版本字段：
+
+```powershell
+python -X utf8 packaging/versioning.py --check
+python -X utf8 packaging/versioning.py --set 1.4.0
+```
+
 ## 数据与隐私
 
 - 码熊只操作导入到工作区的 PDM 副本，不会修改原始 PDM。
 - 本地服务无登录机制，只适合绑定 `127.0.0.1`；请勿改为公网或局域网监听。
-- PDM 索引、项目副本、对话历史和设置均保存在本机 `data` 目录。
+- Windows 的数据保存在程序同级 `data`；macOS 的数据保存在 `~/Library/Application Support/CodeBear`。
 - AI 功能完全可选，需要用户自己的 DeepSeek API Key。
 - AI 请求不会上传原始 PDM 文件；会发送问题、最近对话、来源名称，以及本机检索命中的表名、字段名、类型和备注。
-- Windows 下保存的 API Key 使用当前用户的 DPAPI 加密，且不会进入 PDM、SQLite 或 `.cbbak`。
+- Windows 下保存的 API Key 使用当前用户的 DPAPI 加密；macOS 下保存在当前用户的登录钥匙串。密钥不会进入 PDM、SQLite 或 `.cbbak`。
 - 更新检查只向 GitHub 公共 API 发送匿名 GET 请求（获取最新 Release 元数据），不携带任何本地数据；下载安装包由浏览器直接访问 GitHub 完成。
+- 正式包由 GitHub Actions 从版本标签对应的干净源码构建；构建前检查受控源码，打包后再次拒绝 `data`、数据库、PDM、备份、设置和密钥文件进入发布物。
 
 使用真实业务模型前，请自行确认数据分类、保密要求以及第三方 AI 服务的使用政策。
 
@@ -136,13 +176,13 @@ npm run test:e2e
 ```text
 backend/      FastAPI、PDM 解析、SQLite 索引与测试
 frontend/     React、TypeScript、Ant Design 与 Vite
-packaging/    Windows 绿色版构建和验收脚本
+packaging/    Windows ZIP、macOS App/DMG 构建和验收脚本
 .github/      CI、发布工作流和协作模板
 ```
 
 ## 更新记录
 
-版本发布说明见 [CHANGELOG.md](CHANGELOG.md)，Windows 绿色版发行包见 [GitHub Releases](https://github.com/Eco1i/CodeBear/releases)。
+版本发布说明见 [CHANGELOG.md](CHANGELOG.md)，各平台发行包见 [GitHub Releases](https://github.com/Eco1i/CodeBear/releases)。
 
 ## 参与贡献
 

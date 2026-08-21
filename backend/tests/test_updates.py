@@ -50,8 +50,18 @@ def releases_payload() -> list[dict]:
             "published_at": "2026-08-15T00:00:00Z",
             "body": "# 更新说明\n- 修复问题",
             "assets": [
-                {"name": "CodeBear-v9.9.9-win-x64.zip", "browser_download_url": "https://example.com/a.zip"},
+                {
+                    "name": "CodeBear-v9.9.9-win-x64.zip",
+                    "browser_download_url": "https://example.com/a.zip",
+                    "digest": "sha256:" + "a" * 64,
+                },
                 {"name": "CodeBear-v9.9.9-win-x64.zip.sha256", "browser_download_url": "https://example.com/a.zip.sha256"},
+                {
+                    "name": "CodeBear-v9.9.9-mac-arm64.dmg",
+                    "browser_download_url": "https://example.com/a-arm64.dmg",
+                    "digest": "sha256:" + "b" * 64,
+                },
+                {"name": "CodeBear-v9.9.9-mac-arm64.dmg.sha256", "browser_download_url": "https://example.com/a-arm64.dmg.sha256"},
             ],
         },
     ]
@@ -62,31 +72,33 @@ def patch_latest_tag(monkeypatch: pytest.MonkeyPatch, tag: str) -> None:
 
 
 def test_check_with_enriched_details(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    service = UpdateService(tmp_path / "update-check.json")
+    service = UpdateService(tmp_path / "update-check.json", target="win-x64")
     patch_latest_tag(monkeypatch, "v9.9.9")
     monkeypatch.setattr(UpdateService, "_fetch_releases", lambda self: releases_payload())
     state = service.check_now()
     assert state["status"] == "update_available"
     assert state["latest"]["version"] == "v9.9.9"
-    assert state["latest"]["zip_url"] == "https://example.com/a.zip"
-    assert state["latest"]["sha256"] == "https://example.com/a.zip.sha256"
+    assert state["target"] == "win-x64"
+    assert state["latest"]["download_url"] == "https://example.com/a.zip"
+    assert state["latest"]["checksum_url"] == "https://example.com/a.zip.sha256"
+    assert state["latest"]["sha256"] == "a" * 64
     cached = json.loads((tmp_path / "update-check.json").read_text(encoding="utf-8"))
     assert cached["latest"]["version"] == "v9.9.9"
 
 
 def test_check_falls_back_when_api_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    service = UpdateService(tmp_path / "update-check.json")
+    service = UpdateService(tmp_path / "update-check.json", target="win-x64")
     patch_latest_tag(monkeypatch, "v9.9.9")
     monkeypatch.setattr(UpdateService, "_fetch_releases", lambda self: (_ for _ in ()).throw(OSError("rate limit")))
     state = service.check_now()
     assert state["status"] == "update_available"
     assert state["latest"]["version"] == "v9.9.9"
-    assert state["latest"]["zip_url"] == ""
+    assert state["latest"]["download_url"] == ""
     assert state["latest"]["release_url"] == "https://github.com/Eco1i/CodeBear/releases/tag/v9.9.9"
 
 
 def test_check_up_to_date_without_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    service = UpdateService(tmp_path / "update-check.json")
+    service = UpdateService(tmp_path / "update-check.json", target="win-x64")
     patch_latest_tag(monkeypatch, "v1.1.2")
     state = service.check_now()
     assert state["status"] == "up_to_date"
@@ -94,7 +106,7 @@ def test_check_up_to_date_without_api(tmp_path: Path, monkeypatch: pytest.Monkey
 
 
 def test_check_ignores_prerelease(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    service = UpdateService(tmp_path / "update-check.json")
+    service = UpdateService(tmp_path / "update-check.json", target="win-x64")
     patch_latest_tag(monkeypatch, "v9.9.10-rc1")
     state = service.check_now()
     assert state["status"] == "unknown"
@@ -102,7 +114,7 @@ def test_check_ignores_prerelease(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
 
 def test_check_returns_unknown_on_network_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    service = UpdateService(tmp_path / "update-check.json")
+    service = UpdateService(tmp_path / "update-check.json", target="win-x64")
 
     def fail(self) -> str:
         raise OSError("network down")
@@ -114,9 +126,38 @@ def test_check_returns_unknown_on_network_error(tmp_path: Path, monkeypatch: pyt
 
 
 def test_ignored_version_suppresses_update(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    service = UpdateService(tmp_path / "update-check.json")
+    service = UpdateService(tmp_path / "update-check.json", target="win-x64")
     patch_latest_tag(monkeypatch, "v9.9.9")
     monkeypatch.setattr(UpdateService, "_fetch_releases", lambda self: releases_payload())
     assert service.check_now()["status"] == "update_available"
     assert service.ignore_version("v9.9.9")["status"] == "up_to_date"
     assert service.current_state()["status"] == "up_to_date"
+
+
+def test_release_selects_current_macos_architecture(tmp_path: Path) -> None:
+    service = UpdateService(tmp_path / "update-check.json", target="mac-arm64")
+
+    release = service._latest_stable_release(releases_payload())
+
+    assert release is not None
+    assert release["asset_name"] == "CodeBear-v9.9.9-mac-arm64.dmg"
+    assert release["download_url"] == "https://example.com/a-arm64.dmg"
+    assert release["checksum_url"] == "https://example.com/a-arm64.dmg.sha256"
+    assert release["sha256"] == "b" * 64
+
+
+def test_cache_from_other_platform_is_not_reused(tmp_path: Path) -> None:
+    cache = tmp_path / "update-check.json"
+    cache.write_text(
+        json.dumps({
+            "target": "win-x64",
+            "latest": {"version": "v9.9.9", "download_url": "https://example.com/windows.zip"},
+        }),
+        encoding="utf-8",
+    )
+
+    state = UpdateService(cache, target="mac-arm64").current_state()
+
+    assert state["target"] == "mac-arm64"
+    assert state["latest"] is None
+    assert state["status"] == "unknown"

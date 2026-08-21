@@ -63,7 +63,7 @@ def _safe_relative_path(value: object, *, allow_empty: bool = False) -> str:
             or part.split(".", 1)[0].upper() in WINDOWS_RESERVED_NAMES
             or part in INTERNAL_BACKUP_NAMES
         ):
-            raise BackupFormatError("节点路径包含 Windows 不允许的名称")
+            raise BackupFormatError("节点路径包含跨平台备份不支持的名称")
     return normalized
 
 

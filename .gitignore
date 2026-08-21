@@ -32,4 +32,8 @@ pdm文件/
 *.sha256
 settings.json
 
+# Local design explorations are not part of release source or packages.
+/docs/icon-candidates/
+/*.html
+
 # PDM and backup files may contain confidential schema information.

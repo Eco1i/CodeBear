@@ -10,6 +10,8 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from backend.platform_support import release_target
+
 from .config import APP_VERSION
 
 logger = logging.getLogger("backend.app.updates")
@@ -48,17 +50,22 @@ def parse_tag_from_location(location: str) -> str:
 class UpdateService:
     """查询 GitHub Releases 的最新稳定版，结果缓存到本地 JSON 文件。"""
 
-    def __init__(self, cache_path: Path):
+    def __init__(self, cache_path: Path, *, target: str | None = None):
         self.cache_path = cache_path
+        self.target = target or release_target()
         self._lock = RLock()
 
     # ---- 缓存 ----
 
     def _read_cache(self) -> dict[str, Any]:
         try:
-            return json.loads(self.cache_path.read_text(encoding="utf-8"))
+            payload = json.loads(self.cache_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return {}
+        if not isinstance(payload, dict):
+            return {}
+        cached_target = str(payload.get("target") or "")
+        return {} if cached_target and cached_target != self.target else payload
 
     def _write_cache(self, state: dict[str, Any]) -> None:
         temporary = self.cache_path.with_suffix(".tmp")
@@ -73,9 +80,19 @@ class UpdateService:
             cached = self._read_cache()
             return self._state_from_cache(cached)
 
-    @staticmethod
-    def _state_from_cache(cached: dict[str, Any]) -> dict[str, Any]:
+    def _state_from_cache(self, cached: dict[str, Any]) -> dict[str, Any]:
         latest = cached.get("latest")
+        cached_target = str(cached.get("target") or "")
+        if cached_target and cached_target != self.target:
+            latest = None
+        elif isinstance(latest, dict):
+            latest = dict(latest)
+            if "download_url" not in latest:
+                latest["download_url"] = (
+                    str(latest.get("zip_url") or "") if self.target.startswith("win-") else ""
+                )
+            latest.setdefault("checksum_url", "")
+            latest.setdefault("asset_name", "")
         ignored = cached.get("ignored_version", "")
         update_available = False
         if isinstance(latest, dict) and latest.get("version"):
@@ -84,6 +101,7 @@ class UpdateService:
                 update_available = True
         return {
             "current_version": APP_VERSION,
+            "target": self.target,
             "status": "update_available" if update_available else (
                 "up_to_date" if isinstance(latest, dict) and latest.get("version") else "unknown"
             ),
@@ -126,8 +144,7 @@ class UpdateService:
             payload = json.loads(response.read().decode("utf-8"))
         return payload if isinstance(payload, list) else []
 
-    @staticmethod
-    def _latest_stable_release(releases: list[dict[str, Any]]) -> dict[str, Any] | None:
+    def _latest_stable_release(self, releases: list[dict[str, Any]]) -> dict[str, Any] | None:
         for release in releases:
             if not isinstance(release, dict):
                 continue
@@ -136,22 +153,38 @@ class UpdateService:
             tag = str(release.get("tag_name") or "").strip()
             if not tag:
                 continue
-            zip_url = ""
-            sha256 = ""
-            for asset in release.get("assets") or []:
+            package_asset: dict[str, Any] | None = None
+            checksum_url = ""
+            extension = ".zip" if self.target.startswith("win-") else ".dmg"
+            suffix = f"-{self.target}{extension}".casefold()
+            assets = release.get("assets") or []
+            for asset in assets:
                 if not isinstance(asset, dict):
                     continue
                 name = str(asset.get("name") or "")
-                url = str(asset.get("browser_download_url") or "")
-                if name.endswith(".zip") and not zip_url:
-                    zip_url = url
-                elif name.endswith(".sha256") and not sha256:
-                    sha256 = url
+                if name.casefold().endswith(suffix):
+                    package_asset = asset
+                    break
+            if package_asset:
+                package_name = str(package_asset.get("name") or "")
+                checksum_name = f"{package_name}.sha256".casefold()
+                for asset in assets:
+                    if not isinstance(asset, dict):
+                        continue
+                    if str(asset.get("name") or "").casefold() == checksum_name:
+                        checksum_url = str(asset.get("browser_download_url") or "")
+                        break
+            else:
+                package_name = ""
+            digest = str(package_asset.get("digest") or "") if package_asset else ""
+            sha256 = digest.removeprefix("sha256:").lower() if re.fullmatch(r"sha256:[0-9a-fA-F]{64}", digest) else ""
             return {
                 "version": tag,
                 "published_at": str(release.get("published_at") or ""),
                 "release_url": str(release.get("html_url") or ""),
-                "zip_url": zip_url,
+                "download_url": str(package_asset.get("browser_download_url") or "") if package_asset else "",
+                "checksum_url": checksum_url,
+                "asset_name": package_name,
                 "sha256": sha256,
                 "notes": str(release.get("body") or "")[:MAX_NOTES_LENGTH],
             }
@@ -175,7 +208,9 @@ class UpdateService:
             "version": tag,
             "published_at": "",
             "release_url": release_url,
-            "zip_url": "",
+            "download_url": "",
+            "checksum_url": "",
+            "asset_name": "",
             "sha256": "",
             "notes": "（发布说明获取失败，请前往 Release 页面查看）",
         }
@@ -197,7 +232,9 @@ class UpdateService:
                     "version": tag,
                     "published_at": "",
                     "release_url": release_url,
-                    "zip_url": "",
+                    "download_url": "",
+                    "checksum_url": "",
+                    "asset_name": "",
                     "sha256": "",
                     "notes": "",
                 }
@@ -205,6 +242,7 @@ class UpdateService:
                 release = self._enrich_release(tag, release_url)
             state = {
                 "checked_at": int(time.time()),
+                "target": self.target,
                 "latest": release,
                 "ignored_version": cached.get("ignored_version", ""),
             }
@@ -217,6 +255,7 @@ class UpdateService:
     def ignore_version(self, version: str) -> dict[str, Any]:
         with self._lock:
             cached = self._read_cache()
+            cached["target"] = self.target
             cached["ignored_version"] = (version or "").strip()[:100]
             self._write_cache(cached)
             return self._state_from_cache(cached)

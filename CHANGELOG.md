@@ -2,6 +2,28 @@
 
 本项目遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## 1.4.0 - 2026-08-21
+
+### 新功能
+
+- 正式支持 macOS 13+ Apple Silicon：提供独立的 `CodeBear.app` 和 DMG，不与 Windows 二进制混装。
+- macOS 从菜单栏运行，数据写入 `~/Library/Application Support/CodeBear`，API Key 使用当前用户的登录钥匙串保存。
+- 新增跨平台单实例锁、Finder 数据目录入口、macOS 原生错误提示和平台中性的工作区路径比较。
+- 更新检查按当前系统和 CPU 架构选择 Windows ZIP 或 macOS DMG，并直接展示 GitHub Release 提供的 SHA-256 摘要。
+
+### 构建与质量
+
+- GitHub Actions CI 扩展到 Windows 与原生 Apple Silicon macOS；发布流程分别构建 Windows ZIP 和 macOS DMG，再汇总到同一个 Release。
+- 新增统一版本管理命令，集中校验或更新 `VERSION`、后端与前端版本字段。
+- Windows ZIP 会执行解压启动验收；macOS DMG 会执行 ad-hoc 签名校验、应用启动、镜像校验、挂载及签名复验。
+- Windows 与 macOS 的后端、前端和浏览器端到端测试均已通过，并在真实 Apple Silicon Mac 上完成试用验证。
+
+### 安全与隐私
+
+- 正式发布包从版本标签对应的干净源码构建，不包含维护者本地 `data`、数据库、PDM、备份、设置、API Key 或原型文件。
+- 构建流程增加受控源码和安装包双重隐私检查，发现潜在用户数据时直接终止发布。
+- 当前 macOS 包采用 ad-hoc 签名且未经过 Apple 公证，首次启动可能需要在 Finder 中右键选择“打开”或在系统隐私设置中放行。
+
 ## 1.3.1 - 2026-08-16
 
 ### 修复

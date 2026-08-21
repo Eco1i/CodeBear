@@ -41,5 +41,5 @@ export function projectForNode(
 }
 
 export function normalizeWorkspacePath(path: string): string {
-  return path.trim().replaceAll("/", "\\").replace(/\\+$/, "").toLocaleLowerCase();
+  return path.trim().replaceAll("\\", "/").replace(/\/+$/, "");
 }
