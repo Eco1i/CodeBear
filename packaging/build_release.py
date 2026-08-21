@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 from versioning import verify_version_sync
+from release_privacy import verify_archive_members, verify_release_tree, verify_tracked_sources
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -174,8 +175,7 @@ def verify_release(archive_path: Path, version: str) -> None:
         temp = Path(temp_name)
         with zipfile.ZipFile(archive_path) as archive:
             names = archive.namelist()
-            if any("/data/" in name.replace("\\", "/") for name in names):
-                raise RuntimeError("发布包意外包含 data 目录")
+            verify_archive_members(names)
             archive.extractall(temp)
 
         executable = next(temp.glob("*/CodeBear.exe"), None)
@@ -230,6 +230,7 @@ def main() -> None:
     arguments = parser.parse_args()
 
     version = verify_version_sync()
+    verify_tracked_sources(ROOT)
     if arguments.check_version_only:
         print(f"版本号同步校验通过：{version}", flush=True)
         return
@@ -252,6 +253,7 @@ def main() -> None:
 
     shutil.copytree(executable_dir, package_dir)
     write_release_documents(package_dir, version, build_python)
+    verify_release_tree(package_dir)
     make_zip(package_dir, archive_path)
     digest = hashlib.sha256(archive_path.read_bytes()).hexdigest()
     checksum_path.write_text(f"{digest}  {archive_path.name}\n", encoding="ascii", newline="\n")

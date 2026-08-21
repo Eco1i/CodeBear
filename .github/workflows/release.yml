@@ -73,6 +73,7 @@ jobs:
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           pattern: release-*
@@ -86,8 +87,14 @@ jobs:
         run: |
           set -euo pipefail
           tag="${{ github.ref_name }}"
+          notes_file="docs/releases/${tag}.md"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release/* --clobber
+            if [[ -f "$notes_file" ]]; then
+              gh release edit "$tag" --title "码熊 $tag" --notes-file "$notes_file"
+            fi
+          elif [[ -f "$notes_file" ]]; then
+            gh release create "$tag" release/* --notes-file "$notes_file" --title "码熊 $tag"
           else
             gh release create "$tag" release/* --generate-notes --title "码熊 $tag"
           fi

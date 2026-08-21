@@ -16,6 +16,7 @@ import venv
 from pathlib import Path
 
 from versioning import verify_version_sync
+from release_privacy import verify_release_tree, verify_tracked_sources
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -267,6 +268,7 @@ def verify_dmg(destination: Path) -> None:
                 "--verbose=2",
                 str(mountpoint / "CodeBear.app"),
             ])
+            verify_release_tree(mountpoint / "CodeBear.app")
         finally:
             if attached:
                 subprocess.run(["hdiutil", "detach", str(mountpoint)], check=False)
@@ -281,6 +283,7 @@ def main() -> None:
     if sys.platform != "darwin":
         raise RuntimeError("macOS 发布包只能在 macOS 上构建")
     version = verify_version_sync()
+    verify_tracked_sources(ROOT)
     if arguments.check_version_only:
         print(f"版本号同步校验通过：{version}")
         return
@@ -291,6 +294,7 @@ def main() -> None:
     build_python = ensure_build_environment()
     app = build_app(build_python)
     add_release_documents(app, version, build_python)
+    verify_release_tree(app)
     sign_and_verify(app)
     verify_app(app, version)
 
