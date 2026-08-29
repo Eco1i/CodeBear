@@ -383,32 +383,31 @@ def run_with_tray(
         icon.stop()
         stop_server_process(server_process)
 
-    if pystray is None:
-        raise RuntimeError("未安装托盘运行依赖")
-    app_icon = create_app_icon(256)
-    if sys.platform == "win32":
-        icon: pystray.Icon = CodeBearTrayIcon(
-            "maxiong",
-            app_icon,
-            "码熊 · PDM 数据字典工作台",
-            menu=pystray.Menu(pystray.MenuItem("打开码熊", open_app, default=True)),
-            popup_actions=(lambda: open_app(), lambda: open_data(), lambda: open_updates(), lambda: exit_app(icon)),
-        )
-    else:
-        icon = pystray.Icon(
-            "maxiong",
-            app_icon,
-            "码熊 · PDM 数据字典工作台",
-            menu=pystray.Menu(
-                pystray.MenuItem("打开码熊", open_app, default=True),
-                pystray.MenuItem("打开数据目录", open_data),
-                pystray.MenuItem("检查更新", open_updates),
-                pystray.Menu.SEPARATOR,
-                pystray.MenuItem("退出码熊", exit_app),
-            ),
-        )
-
     try:
+        if pystray is None:
+            raise RuntimeError("未安装托盘运行依赖")
+        app_icon = create_app_icon(256)
+        if sys.platform == "win32":
+            icon: pystray.Icon = CodeBearTrayIcon(
+                "maxiong",
+                app_icon,
+                "码熊 · PDM 数据字典工作台",
+                menu=pystray.Menu(pystray.MenuItem("打开码熊", open_app, default=True)),
+                popup_actions=(lambda: open_app(), lambda: open_data(), lambda: open_updates(), lambda: exit_app(icon)),
+            )
+        else:
+            icon = pystray.Icon(
+                "maxiong",
+                app_icon,
+                "码熊 · PDM 数据字典工作台",
+                menu=pystray.Menu(
+                    pystray.MenuItem("打开码熊", open_app, default=True),
+                    pystray.MenuItem("打开数据目录", open_data),
+                    pystray.MenuItem("检查更新", open_updates),
+                    pystray.Menu.SEPARATOR,
+                    pystray.MenuItem("退出码熊", exit_app),
+                ),
+            )
         icon.run()
     except Exception as exc:  # pragma: no cover - depends on the desktop shell
         show_message("码熊托盘启动失败", str(exc), error=True)
