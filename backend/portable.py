@@ -35,6 +35,7 @@ if sys.platform == "win32":
 APP_HOST = "127.0.0.1"
 APP_PORT = 8765
 SERVER_SHUTDOWN_TIMEOUT = 5
+_PROCESS_JOB_HANDLES: dict[int, int] = {}
 if sys.platform == "win32" and pystray is not None:
     class CodeBearTrayIcon(pystray_win32.Icon):
         """Use the normal tray icon but replace the shell context menu."""
@@ -191,17 +192,27 @@ def build_server(port: int) -> uvicorn.Server:
 def run_server_only(port: int) -> int:
     """Run the API worker and listen for a shutdown command from the launcher."""
     server = build_server(port)
+    launcher_pid = os.getppid()
 
     def wait_for_launcher() -> None:
         try:
-            for line in sys.stdin:
-                if line.strip() == "shutdown":
+            while True:
+                line = sys.stdin.readline()
+                if not line or line.strip() == "shutdown":
                     break
         except (OSError, ValueError):
             pass
         server.should_exit = True
 
+    def monitor_launcher() -> None:
+        while True:
+            time.sleep(0.5)
+            if os.getppid() != launcher_pid:
+                server.should_exit = True
+                return
+
     threading.Thread(target=wait_for_launcher, name="maxiong-shutdown", daemon=True).start()
+    threading.Thread(target=monitor_launcher, name="maxiong-launcher-monitor", daemon=True).start()
     server.run()
     return 0
 
@@ -212,9 +223,83 @@ def server_command(port: int) -> list[str]:
     return [sys.executable, "-m", "backend.portable", "--server", "--port", str(port)]
 
 
+def attach_process_job(process: subprocess.Popen[bytes]) -> None:
+    """Ensure a Windows worker cannot outlive its launcher."""
+    if sys.platform != "win32":
+        return
+    handle = getattr(process, "_handle", None)
+    if handle is None:
+        return
+    try:
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p]
+        kernel32.CreateJobObjectW.restype = ctypes.c_void_p
+        kernel32.SetInformationJobObject.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint]
+        kernel32.SetInformationJobObject.restype = ctypes.c_bool
+        kernel32.AssignProcessToJobObject.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        kernel32.AssignProcessToJobObject.restype = ctypes.c_bool
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        kernel32.CloseHandle.restype = ctypes.c_bool
+
+        class BasicLimitInformation(ctypes.Structure):
+            _fields_ = [
+                ("per_process_user_time_limit", ctypes.c_longlong),
+                ("per_job_user_time_limit", ctypes.c_longlong),
+                ("limit_flags", ctypes.c_uint32),
+                ("minimum_working_set_size", ctypes.c_size_t),
+                ("maximum_working_set_size", ctypes.c_size_t),
+                ("active_process_limit", ctypes.c_uint32),
+                ("affinity", ctypes.c_size_t),
+                ("priority_class", ctypes.c_uint32),
+                ("scheduling_class", ctypes.c_uint32),
+            ]
+
+        class IoCounters(ctypes.Structure):
+            _fields_ = [(f"value_{index}", ctypes.c_uint64) for index in range(6)]
+
+        class ExtendedLimitInformation(ctypes.Structure):
+            _fields_ = [
+                ("basic_limit_information", BasicLimitInformation),
+                ("io_info", IoCounters),
+                ("process_memory_limit", ctypes.c_size_t),
+                ("job_memory_limit", ctypes.c_size_t),
+                ("peak_process_memory_used", ctypes.c_size_t),
+                ("peak_job_memory_used", ctypes.c_size_t),
+            ]
+
+        job = kernel32.CreateJobObjectW(None, None)
+        if not job:
+            return
+        limits = ExtendedLimitInformation()
+        limits.basic_limit_information.limit_flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        configured = kernel32.SetInformationJobObject(
+            job,
+            9,  # JobObjectExtendedLimitInformation
+            ctypes.byref(limits),
+            ctypes.sizeof(limits),
+        )
+        assigned = configured and kernel32.AssignProcessToJobObject(job, ctypes.c_void_p(handle))
+        if not assigned:
+            kernel32.CloseHandle(job)
+            return
+        _PROCESS_JOB_HANDLES[process.pid] = int(job)
+    except (AttributeError, OSError):
+        return
+
+
+def close_process_job(process: subprocess.Popen[bytes]) -> None:
+    job = _PROCESS_JOB_HANDLES.pop(process.pid, None)
+    if job is None or sys.platform != "win32":
+        return
+    try:
+        ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(job))
+    except (AttributeError, OSError):
+        pass
+
+
 def start_server_process(port: int) -> subprocess.Popen[bytes]:
     creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    return subprocess.Popen(
+    process = subprocess.Popen(
         server_command(port),
         cwd=executable_root(),
         env=os.environ.copy(),
@@ -223,10 +308,13 @@ def start_server_process(port: int) -> subprocess.Popen[bytes]:
         stderr=subprocess.DEVNULL,
         creationflags=creation_flags,
     )
+    attach_process_job(process)
+    return process
 
 
 def stop_server_process(process: subprocess.Popen[bytes]) -> None:
     if process.poll() is not None:
+        close_process_job(process)
         return
     try:
         if process.stdin is not None:
@@ -237,17 +325,20 @@ def stop_server_process(process: subprocess.Popen[bytes]) -> None:
         pass
 
     try:
-        process.wait(timeout=SERVER_SHUTDOWN_TIMEOUT)
-        return
-    except subprocess.TimeoutExpired:
-        pass
+        try:
+            process.wait(timeout=SERVER_SHUTDOWN_TIMEOUT)
+            return
+        except subprocess.TimeoutExpired:
+            pass
 
-    process.terminate()
-    try:
-        process.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=2)
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
+    finally:
+        close_process_job(process)
 
 
 def wait_for_server_process(process: subprocess.Popen[bytes], port: int, timeout: float = 15.0) -> bool:
