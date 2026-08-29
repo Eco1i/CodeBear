@@ -52,48 +52,183 @@
   background: var(--blue-soft) !important;
 }
 
+.table-search-settings-popover .ant-popover-inner {
+  width: min(304px, calc(100vw - 32px));
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #d9e5f3;
+  border-radius: 10px;
+  box-shadow: 0 16px 36px rgba(31, 55, 88, 0.16), 0 3px 10px rgba(31, 55, 88, 0.06);
+}
+
 .table-search-settings {
-  width: 242px;
+  width: 304px;
+  max-width: calc(100vw - 32px);
   color: #526682;
   font-size: 11px;
+}
+
+.table-search-settings-heading {
+  min-height: 58px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #f5f9ff 0%, #ffffff 78%);
+  border-bottom: 1px solid #e7eef7;
+}
+
+.table-search-settings-heading > span:last-child,
+.table-search-setting-copy,
+.table-search-clear-row > span,
+.table-search-clear-confirm-copy > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.table-search-settings-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--blue);
+  background: #e8f2ff;
+  border: 1px solid #d2e5ff;
+  border-radius: 7px;
+  font-size: 14px;
+}
+
+.table-search-settings-heading strong {
+  color: #20314d;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.table-search-settings-heading small,
+.table-search-setting-row small,
+.table-search-clear-row small,
+.table-search-clear-confirm-copy small {
+  color: #7a8ba4;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.table-search-setting-card {
+  margin: 12px 12px 0;
+  padding: 10px 11px;
+  background: #fbfcfe;
+  border: 1px solid #e5ebf4;
+  border-radius: 8px;
 }
 
 .table-search-setting-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 14px;
 }
 
-.table-search-setting-row > span {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.table-search-setting-row strong,
+.table-search-clear-row strong,
+.table-search-clear-confirm-copy strong {
+  color: #263b58;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
-.table-search-setting-row strong {
-  color: #20314d;
-  font-size: 12px;
+.table-search-setting-row .ant-switch {
+  flex: 0 0 auto;
 }
 
-.table-search-setting-row small,
 .table-search-setting-note {
-  color: #7a8ba4;
+  margin: 11px 12px 0;
+  padding: 0 1px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #8191a8;
   font-size: 10px;
   line-height: 1.5;
 }
 
-.table-search-setting-note {
-  margin-top: 10px;
-  padding-top: 9px;
-  border-top: 1px solid #edf1f6;
+.table-search-setting-note > svg:first-child {
+  color: #6f9bd0;
+  font-size: 11px;
 }
 
-.table-search-clear-memory {
-  margin-top: 8px;
-  padding: 0 !important;
+.table-search-setting-note .ant-tooltip-trigger {
+  margin-left: auto;
+  color: #a0aec0;
+  cursor: help;
+}
+
+.table-search-clear-row {
+  margin: 12px;
+  padding: 10px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #e5ebf4;
+  border-radius: 8px;
+}
+
+.table-search-clear-row .ant-btn {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 9px;
   font-size: 10px;
+  border-color: #ffc9c5;
+  box-shadow: none;
+}
+
+.table-search-clear-row .ant-btn:not(:disabled):hover {
+  color: #d8473f;
+  background: #fff5f4;
+  border-color: #f08b84;
+}
+
+.table-search-clear-confirm {
+  margin: 12px;
+  padding: 11px;
+  background: #fff9f7;
+  border: 1px solid #ffd8d2;
+  border-radius: 8px;
+}
+
+.table-search-clear-confirm-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.table-search-clear-confirm-copy > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #e08a22;
+  font-size: 14px;
+}
+
+.table-search-clear-confirm-actions {
+  margin-top: 11px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.table-search-clear-confirm-actions .ant-btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 10px;
+}
+
+.table-search-clear-confirm-actions .ant-btn-primary {
+  box-shadow: 0 2px 5px rgba(216, 71, 63, 0.2);
 }
 
 .data-grid {

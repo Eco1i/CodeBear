@@ -80,6 +80,7 @@ describe("TablePanel", () => {
   it("exposes search memory settings and marks promoted tables", async () => {
     const user = userEvent.setup();
     const onSmartRankingChange = vi.fn();
+    const onClearSearchMemory = vi.fn();
     render(
       <TablePanel
         tables={[table]}
@@ -102,7 +103,7 @@ describe("TablePanel", () => {
         hasSearchMemory
         preferredTableIds={new Set([table.id])}
         onSmartRankingChange={onSmartRankingChange}
-        onClearSearchMemory={vi.fn()}
+        onClearSearchMemory={onClearSearchMemory}
       />,
     );
 
@@ -111,6 +112,10 @@ describe("TablePanel", () => {
     expect(screen.getByText("优先显示当前关键词下最近打开的表")).toBeInTheDocument();
     await user.click(screen.getByRole("switch", { name: "启用智能排序" }));
     expect(onSmartRankingChange).toHaveBeenCalledWith(false, expect.anything());
+    await user.click(screen.getByRole("button", { name: /清除记录/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent("确认清除搜索记忆？");
+    await user.click(screen.getByRole("button", { name: /清除记录/ }));
+    expect(onClearSearchMemory).toHaveBeenCalledTimes(1);
   });
 
   it("selects tables and exposes the batch delete action", async () => {

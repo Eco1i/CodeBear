@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DeleteOutlined, SearchOutlined, SettingOutlined } from "@ant-design/icons";
+import {
+  DeleteOutlined,
+  ExclamationCircleOutlined,
+  InfoCircleOutlined,
+  LockOutlined,
+  SearchOutlined,
+  SettingOutlined,
+} from "@ant-design/icons";
 import {
   Button,
   Checkbox,
   Empty,
   Input,
-  Popconfirm,
   Popover,
   Segmented,
   Spin,
@@ -75,6 +81,7 @@ export function TablePanel({
   const scrollBodyRef = useRef<HTMLDivElement>(null);
   const pendingScrollTopRef = useRef(0);
   const scrollFrameRef = useRef<number | null>(null);
+  const [clearMemoryConfirmOpen, setClearMemoryConfirmOpen] = useState(false);
 
   useEffect(() => {
     setDraftMode(mode);
@@ -135,36 +142,83 @@ export function TablePanel({
   const tableHighlightQuery = mode === "table" ? query.trim() : "";
   const searchSettings = (
     <div className="table-search-settings">
-      <div className="table-search-setting-row">
-        <span>
-          <strong>智能排序</strong>
-          <small>优先显示当前关键词下最近打开的表</small>
+      <div className="table-search-settings-heading">
+        <span className="table-search-settings-icon" aria-hidden="true">
+          <SettingOutlined />
         </span>
-        <Switch
-          size="small"
-          checked={smartRankingEnabled}
-          onChange={onSmartRankingChange}
-          aria-label="启用智能排序"
-        />
+        <span>
+          <strong>搜索偏好</strong>
+          <small>仅影响本机的搜索结果排序</small>
+        </span>
       </div>
-      <div className="table-search-setting-note">搜索记忆仅保存在本机</div>
-      <Popconfirm
-        title="清除搜索记忆？"
-        description="只会清除本机搜索偏好，不会删除项目、PDM 或数据表。"
-        okText="清除记录"
-        cancelText="取消"
-        onConfirm={onClearSearchMemory}
-      >
-        <Button
-          type="link"
-          danger
-          size="small"
-          disabled={!hasSearchMemory}
-          className="table-search-clear-memory"
-        >
-          清除搜索记忆
-        </Button>
-      </Popconfirm>
+
+      <div className="table-search-setting-card">
+        <div className="table-search-setting-row">
+          <span className="table-search-setting-copy">
+            <strong>智能排序</strong>
+            <small>优先显示当前关键词下最近打开的表</small>
+          </span>
+          <Switch
+            size="small"
+            checked={smartRankingEnabled}
+            onChange={onSmartRankingChange}
+            aria-label="启用智能排序"
+          />
+        </div>
+      </div>
+
+      <div className="table-search-setting-note">
+        <LockOutlined />
+        <span>搜索记录仅保存在本机浏览器</span>
+        <Tooltip title="不会上传到服务器，也不会写入项目数据">
+          <InfoCircleOutlined aria-label="搜索记忆隐私说明" />
+        </Tooltip>
+      </div>
+
+      {clearMemoryConfirmOpen ? (
+        <div className="table-search-clear-confirm" role="alert">
+          <div className="table-search-clear-confirm-copy">
+            <ExclamationCircleOutlined />
+            <span>
+              <strong>确认清除搜索记忆？</strong>
+              <small>只清除本机偏好，不会影响项目、PDM 或数据表。</small>
+            </span>
+          </div>
+          <div className="table-search-clear-confirm-actions">
+            <Button size="small" onClick={() => setClearMemoryConfirmOpen(false)}>
+              取消
+            </Button>
+            <Button
+              danger
+              type="primary"
+              size="small"
+              icon={<DeleteOutlined />}
+              onClick={() => {
+                onClearSearchMemory();
+                setClearMemoryConfirmOpen(false);
+              }}
+            >
+              清除记录
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="table-search-clear-row">
+          <span>
+            <strong>搜索记忆</strong>
+            <small>{hasSearchMemory ? "已保存本机的最近使用记录" : "暂无可清除的记录"}</small>
+          </span>
+          <Button
+            danger
+            size="small"
+            icon={<DeleteOutlined />}
+            disabled={!hasSearchMemory}
+            onClick={() => setClearMemoryConfirmOpen(true)}
+          >
+            清除记录
+          </Button>
+        </div>
+      )}
     </div>
   );
   const selectedTables = useMemo(
@@ -232,7 +286,15 @@ export function TablePanel({
             <Checkbox checked={draftAllNodes} onChange={(event) => setDraftAllNodes(event.target.checked)}>
               所有节点
             </Checkbox>
-            <Popover content={searchSettings} trigger="click" placement="bottomRight">
+            <Popover
+              content={searchSettings}
+              trigger="click"
+              placement="bottomRight"
+              classNames={{ root: "table-search-settings-popover" }}
+              onOpenChange={(open) => {
+                if (!open) setClearMemoryConfirmOpen(false);
+              }}
+            >
               <Button
                 type="text"
                 size="small"
