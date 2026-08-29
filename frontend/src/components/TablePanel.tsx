@@ -241,6 +241,7 @@ export function TablePanel({
               trigger="click"
               placement="bottomRight"
               arrow={{ pointAtCenter: true }}
+              styles={{ container: { padding: 0 } }}
               classNames={{ root: "table-search-settings-popover" }}
             >
               <Button
