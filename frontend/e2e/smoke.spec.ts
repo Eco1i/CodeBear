@@ -51,7 +51,7 @@ test.describe.serial("CodeBear workspace smoke tests", () => {
     await captureVisual(page, "ai");
     await page.getByRole("button", { name: "收起 AI 助手" }).click();
     const returningLauncher = page.locator(".ai-launcher");
-    expect(await returningLauncher.evaluate((element) => getComputedStyle(element).visibility)).toBe("hidden");
+    await expect(returningLauncher).toHaveCSS("visibility", "hidden");
     const firstVisibleFrame = await page.evaluate(async () => {
       const launcher = document.querySelector<HTMLElement>(".ai-launcher");
       const assistant = document.querySelector<HTMLElement>(".ai-assistant");
