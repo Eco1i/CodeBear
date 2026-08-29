@@ -61,7 +61,7 @@ def npm_command() -> str:
 
 
 def build_frontend() -> None:
-    run([npm_command(), "ci"], cwd=ROOT / "frontend")
+    run([npm_command(), "ci", "--include=dev"], cwd=ROOT / "frontend")
     run([npm_command(), "run", "build"], cwd=ROOT / "frontend")
 
 

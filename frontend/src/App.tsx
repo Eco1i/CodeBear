@@ -367,7 +367,10 @@ export default function App() {
 
         loadedTablePagesRef.current.add(page);
         const ranking = smartRankingEnabled
-          ? prioritizeTables(result.items, loadSearchMemory(), searchMemoryKey(query))
+          ? prioritizeTables(result.items, loadSearchMemory(), searchMemoryKey(query), {
+              mode: query.mode,
+              query: query.query,
+            })
           : { items: result.items, preferredIds: [] };
         setTables((current) => {
           const next: Array<TableSummary | undefined> =

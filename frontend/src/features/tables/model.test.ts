@@ -28,16 +28,21 @@ describe("table search memory", () => {
   it("promotes recently selected tables only for the matching search", () => {
     const key = searchMemoryKey(query);
     const otherKey = searchMemoryKey({ ...query, query: "订单" });
-    const first = recordSearchSelection([], key, "table-2", 100);
+    const first = recordSearchSelection([], key, "table-1", 100);
     const records = recordSearchSelection(first, otherKey, "table-3", 200);
     const ranked = prioritizeTables(
-      [{ id: "table-1" }, { id: "table-2" }, { id: "table-3" }],
+      [
+        { id: "table-1", code: "VOUT_DEPOSITTPENDSETTLE" },
+        { id: "table-2", code: "TPendSettle" },
+        { id: "table-3", code: "TPendSettleTmp" },
+      ],
       records,
       key,
+      { mode: "table", query: "tpendsettle" },
     );
 
-    expect(ranked.items.map((item) => item.id)).toEqual(["table-2", "table-1", "table-3"]);
-    expect(ranked.preferredIds).toEqual(["table-2"]);
+    expect(ranked.items.map((item) => item.id)).toEqual(["table-2", "table-3", "table-1"]);
+    expect(ranked.preferredIds).toEqual(["table-1"]);
   });
 
   it("keeps at most three preferred tables per search and caps memory", () => {

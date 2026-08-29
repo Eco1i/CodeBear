@@ -1891,6 +1891,49 @@ class WorkspaceService:
             JOIN projects p ON p.id = pf.project_id
             {clause}
         """
+        order_params: list[Any] = []
+        if needle:
+            prefix = f"{_like_escape(needle)}%"
+            contains = f"%{_like_escape(needle)}%"
+            if mode == "field":
+                order_by = """
+                    CASE
+                        WHEN t.id IN (
+                            SELECT mf_order.table_id FROM model_fields mf_order
+                            WHERE mf_order.code = ? COLLATE NOCASE
+                               OR mf_order.name = ? COLLATE NOCASE
+                        ) THEN 0
+                        WHEN t.id IN (
+                            SELECT mf_order.table_id FROM model_fields mf_order
+                            WHERE mf_order.code LIKE ? ESCAPE '\\' COLLATE NOCASE
+                               OR mf_order.name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                        ) THEN 1
+                        WHEN t.id IN (
+                            SELECT mf_order.table_id FROM model_fields mf_order
+                            WHERE mf_order.code LIKE ? ESCAPE '\\' COLLATE NOCASE
+                               OR mf_order.name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                        ) THEN 2
+                        ELSE 3
+                    END,
+                    p.name COLLATE NOCASE, pf.relative_path COLLATE NOCASE, t.ordinal
+                """
+                order_params = [needle, needle, prefix, prefix, contains, contains]
+            else:
+                order_by = """
+                    CASE
+                        WHEN t.code = ? COLLATE NOCASE OR t.name = ? COLLATE NOCASE THEN 0
+                        WHEN t.code LIKE ? ESCAPE '\\' COLLATE NOCASE
+                             OR t.name LIKE ? ESCAPE '\\' COLLATE NOCASE THEN 1
+                        WHEN t.code LIKE ? ESCAPE '\\' COLLATE NOCASE
+                             OR t.name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                             OR t.comment LIKE ? ESCAPE '\\' COLLATE NOCASE THEN 2
+                        ELSE 3
+                    END,
+                    p.name COLLATE NOCASE, pf.relative_path COLLATE NOCASE, t.ordinal
+                """
+                order_params = [needle, needle, prefix, prefix, contains, contains, contains]
+        else:
+            order_by = "p.name COLLATE NOCASE, pf.relative_path COLLATE NOCASE, t.ordinal"
         try:
             with self.database.connect() as connection:
                 stats = connection.execute(
@@ -1908,10 +1951,10 @@ class WorkspaceService:
                            p.id AS project_id, p.name AS project_name,
                            pf.id AS pdm_id, pf.relative_path, pf.source_hash
                     {base}
-                    ORDER BY p.name COLLATE NOCASE, pf.relative_path COLLATE NOCASE, t.ordinal
+                    ORDER BY {order_by}
                     LIMIT ? OFFSET ?
-                    """,
-                    [*params, limit, offset],
+                    """.format(order_by=order_by),
+                    [*params, *order_params, limit, offset],
                 ).fetchall()
         except sqlite3.OperationalError:
             if not use_fts:

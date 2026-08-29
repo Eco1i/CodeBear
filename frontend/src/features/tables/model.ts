@@ -1,4 +1,4 @@
-import type { SearchMode, TableSummary } from "./types";
+import type { SearchMode } from "./types";
 
 export const SEARCH_MEMORY_STORAGE_KEY = "codebear.search-memory.v1";
 export const SMART_SEARCH_PREFERENCE_KEY = "codebear.smart-search.enabled.v1";
@@ -21,6 +21,13 @@ export interface SearchMemoryRecord {
   tableId: string;
   lastSelectedAt: number;
   selectionCount: number;
+}
+
+export interface TableRankingItem {
+  id: string;
+  code?: string;
+  name?: string;
+  comment?: string;
 }
 
 function storageOrNull(storage?: Storage): Storage | null {
@@ -126,10 +133,11 @@ export function recordSearchSelection(
     .slice(0, MAX_MEMORY_RECORDS);
 }
 
-export function prioritizeTables<T extends Pick<TableSummary, "id">>(
+export function prioritizeTables<T extends TableRankingItem>(
   items: T[],
   records: SearchMemoryRecord[],
   key: string,
+  options?: { mode?: SearchMode | string; query?: string },
 ): { items: T[]; preferredIds: string[] } {
   if (!key || items.length < 2) return { items, preferredIds: [] };
   const itemIds = new Set(items.map((item) => item.id));
@@ -140,12 +148,25 @@ export function prioritizeTables<T extends Pick<TableSummary, "id">>(
     .map((record) => record.tableId);
   if (!preferredIds.length) return { items, preferredIds: [] };
 
-  const preferred = new Set(preferredIds);
+  const preferredOrder = new Map(preferredIds.map((id, index) => [id, index]));
+  const originalOrder = new Map(items.map((item, index) => [item.id, index]));
+  const needle = normalizeSearchQuery(options?.query || "");
+  const matchTier = (item: T): number => {
+    if (options?.mode !== "table" || !needle) return 0;
+    const searchable = [item.code || "", item.name || ""];
+    if (searchable.some((value) => normalizeSearchQuery(value) === needle)) return 0;
+    if (searchable.some((value) => normalizeSearchQuery(value).startsWith(needle))) return 1;
+    return 2;
+  };
   return {
-    items: [
-      ...preferredIds.flatMap((id) => items.filter((item) => item.id === id)),
-      ...items.filter((item) => !preferred.has(item.id)),
-    ],
+    items: [...items].sort((left, right) => {
+      const tierDifference = matchTier(left) - matchTier(right);
+      if (tierDifference !== 0) return tierDifference;
+      const leftPreference = preferredOrder.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+      const rightPreference = preferredOrder.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+      if (leftPreference !== rightPreference) return leftPreference - rightPreference;
+      return originalOrder.get(left.id)! - originalOrder.get(right.id)!;
+    }),
     preferredIds,
   };
 }
