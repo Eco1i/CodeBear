@@ -109,7 +109,9 @@ describe("TablePanel", () => {
 
     expect(screen.getByText("最近打开")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "搜索设置" }));
+    expect(screen.getByText("搜索偏好")).toBeInTheDocument();
     expect(screen.getByText("智能排序")).toBeInTheDocument();
+    expect(screen.getByText("精确匹配优先，最近打开优先")).toBeInTheDocument();
     await user.click(screen.getByRole("switch", { name: "启用智能排序" }));
     expect(onSmartRankingChange).toHaveBeenCalledWith(false, expect.anything());
     await user.click(screen.getByRole("button", { name: /清除/ }));

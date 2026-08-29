@@ -135,22 +135,27 @@ export function TablePanel({
   const tableHighlightQuery = mode === "table" ? query.trim() : "";
   const searchSettings = (
     <div className="table-search-settings">
-      <div className="table-search-setting-row">
-        <strong>智能排序</strong>
-        <Switch
-          size="small"
-          checked={smartRankingEnabled}
-          onChange={onSmartRankingChange}
-          aria-label="启用智能排序"
-        />
+      <div className="table-search-settings-title">搜索偏好</div>
+      <div className="table-search-setting-block">
+        <div className="table-search-setting-row">
+          <strong>智能排序</strong>
+          <Switch
+            size="small"
+            checked={smartRankingEnabled}
+            onChange={onSmartRankingChange}
+            aria-label="启用智能排序"
+          />
+        </div>
+        <small>精确匹配优先，最近打开优先</small>
       </div>
-      <div className="table-search-setting-row">
+      <div className="table-search-setting-row table-search-memory-row">
         <strong>搜索记忆</strong>
         <Popconfirm
           title="确认清除搜索记忆？"
           okText="确认"
           cancelText="取消"
           placement="left"
+          arrow={{ pointAtCenter: true }}
           classNames={{ root: "table-search-clear-popconfirm" }}
           onConfirm={onClearSearchMemory}
         >
@@ -235,6 +240,7 @@ export function TablePanel({
               content={searchSettings}
               trigger="click"
               placement="bottomRight"
+              arrow={{ pointAtCenter: true }}
               classNames={{ root: "table-search-settings-popover" }}
             >
               <Button
