@@ -15,23 +15,27 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import pystray
+try:
+    import pystray
+except ModuleNotFoundError:  # pragma: no cover - only source environments without packaging extras
+    pystray = None  # type: ignore[assignment]
 import uvicorn
-from PIL import Image, ImageDraw
 
 from backend.instance_lock import SingleInstance
 from backend.platform_support import default_data_dir, reveal_directory
 
 if sys.platform == "win32":
-    from pystray import _win32 as pystray_win32
-    from pystray._util import win32 as pystray_win32_api
-
     from backend.tray_menu import TrayPopupMenu, enable_high_dpi
+
+    if pystray is not None:
+        from pystray import _win32 as pystray_win32
+        from pystray._util import win32 as pystray_win32_api
 
 
 APP_HOST = "127.0.0.1"
 APP_PORT = 8765
-if sys.platform == "win32":
+SERVER_SHUTDOWN_TIMEOUT = 5
+if sys.platform == "win32" and pystray is not None:
     class CodeBearTrayIcon(pystray_win32.Icon):
         """Use the normal tray icon but replace the shell context menu."""
 
@@ -95,6 +99,8 @@ def write_launcher_error(data_dir: Path) -> None:
 
 
 def create_app_icon(size: int = 256) -> Image.Image:
+    from PIL import Image, ImageDraw
+
     source_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
     candidates = (
         source_root / "frontend" / "dist" / "codebear-icon-v3.png",
@@ -182,13 +188,89 @@ def build_server(port: int) -> uvicorn.Server:
     return uvicorn.Server(config)
 
 
-def run_with_tray(server: uvicorn.Server, port: int, data_dir: Path, open_browser: bool) -> int:
-    server_thread = threading.Thread(target=server.run, name="maxiong-server", daemon=False)
-    server_thread.start()
+def run_server_only(port: int) -> int:
+    """Run the API worker and listen for a shutdown command from the launcher."""
+    server = build_server(port)
 
-    if not wait_until_listening(port):
+    def wait_for_launcher() -> None:
+        try:
+            for line in sys.stdin:
+                if line.strip() == "shutdown":
+                    break
+        except (OSError, ValueError):
+            pass
         server.should_exit = True
-        server_thread.join(timeout=3)
+
+    threading.Thread(target=wait_for_launcher, name="maxiong-shutdown", daemon=True).start()
+    server.run()
+    return 0
+
+
+def server_command(port: int) -> list[str]:
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "--server", "--port", str(port)]
+    return [sys.executable, "-m", "backend.portable", "--server", "--port", str(port)]
+
+
+def start_server_process(port: int) -> subprocess.Popen[bytes]:
+    creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    return subprocess.Popen(
+        server_command(port),
+        cwd=executable_root(),
+        env=os.environ.copy(),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=creation_flags,
+    )
+
+
+def stop_server_process(process: subprocess.Popen[bytes]) -> None:
+    if process.poll() is not None:
+        return
+    try:
+        if process.stdin is not None:
+            process.stdin.write(b"shutdown\n")
+            process.stdin.flush()
+            process.stdin.close()
+    except (BrokenPipeError, OSError, ValueError):
+        pass
+
+    try:
+        process.wait(timeout=SERVER_SHUTDOWN_TIMEOUT)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+
+    process.terminate()
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=2)
+
+
+def wait_for_server_process(process: subprocess.Popen[bytes], port: int, timeout: float = 15.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            return False
+        try:
+            with socket.create_connection((APP_HOST, port), timeout=0.25):
+                return True
+        except OSError:
+            time.sleep(0.1)
+    return False
+
+
+def run_with_tray(
+    server_process: subprocess.Popen[bytes],
+    port: int,
+    data_dir: Path,
+    open_browser: bool,
+) -> int:
+    if not wait_for_server_process(server_process, port):
+        stop_server_process(server_process)
         log_path = data_dir / "logs" / "server.log"
         show_message("码熊启动失败", f"本机服务未能在端口 {port} 启动，请查看 {log_path}。", error=True)
         return 1
@@ -207,9 +289,11 @@ def run_with_tray(server: uvicorn.Server, port: int, data_dir: Path, open_browse
         reveal_directory(data_dir)
 
     def exit_app(icon: pystray.Icon, _: Any = None) -> None:
-        server.should_exit = True
         icon.stop()
+        stop_server_process(server_process)
 
+    if pystray is None:
+        raise RuntimeError("未安装托盘运行依赖")
     app_icon = create_app_icon(256)
     if sys.platform == "win32":
         icon: pystray.Icon = CodeBearTrayIcon(
@@ -241,11 +325,7 @@ def run_with_tray(server: uvicorn.Server, port: int, data_dir: Path, open_browse
     else:
         return_code = 0
     finally:
-        server.should_exit = True
-        server_thread.join(timeout=10)
-        if server_thread.is_alive():
-            server.force_exit = True
-            server_thread.join(timeout=2)
+        stop_server_process(server_process)
     return return_code
 
 
@@ -256,9 +336,17 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=APP_PORT)
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--no-tray", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--server", action="store_true", help=argparse.SUPPRESS)
     arguments = parser.parse_args()
 
     data_dir = configure_portable_data_dir()
+    if arguments.server:
+        try:
+            return run_server_only(arguments.port)
+        except Exception:
+            write_launcher_error(data_dir)
+            raise
+
     instance = SingleInstance(arguments.port, data_dir)
     try:
         if instance.already_exists:
@@ -277,13 +365,14 @@ def main() -> int:
             )
             return 1
 
-        server = build_server(arguments.port)
         if arguments.no_tray:
+            server = build_server(arguments.port)
             if not arguments.no_browser:
                 threading.Thread(target=open_when_ready, args=(arguments.port,), daemon=True).start()
             server.run()
             return 0
-        return run_with_tray(server, arguments.port, data_dir, not arguments.no_browser)
+        server_process = start_server_process(arguments.port)
+        return run_with_tray(server_process, arguments.port, data_dir, not arguments.no_browser)
     except Exception as exc:  # pragma: no cover - final desktop error boundary
         write_launcher_error(data_dir)
         show_message("码熊启动失败", str(exc), error=True)
