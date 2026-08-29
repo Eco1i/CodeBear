@@ -56,15 +56,21 @@
   width: 280px;
   padding: 0;
   overflow: hidden;
+  background: #fff;
   border: 1px solid #dce5f0;
   border-radius: 8px;
   box-shadow: 0 10px 24px rgba(31, 55, 88, 0.14), 0 2px 6px rgba(31, 55, 88, 0.06);
 }
 
+.table-search-settings-popover .ant-popover-inner-content {
+  padding: 0;
+  background: #fff;
+}
+
 .table-search-settings {
   width: 280px;
   color: #526682;
-  background: #fbfcfe;
+  background: #fff;
   font-size: 11px;
 }
 
@@ -73,7 +79,7 @@
   color: #20314d;
   font-size: 12px;
   font-weight: 700;
-  background: #f4f8fd;
+  background: #fff;
   border-bottom: 1px solid #e3ebf5;
 }
 
