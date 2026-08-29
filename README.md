@@ -4,7 +4,7 @@
 
 码熊是一款本地运行的 PowerDesigner PDM 数据字典工具。它可以集中管理 PDM，查看和搜索表字段，维护数据字典与表关系，也可以直接生成建表脚本。
 
-> 当前稳定版本：`v1.5.15` · 支持 Windows 10/11 x64 与 macOS 13+ Apple Silicon
+> 当前稳定版本：`v1.5.16` · 支持 Windows 10/11 x64 与 macOS 13+ Apple Silicon
 
 ## 功能
 
@@ -60,10 +60,10 @@
 
 ## 下载
 
-- Windows 10/11 x64：`CodeBear-v1.5.15-win-x64.zip`
-- macOS 13 及以上 Apple Silicon：`CodeBear-v1.5.15-mac-arm64.dmg`
+- Windows 10/11 x64：`CodeBear-v1.5.16-win-x64.zip`
+- macOS 13 及以上 Apple Silicon：`CodeBear-v1.5.16-mac-arm64.dmg`
 
-请前往 [GitHub Releases](https://github.com/Eco1i/CodeBear/releases/tag/v1.5.15) 下载。Windows 和 macOS 是两个独立安装包，请按自己的系统选择。
+请前往 [GitHub Releases](https://github.com/Eco1i/CodeBear/releases/tag/v1.5.16) 下载。Windows 和 macOS 是两个独立安装包，请按自己的系统选择。
 
 当前 Mac 版只支持 M 系列芯片，暂不支持 Intel Mac。
 

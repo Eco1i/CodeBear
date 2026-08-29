@@ -13,6 +13,11 @@ export interface TableSummary {
   source_hash: string;
 }
 
+export type TableTab = Pick<
+  TableSummary,
+  "id" | "name" | "code" | "project_id" | "project_name" | "pdm_id" | "relative_path"
+>;
+
 export interface FieldDefinition {
   id: string;
   is_new?: boolean;

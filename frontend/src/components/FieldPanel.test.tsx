@@ -163,6 +163,64 @@ describe("FieldPanel", () => {
     );
   });
 
+  it("keeps a tab's field draft when switching to another table and back", async () => {
+    const user = userEvent.setup();
+    const secondDetail: TableDetail = {
+      ...detail,
+      id: "table-2",
+      xml_id: "o20",
+      name: "订单表",
+      code: "t_order",
+      comment: "保存订单",
+      fields: [{
+        ...detail.fields[0],
+        id: "field-2",
+        table_id: "table-2",
+        xml_id: "o21",
+        code: "order_id",
+        name: "订单编号",
+      }],
+    };
+    const { rerender } = render(
+      <FieldPanel
+        detail={detail}
+        loading={false}
+        saving={false}
+        highlightQuery=""
+        onSave={vi.fn()}
+        onDirtyChange={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /编辑字典/ }));
+    await user.clear(screen.getByRole("textbox", { name: "表名称" }));
+    await user.type(screen.getByRole("textbox", { name: "表名称" }), "学习用户表");
+
+    rerender(
+      <FieldPanel
+        detail={secondDetail}
+        loading={false}
+        saving={false}
+        highlightQuery=""
+        onSave={vi.fn()}
+        onDirtyChange={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("订单表")).toBeInTheDocument());
+
+    rerender(
+      <FieldPanel
+        detail={detail}
+        loading={false}
+        saving={false}
+        highlightQuery=""
+        onSave={vi.fn()}
+        onDirtyChange={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "表名称" })).toHaveValue("学习用户表"));
+  });
+
   it("adds a new field and removes an existing non-primary field before saving", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn().mockResolvedValue(undefined);
