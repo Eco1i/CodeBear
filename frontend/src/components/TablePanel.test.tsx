@@ -77,6 +77,42 @@ describe("TablePanel", () => {
     expect(onSelect).toHaveBeenCalledWith(table);
   });
 
+  it("exposes search memory settings and marks promoted tables", async () => {
+    const user = userEvent.setup();
+    const onSmartRankingChange = vi.fn();
+    render(
+      <TablePanel
+        tables={[table]}
+        total={1}
+        datasetRevision={1}
+        selectedTableId={null}
+        selectedTableIds={new Set()}
+        loading={false}
+        deleting={false}
+        mode="table"
+        query="user"
+        allNodes={false}
+        onSearch={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleSelection={vi.fn()}
+        onClearSelection={vi.fn()}
+        onDelete={vi.fn()}
+        onRequestRange={vi.fn()}
+        smartRankingEnabled
+        hasSearchMemory
+        preferredTableIds={new Set([table.id])}
+        onSmartRankingChange={onSmartRankingChange}
+        onClearSearchMemory={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("最近打开")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "搜索设置" }));
+    expect(screen.getByText("优先显示当前关键词下最近打开的表")).toBeInTheDocument();
+    await user.click(screen.getByRole("switch", { name: "启用智能排序" }));
+    expect(onSmartRankingChange).toHaveBeenCalledWith(false, expect.anything());
+  });
+
   it("selects tables and exposes the batch delete action", async () => {
     const user = userEvent.setup();
     const onToggleSelection = vi.fn();

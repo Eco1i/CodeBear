@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DeleteOutlined, SearchOutlined } from "@ant-design/icons";
-import { Button, Checkbox, Empty, Input, Segmented, Spin, Tooltip } from "antd";
+import { DeleteOutlined, SearchOutlined, SettingOutlined } from "@ant-design/icons";
+import {
+  Button,
+  Checkbox,
+  Empty,
+  Input,
+  Popconfirm,
+  Popover,
+  Segmented,
+  Spin,
+  Switch,
+  Tooltip,
+} from "antd";
 import type { SearchMode, TableSummary } from "../types";
 import { useGridScrollbarGutter } from "../useGridScrollbarGutter";
 import { HighlightedText } from "./HighlightedText";
@@ -26,6 +37,11 @@ interface TablePanelProps {
   onClearSelection: () => void;
   onDelete: (tables: TableSummary[]) => void;
   onRequestRange: (startIndex: number, endIndex: number) => void;
+  smartRankingEnabled?: boolean;
+  hasSearchMemory?: boolean;
+  preferredTableIds?: ReadonlySet<string>;
+  onSmartRankingChange?: (enabled: boolean) => void;
+  onClearSearchMemory?: () => void;
 }
 
 export function TablePanel({
@@ -45,6 +61,11 @@ export function TablePanel({
   onClearSelection,
   onDelete,
   onRequestRange,
+  smartRankingEnabled = true,
+  hasSearchMemory = false,
+  preferredTableIds = new Set(),
+  onSmartRankingChange = () => {},
+  onClearSearchMemory = () => {},
 }: TablePanelProps) {
   const [draftMode, setDraftMode] = useState<SearchMode>(mode);
   const [draftQuery, setDraftQuery] = useState(query);
@@ -112,6 +133,40 @@ export function TablePanel({
 
   const submitSearch = () => onSearch(draftMode, draftQuery, draftAllNodes);
   const tableHighlightQuery = mode === "table" ? query.trim() : "";
+  const searchSettings = (
+    <div className="table-search-settings">
+      <div className="table-search-setting-row">
+        <span>
+          <strong>智能排序</strong>
+          <small>优先显示当前关键词下最近打开的表</small>
+        </span>
+        <Switch
+          size="small"
+          checked={smartRankingEnabled}
+          onChange={onSmartRankingChange}
+          aria-label="启用智能排序"
+        />
+      </div>
+      <div className="table-search-setting-note">搜索记忆仅保存在本机</div>
+      <Popconfirm
+        title="清除搜索记忆？"
+        description="只会清除本机搜索偏好，不会删除项目、PDM 或数据表。"
+        okText="清除记录"
+        cancelText="取消"
+        onConfirm={onClearSearchMemory}
+      >
+        <Button
+          type="link"
+          danger
+          size="small"
+          disabled={!hasSearchMemory}
+          className="table-search-clear-memory"
+        >
+          清除搜索记忆
+        </Button>
+      </Popconfirm>
+    </div>
+  );
   const selectedTables = useMemo(
     () => tables.filter((table): table is TableSummary => Boolean(table && selectedTableIds.has(table.id))),
     [selectedTableIds, tables],
@@ -177,6 +232,16 @@ export function TablePanel({
             <Checkbox checked={draftAllNodes} onChange={(event) => setDraftAllNodes(event.target.checked)}>
               所有节点
             </Checkbox>
+            <Popover content={searchSettings} trigger="click" placement="bottomRight">
+              <Button
+                type="text"
+                size="small"
+                icon={<SettingOutlined />}
+                aria-label="搜索设置"
+                title="搜索设置"
+                className="table-search-settings-trigger"
+              />
+            </Popover>
           </div>
         )}
       </header>
@@ -243,11 +308,19 @@ export function TablePanel({
                       <span className="code-cell" title={table.code}>
                         <HighlightedText text={table.code || "—"} query={tableHighlightQuery} />
                       </span>
-                      <span title={table.name || table.comment}>
-                        <HighlightedText
-                          text={table.name || table.comment || "—"}
-                          query={tableHighlightQuery}
-                        />
+                      <span
+                        className="table-name-cell"
+                        title={table.name || table.comment}
+                      >
+                        <span className="table-name-text">
+                          <HighlightedText
+                            text={table.name || table.comment || "—"}
+                            query={tableHighlightQuery}
+                          />
+                        </span>
+                        {preferredTableIds.has(table.id) ? (
+                          <span className="recent-table-badge">最近打开</span>
+                        ) : null}
                       </span>
                       <span title={table.project_name}>{table.project_name}</span>
                       <span className="path-cell" title={table.relative_path}>{table.relative_path}</span>

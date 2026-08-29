@@ -17,6 +17,15 @@ import { ProjectNavigator } from "./components/ProjectNavigator";
 import { ProjectGlyph } from "./components/PrototypeGlyphs";
 import { TablePanel } from "./components/TablePanel";
 import { TableDeleteConfirmModal } from "./features/tables/components/TableDeleteConfirmModal";
+import {
+  loadSearchMemory,
+  prioritizeTables,
+  readSmartSearchPreference,
+  recordSearchSelection,
+  saveSearchMemory,
+  searchMemoryKey,
+  writeSmartSearchPreference,
+} from "./features/tables/model";
 import { useAiLayout } from "./features/ai/useAiLayout";
 import { LazyFeatureOverlays } from "./features/shell/LazyFeatureOverlays";
 import {
@@ -95,6 +104,10 @@ export default function App() {
   const [tableDatasetRevision, setTableDatasetRevision] = useState(0);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [selectedTableIds, setSelectedTableIds] = useState<Set<string>>(() => new Set());
+  const [smartRankingEnabled, setSmartRankingEnabled] = useState(() => readSmartSearchPreference());
+  const [hasSearchMemory, setHasSearchMemory] = useState(() => loadSearchMemory().length > 0);
+  const [preferredTableIds, setPreferredTableIds] = useState<Set<string>>(() => new Set());
+  const [searchMemoryRevision, setSearchMemoryRevision] = useState(0);
   const [deletingTables, setDeletingTables] = useState(false);
   const [tableDeleteDialog, setTableDeleteDialog] = useState<TableDeleteDialogState | null>(null);
   const [navigatorLocateRevision, setNavigatorLocateRevision] = useState(0);
@@ -353,20 +366,24 @@ export default function App() {
         if (generation !== tableGenerationRef.current) return;
 
         loadedTablePagesRef.current.add(page);
+        const ranking = smartRankingEnabled
+          ? prioritizeTables(result.items, loadSearchMemory(), searchMemoryKey(query))
+          : { items: result.items, preferredIds: [] };
         setTables((current) => {
           const next: Array<TableSummary | undefined> =
             current.length === result.total ? current.slice() : new Array(result.total);
-          result.items.forEach((table, index) => {
+          ranking.items.forEach((table, index) => {
             next[offset + index] = table;
           });
           return next;
         });
+        if (page === 0) setPreferredTableIds(new Set(ranking.preferredIds));
         setTableTotal(result.total);
         setTableFieldTotal(result.field_total);
         setTablePdmTotal(result.pdm_total);
         if (page === 0) {
           const preferredTableId = pendingAiTableIdRef.current;
-          setSelectedTableId(preferredTableId || result.items[0]?.id || null);
+          setSelectedTableId(preferredTableId || ranking.items[0]?.id || null);
           if (preferredTableId) pendingAiTableIdRef.current = null;
         }
       } catch (error) {
@@ -386,7 +403,7 @@ export default function App() {
         if (initial && generation === tableGenerationRef.current) setTableLoading(false);
       }
     },
-    [message],
+    [message, smartRankingEnabled],
   );
 
   const requestTableRange = useCallback(
@@ -419,6 +436,7 @@ export default function App() {
     setTablePdmTotal(0);
     setSelectedTableId(null);
     setSelectedTableIds(new Set());
+    setPreferredTableIds(new Set());
     setTableDatasetRevision((value) => value + 1);
 
     const projectId = getProjectId(selectedNode);
@@ -446,6 +464,7 @@ export default function App() {
     searchRevision,
     allNodes,
     revision,
+    searchMemoryRevision,
     requestTablePage,
   ]);
 
@@ -537,7 +556,29 @@ export default function App() {
 
   const selectTable = (table: TableSummary) => {
     if (selectedTableId === table.id) return;
-    requestContextChange(() => setSelectedTableId(table.id));
+    const activeQuery = tableQueryRef.current;
+    requestContextChange(() => {
+      if (smartRankingEnabled && activeQuery?.query.trim()) {
+        const key = searchMemoryKey(activeQuery);
+        const nextMemory = recordSearchSelection(loadSearchMemory(), key, table.id);
+        saveSearchMemory(nextMemory);
+        setHasSearchMemory(nextMemory.length > 0);
+      }
+      setSelectedTableId(table.id);
+    });
+  };
+
+  const changeSmartRanking = (enabled: boolean) => {
+    writeSmartSearchPreference(enabled);
+    setSmartRankingEnabled(enabled);
+    setPreferredTableIds(new Set());
+  };
+
+  const clearSearchMemory = () => {
+    saveSearchMemory([]);
+    setHasSearchMemory(false);
+    setPreferredTableIds(new Set());
+    setSearchMemoryRevision((value) => value + 1);
   };
 
   const locateSelectedTable = () => {
@@ -1094,6 +1135,11 @@ export default function App() {
               onClearSelection={clearTableSelection}
               onDelete={requestTableDeletion}
               onRequestRange={requestTableRange}
+              smartRankingEnabled={smartRankingEnabled}
+              hasSearchMemory={hasSearchMemory}
+              preferredTableIds={preferredTableIds}
+              onSmartRankingChange={changeSmartRanking}
+              onClearSearchMemory={clearSearchMemory}
             />
             <FieldPanel
               detail={detail}
