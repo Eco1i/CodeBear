@@ -1,10 +1,11 @@
-import type { SearchMode } from "./types";
+import type { SearchMode, TableTab } from "./types";
 
 export const SEARCH_MEMORY_STORAGE_KEY = "codebear.search-memory.v1";
+export const OPEN_TABLE_TABS_STORAGE_KEY = "codebear.open-table-tabs.v1";
 export const SMART_SEARCH_PREFERENCE_KEY = "codebear.smart-search.enabled.v1";
 
 const MAX_MEMORY_RECORDS = 100;
-const MAX_PREFERRED_TABLES_PER_CONTEXT = 3;
+const MAX_PREFERRED_TABLES_PER_CONTEXT = 10;
 const MEMORY_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 
 export interface SearchMemoryQuery {
@@ -28,6 +29,11 @@ export interface TableRankingItem {
   code?: string;
   name?: string;
   comment?: string;
+}
+
+export interface TableTabsState {
+  tabs: TableTab[];
+  activeTableId: string | null;
 }
 
 function storageOrNull(storage?: Storage): Storage | null {
@@ -124,6 +130,77 @@ export function saveSearchMemory(records: SearchMemoryRecord[], storage?: Storag
   }
 }
 
+function normalizeTableTab(value: unknown): TableTab | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<TableTab>;
+  if (
+    typeof candidate.id !== "string" ||
+    !candidate.id ||
+    typeof candidate.name !== "string" ||
+    typeof candidate.code !== "string" ||
+    typeof candidate.project_id !== "string" ||
+    typeof candidate.project_name !== "string" ||
+    typeof candidate.pdm_id !== "string" ||
+    typeof candidate.relative_path !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: candidate.id,
+    name: candidate.name,
+    code: candidate.code,
+    project_id: candidate.project_id,
+    project_name: candidate.project_name,
+    pdm_id: candidate.pdm_id,
+    relative_path: candidate.relative_path,
+  };
+}
+
+export function loadTableTabsState(storage?: Storage): TableTabsState {
+  const target = storageOrNull(storage);
+  if (!target) return { tabs: [], activeTableId: null };
+  try {
+    const parsed: unknown = JSON.parse(target.getItem(OPEN_TABLE_TABS_STORAGE_KEY) || "{}");
+    if (!parsed || typeof parsed !== "object") return { tabs: [], activeTableId: null };
+    const candidate = parsed as { tabs?: unknown; activeTableId?: unknown };
+    if (!Array.isArray(candidate.tabs)) return { tabs: [], activeTableId: null };
+    const seen = new Set<string>();
+    const tabs = candidate.tabs
+      .map(normalizeTableTab)
+      .filter((tab): tab is TableTab => Boolean(tab))
+      .filter((tab) => {
+        if (seen.has(tab.id)) return false;
+        seen.add(tab.id);
+        return true;
+      });
+    const activeTableId = typeof candidate.activeTableId === "string" && seen.has(candidate.activeTableId)
+      ? candidate.activeTableId
+      : tabs[0]?.id || null;
+    return { tabs, activeTableId };
+  } catch {
+    return { tabs: [], activeTableId: null };
+  }
+}
+
+export function saveTableTabsState(state: TableTabsState, storage?: Storage): void {
+  const target = storageOrNull(storage);
+  if (!target) return;
+  try {
+    const tabs = state.tabs
+      .map(normalizeTableTab)
+      .filter((tab): tab is TableTab => Boolean(tab));
+    const tabIds = new Set(tabs.map((tab) => tab.id));
+    target.setItem(OPEN_TABLE_TABS_STORAGE_KEY, JSON.stringify({
+      tabs,
+      activeTableId: state.activeTableId && tabIds.has(state.activeTableId)
+        ? state.activeTableId
+        : null,
+    }));
+  } catch {
+    // Local preference storage is optional and must not interrupt table navigation.
+  }
+}
+
 export function recordSearchSelection(
   records: SearchMemoryRecord[],
   key: string,
@@ -178,11 +255,11 @@ export function prioritizeTables<T extends TableRankingItem>(
   key: string,
   options?: { mode?: SearchMode | string; query?: string },
 ): { items: T[]; preferredIds: string[] } {
-  if (!key || items.length < 2) return { items, preferredIds: [] };
+  if (!key) return { items, preferredIds: [] };
   const preferredForSearch = preferredTableIdsForSearch(records, key);
   const itemIds = new Set(items.map((item) => item.id));
   const preferredIds = preferredForSearch.filter((tableId) => itemIds.has(tableId));
-  if (!preferredIds.length) return { items, preferredIds: [] };
+  if (!preferredIds.length || items.length < 2) return { items, preferredIds };
 
   const preferredOrder = new Map(preferredIds.map((id, index) => [id, index]));
   const originalOrder = new Map(items.map((item, index) => [item.id, index]));

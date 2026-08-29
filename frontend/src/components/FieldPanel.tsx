@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   CheckOutlined,
@@ -12,13 +12,19 @@ import {
 import { Button, Checkbox, Drawer, Empty, Input, Spin, Table, Tag, Tooltip } from "antd";
 import type { InputRef } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { FieldDefinition, TableDetail, TableMetadataUpdate } from "../types";
+import type { FieldDefinition, TableDetail, TableMetadataUpdate, TableTab } from "../types";
 import { dictionariesApi } from "../features/dictionaries/api";
+import { TableTabs } from "../features/tables/components/TableTabs";
 import type { DictionaryFieldBinding, DictionaryItem } from "../features/dictionaries/types";
 import { useGridScrollbarGutter } from "../useGridScrollbarGutter";
 import { FullTextPopover } from "./FullTextPopover";
 import { HighlightedText } from "./HighlightedText";
 import { TableGlyph } from "./PrototypeGlyphs";
+
+export interface FieldPanelHandle {
+  save: () => Promise<boolean>;
+  discard: () => void;
+}
 
 interface FieldPanelProps {
   detail: TableDetail | null;
@@ -27,8 +33,23 @@ interface FieldPanelProps {
   highlightQuery: string;
   onSave: (table: TableMetadataUpdate, fields: FieldDefinition[]) => Promise<void>;
   onDirtyChange: (dirty: boolean) => void;
+  onTabDirtyChange?: (tableId: string, dirty: boolean) => void;
+  tabs?: TableTab[];
+  activeTableId?: string | null;
+  dirtyTableIds?: ReadonlySet<string>;
+  onSelectTab?: (tableId: string) => void;
+  onCloseTab?: (tableId: string) => void;
+  onCloseOtherTabs?: (tableId: string) => void;
+  onCloseTabsToLeft?: (tableId: string) => void;
+  onCloseTabsToRight?: (tableId: string) => void;
   bindingRevision?: number;
   onOpenRelations?: () => void;
+}
+
+interface CachedDraft {
+  editing: boolean;
+  draft: FieldDefinition[];
+  draftTable: TableMetadataUpdate;
 }
 
 const cloneFields = (fields: FieldDefinition[]): FieldDefinition[] => fields.map((field) => ({ ...field }));
@@ -86,16 +107,25 @@ function matchesField(field: FieldDefinition, query: string): boolean {
   return haystack.includes(query.toLocaleLowerCase());
 }
 
-export function FieldPanel({
+export const FieldPanel = forwardRef<FieldPanelHandle, FieldPanelProps>(function FieldPanel({
   detail,
   loading,
   saving,
   highlightQuery,
   onSave,
   onDirtyChange,
+  onTabDirtyChange,
+  tabs = [],
+  activeTableId = null,
+  dirtyTableIds = new Set(),
+  onSelectTab = () => {},
+  onCloseTab = () => {},
+  onCloseOtherTabs = () => {},
+  onCloseTabsToLeft = () => {},
+  onCloseTabsToRight = () => {},
   bindingRevision = 0,
   onOpenRelations,
-}: FieldPanelProps) {
+}: FieldPanelProps, ref) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<FieldDefinition[]>([]);
   const [draftTable, setDraftTable] = useState<TableMetadataUpdate>(tableMetadata());
@@ -108,6 +138,9 @@ export function FieldPanel({
   const [drawerQuery, setDrawerQuery] = useState("");
   const [drawerDraftQuery, setDrawerDraftQuery] = useState("");
   const [drawerLoading, setDrawerLoading] = useState(false);
+  const [syncedDetailId, setSyncedDetailId] = useState<string | null>(detail?.id || null);
+  const draftCacheRef = useRef<Map<string, CachedDraft>>(new Map());
+  const previousDetailIdRef = useRef<string | null>(detail?.id || null);
   const searchRef = useRef<InputRef>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const scrollBodyRef = useRef<HTMLDivElement>(null);
@@ -166,9 +199,21 @@ export function FieldPanel({
   };
 
   useEffect(() => {
-    setEditing(false);
-    setDraft(cloneFields(detail?.fields || []));
-    setDraftTable(tableMetadata(detail));
+    const previousDetailId = previousDetailIdRef.current;
+    if (previousDetailId && previousDetailId !== detail?.id && editing) {
+      draftCacheRef.current.set(previousDetailId, {
+        editing: true,
+        draft: cloneFields(draft),
+        draftTable: { ...draftTable },
+      });
+    }
+
+    previousDetailIdRef.current = detail?.id || null;
+    setSyncedDetailId(detail?.id || null);
+    const cached = detail?.id ? draftCacheRef.current.get(detail.id) : undefined;
+    setEditing(cached?.editing || false);
+    setDraft(cloneFields(cached?.draft || detail?.fields || []));
+    setDraftTable(cached ? { ...cached.draftTable } : tableMetadata(detail));
     setSearchOpen(false);
     setQuery("");
     setDraftQuery("");
@@ -261,8 +306,11 @@ export function FieldPanel({
   }, [draft, editing]);
 
   useEffect(() => {
+    const currentDetailId = detail?.id || null;
+    if (currentDetailId !== syncedDetailId) return;
     onDirtyChange(dirty);
-  }, [dirty, onDirtyChange]);
+    if (currentDetailId) onTabDirtyChange?.(currentDetailId, dirty);
+  }, [detail?.id, dirty, onDirtyChange, onTabDirtyChange, syncedDetailId]);
 
   useEffect(
     () => () => {
@@ -317,19 +365,41 @@ export function FieldPanel({
   };
 
   const cancelEditing = () => {
+    if (detail?.id) draftCacheRef.current.delete(detail.id);
     setDraft(cloneFields(detail?.fields || []));
     setDraftTable(tableMetadata(detail));
     setEditing(false);
   };
 
-  const save = async () => {
-    if (draftValidation) return;
+  const save = async (): Promise<boolean> => {
+    if (!detail || draftValidation) return false;
     await onSave(draftTable, draft);
+    if (detail.id) draftCacheRef.current.delete(detail.id);
+    setDraft(cloneFields(draft));
+    setDraftTable({ ...draftTable });
     setEditing(false);
+    return true;
   };
+
+  useImperativeHandle(ref, () => ({
+    save,
+    discard: cancelEditing,
+  }), [cancelEditing, save]);
 
   return (
     <section className="field-panel panel-shell">
+      {tabs.length > 0 && (
+        <TableTabs
+          tabs={tabs}
+          activeTableId={activeTableId}
+          dirtyTableIds={dirtyTableIds}
+          onSelect={onSelectTab}
+          onClose={onCloseTab}
+          onCloseOthers={onCloseOtherTabs}
+          onCloseToLeft={onCloseTabsToLeft}
+          onCloseToRight={onCloseTabsToRight}
+        />
+      )}
       <header className="field-panel-header">
         <div className="section-title field-title">
           <span className="section-index">02</span>
@@ -704,4 +774,4 @@ export function FieldPanel({
       </Drawer>
     </section>
   );
-}
+});

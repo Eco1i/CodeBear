@@ -211,12 +211,17 @@ test.describe.serial("CodeBear workspace smoke tests", () => {
     const pdmNode = page.getByRole("treeitem").filter({ hasText: "sample.pdm" });
     await expect(pdmNode).toBeVisible();
     await pdmNode.click();
+    await expect(page.getByRole("tab", { name: "用户表" })).toHaveCount(0);
 
+    const searchMemoryStorageKey = "codebear.search-memory.v1";
+    await page.evaluate((key) => localStorage.removeItem(key), searchMemoryStorageKey);
     const tableSearch = page.getByPlaceholder("输入表名、描述或注释");
     await tableSearch.fill("系统用户");
     await tableSearch.press("Enter");
     const tableRow = page.locator(".table-grid-body .data-grid-row").filter({ hasText: "t_user" });
     await expect(tableRow).toBeVisible();
+    await expect(page.getByRole("tab", { name: "用户表" })).toHaveCount(0);
+    expect(await page.evaluate((key) => localStorage.getItem(key), searchMemoryStorageKey)).toBeNull();
     const tableGridBox = await page.locator(".table-list-grid").boundingBox();
     const deleteAction = page.getByRole("button", { name: "删除数据表 t_user" });
     const deleteActionBox = await deleteAction.boundingBox();
@@ -258,6 +263,49 @@ test.describe.serial("CodeBear workspace smoke tests", () => {
 
     await tableRow.click();
     await expect(page.getByText("user_name", { exact: true })).toBeVisible();
+    const searchMemory = await page.evaluate((key) => {
+      const value = localStorage.getItem(key);
+      return value ? JSON.parse(value) : [];
+    }, searchMemoryStorageKey);
+    expect(searchMemory).toHaveLength(1);
+
+    await tableSearch.press("Enter");
+    await expect(tableRow).toBeVisible();
+    await expect(tableRow.locator(".recent-table-badge")).toBeVisible();
+
+    const tableTab = page.getByRole("tab", { name: "用户表" });
+    const tableTabClose = page.getByRole("button", { name: "关闭 用户表" });
+    await expect(tableTab).toBeVisible();
+    await tableTabClose.hover();
+    const tabBounds = await tableTab.locator("xpath=..").boundingBox();
+    const closeBounds = await tableTabClose.boundingBox();
+    expect(tabBounds).not.toBeNull();
+    expect(closeBounds).not.toBeNull();
+    expect(closeBounds!.x).toBeGreaterThanOrEqual(tabBounds!.x);
+    expect(closeBounds!.y).toBeGreaterThanOrEqual(tabBounds!.y);
+    expect(closeBounds!.x + closeBounds!.width)
+      .toBeLessThanOrEqual(tabBounds!.x + tabBounds!.width);
+    expect(closeBounds!.y + closeBounds!.height)
+      .toBeLessThanOrEqual(tabBounds!.y + tabBounds!.height);
+
+    await tableTab.click({ button: "right" });
+    await expect(page.getByRole("menuitem", { name: "关闭当前" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "关闭左侧" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "关闭右侧" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "关闭其他" })).toBeVisible();
+    await expect(page.getByText("打开最近访问")).toHaveCount(0);
+    await expect(page.getByText(/已打开标签/)).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await captureVisual(page, "table-tabs");
+
+    await page.reload();
+    await expect(page.getByText("PDM 数据字典工作台")).toBeVisible();
+    const restoredPdmNode = page.getByRole("treeitem").filter({ hasText: "sample.pdm" });
+    await expect(restoredPdmNode).toBeVisible();
+    await restoredPdmNode.click();
+    await expect(page.getByRole("tab", { name: "用户表" })).toBeVisible();
+    await expect(page.getByText("user_name", { exact: true })).toBeVisible();
+    await captureVisual(page, "table-tabs-refresh");
 
     await page.getByRole("button", { name: "编辑字典" }).click();
     await page.getByRole("textbox", { name: "表名称" }).fill("账户用户表");

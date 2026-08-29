@@ -13,17 +13,20 @@ import { UpdateIndicator } from "./features/updates/components/UpdateIndicator";
 import type { UpdateState } from "./features/updates/types";
 import { ApiError } from "./shared/api/client";
 import { FieldPanel } from "./components/FieldPanel";
+import type { FieldPanelHandle } from "./components/FieldPanel";
 import { ProjectNavigator } from "./components/ProjectNavigator";
 import { ProjectGlyph } from "./components/PrototypeGlyphs";
 import { TablePanel } from "./components/TablePanel";
 import { TableDeleteConfirmModal } from "./features/tables/components/TableDeleteConfirmModal";
 import {
   loadSearchMemory,
+  loadTableTabsState,
   preferredTableIdsForSearch,
   prioritizeTables,
   readSmartSearchPreference,
   recordSearchSelection,
   saveSearchMemory,
+  saveTableTabsState,
   searchMemoryKey,
   writeSmartSearchPreference,
 } from "./features/tables/model";
@@ -57,6 +60,7 @@ import type {
   TableDeleteTarget,
   TableMetadataUpdate,
   TableSummary,
+  TableTab,
   TrashItem,
   WorkspaceNode,
 } from "./types";
@@ -88,6 +92,21 @@ interface TableDeleteDialogState {
   targets: TableDeleteTarget[];
 }
 
+interface PendingTableClose {
+  targetIds: string[];
+  dirtyIds: string[];
+  preferredId: string | null;
+}
+
+const toTableTab = (table: TableSummary): TableTab => ({
+  id: table.id,
+  name: table.name,
+  code: table.code,
+  project_id: table.project_id,
+  project_name: table.project_name,
+  pdm_id: table.pdm_id,
+  relative_path: table.relative_path,
+});
 
 export default function App() {
   const { message, modal } = AntApp.useApp();
@@ -103,7 +122,12 @@ export default function App() {
   const [tableFieldTotal, setTableFieldTotal] = useState(0);
   const [tablePdmTotal, setTablePdmTotal] = useState(0);
   const [tableDatasetRevision, setTableDatasetRevision] = useState(0);
-  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [storedTableTabs] = useState(() => loadTableTabsState());
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(() => storedTableTabs.activeTableId);
+  const [openTableTabs, setOpenTableTabs] = useState<TableTab[]>(() => storedTableTabs.tabs);
+  const [dirtyTableIds, setDirtyTableIds] = useState<Set<string>>(() => new Set());
+  const [pendingClose, setPendingClose] = useState<PendingTableClose | null>(null);
+  const [closingTab, setClosingTab] = useState(false);
   const [selectedTableIds, setSelectedTableIds] = useState<Set<string>>(() => new Set());
   const [smartRankingEnabled, setSmartRankingEnabled] = useState(() => readSmartSearchPreference());
   const [hasSearchMemory, setHasSearchMemory] = useState(() => loadSearchMemory().length > 0);
@@ -121,7 +145,6 @@ export default function App() {
   const [searchRevision, setSearchRevision] = useState(0);
   const [allNodes, setAllNodes] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [dialog, setDialog] = useState<DialogState>({ kind: null });
   const [dialogValue, setDialogValue] = useState("");
   const [dialogBusy, setDialogBusy] = useState(false);
@@ -173,6 +196,33 @@ export default function App() {
   const discardConfirmOpenRef = useRef(false);
   const workspaceChangeConfirmOpenRef = useRef(false);
   const allowForcedReloadRef = useRef(false);
+  const fieldPanelRef = useRef<FieldPanelHandle>(null);
+  const hasUnsavedChanges = Boolean(selectedTableId && dirtyTableIds.has(selectedTableId));
+  const hasDirtyTabs = dirtyTableIds.size > 0;
+
+  useEffect(() => {
+    saveTableTabsState({ tabs: openTableTabs, activeTableId: selectedTableId });
+  }, [openTableTabs, selectedTableId]);
+
+  const addTableTab = useCallback((table: TableSummary | TableTab) => {
+    const tab = "source_hash" in table ? toTableTab(table) : table;
+    setOpenTableTabs((current) => (
+      current.some((item) => item.id === tab.id) ? current : [...current, tab]
+    ));
+  }, []);
+
+  const rememberTableSelection = useCallback((query: TableQuery | null, tableId: string) => {
+    if (!smartRankingEnabled || !query?.query.trim()) return;
+    const key = searchMemoryKey(query);
+    const nextMemory = recordSearchSelection(loadSearchMemory(), key, tableId);
+    saveSearchMemory(nextMemory);
+    setHasSearchMemory(nextMemory.length > 0);
+    setPreferredTableIds(new Set(preferredTableIdsForSearch(nextMemory, key)));
+  }, [smartRankingEnabled]);
+
+  const activateTableTab = useCallback((tableId: string) => {
+    setSelectedTableId(tableId);
+  }, []);
 
   const loadWorkspace = useCallback(async (preferred?: WorkspaceNode | null) => {
     setNavigationLoading(true);
@@ -244,7 +294,21 @@ export default function App() {
     : null;
 
   const jumpRelationTable = (tableId: string) => {
-    requestContextChange(() => setSelectedTableId(tableId));
+    const table = tables.find((item): item is TableSummary => Boolean(item?.id === tableId));
+    if (table) {
+      addTableTab(table);
+    } else if (!openTableTabs.some((item) => item.id === tableId)) {
+      addTableTab({
+        id: tableId,
+        name: tableId,
+        code: tableId,
+        project_id: detail?.project_id || "",
+        project_name: detail?.project_name || "",
+        pdm_id: detail?.pdm_id || "",
+        relative_path: detail?.relative_path || "",
+      });
+    }
+    activateTableTab(tableId);
   };
 
   const refreshUpdates = async () => {
@@ -276,7 +340,7 @@ export default function App() {
         return false;
       }
 
-      if (!hasUnsavedChanges) {
+      if (!hasDirtyTabs) {
         window.location.reload();
         return true;
       }
@@ -285,7 +349,7 @@ export default function App() {
       workspaceChangeConfirmOpenRef.current = true;
       modal.confirm({
         title: "检测到工作区已变化",
-        content: `程序当前工作区已变为“${nextSettings.workspace_root}”。重新加载会放弃当前表尚未保存的修改。`,
+        content: `程序当前工作区已变为“${nextSettings.workspace_root}”。重新加载会放弃已打开标签中的未保存修改。`,
         okText: "放弃修改并重新加载",
         cancelText: "暂不重新加载",
         okButtonProps: { danger: true },
@@ -302,7 +366,7 @@ export default function App() {
       });
       return true;
     },
-    [hasUnsavedChanges, modal, settings],
+    [hasDirtyTabs, modal, settings],
   );
 
   useEffect(() => {
@@ -390,8 +454,14 @@ export default function App() {
         setTablePdmTotal(result.pdm_total);
         if (page === 0) {
           const preferredTableId = pendingAiTableIdRef.current;
-          setSelectedTableId(preferredTableId || ranking.items[0]?.id || null);
-          if (preferredTableId) pendingAiTableIdRef.current = null;
+          if (preferredTableId) {
+            const firstTable = ranking.items.find((table) => table.id === preferredTableId) || ranking.items[0];
+            if (firstTable) {
+              addTableTab(firstTable);
+              setSelectedTableId(firstTable.id);
+            }
+            pendingAiTableIdRef.current = null;
+          }
         }
       } catch (error) {
         if (controller.signal.aborted || generation !== tableGenerationRef.current) return;
@@ -400,7 +470,6 @@ export default function App() {
           setTableTotal(0);
           setTableFieldTotal(0);
           setTablePdmTotal(0);
-          setSelectedTableId(null);
           pendingAiTableIdRef.current = null;
         }
         message.error(errorMessage(error));
@@ -410,7 +479,7 @@ export default function App() {
         if (initial && generation === tableGenerationRef.current) setTableLoading(false);
       }
     },
-    [message, smartRankingEnabled],
+    [addTableTab, message, smartRankingEnabled],
   );
 
   const requestTableRange = useCallback(
@@ -441,7 +510,6 @@ export default function App() {
     setTableTotal(0);
     setTableFieldTotal(0);
     setTablePdmTotal(0);
-    setSelectedTableId(null);
     setSelectedTableIds(new Set());
     setPreferredTableIds(new Set());
     setTableDatasetRevision((value) => value + 1);
@@ -492,7 +560,14 @@ export default function App() {
     tablesApi
       .detail(selectedTableId)
       .then((result) => {
-        if (!cancelled) setDetail(result);
+        if (cancelled) return;
+        setDetail(result);
+        setOpenTableTabs((current) => {
+          const tab = toTableTab(result);
+          return current.some((item) => item.id === tab.id)
+            ? current.map((item) => (item.id === tab.id ? tab : item))
+            : [...current, tab];
+        });
       })
       .catch((error) => {
         if (!cancelled) {
@@ -508,8 +583,17 @@ export default function App() {
     };
   }, [selectedTableId, message]);
 
-  const handleDirtyChange = useCallback((dirty: boolean) => {
-    setHasUnsavedChanges(dirty);
+  const handleTabDirtyChange = useCallback((tableId: string, dirty: boolean) => {
+    setDirtyTableIds((current) => {
+      const next = new Set(current);
+      if (dirty) next.add(tableId);
+      else next.delete(tableId);
+      return next;
+    });
+  }, []);
+
+  const handleDirtyChange = useCallback((_dirty: boolean) => {
+    // The tab-aware callback below owns dirty state; this callback preserves FieldPanel's legacy contract.
   }, []);
 
   const requestContextChange = useCallback(
@@ -531,7 +615,14 @@ export default function App() {
         okButtonProps: { danger: true },
         onOk: () => {
           discardConfirmOpenRef.current = false;
-          setHasUnsavedChanges(false);
+          fieldPanelRef.current?.discard();
+          if (selectedTableId) {
+            setDirtyTableIds((current) => {
+              const next = new Set(current);
+              next.delete(selectedTableId);
+              return next;
+            });
+          }
           action();
         },
         onCancel: () => {
@@ -542,11 +633,11 @@ export default function App() {
         },
       });
     },
-    [hasUnsavedChanges, modal],
+    [hasUnsavedChanges, modal, selectedTableId],
   );
 
   useEffect(() => {
-    if (!hasUnsavedChanges) return;
+    if (!hasDirtyTabs) return;
     const preventAccidentalExit = (event: BeforeUnloadEvent) => {
       if (allowForcedReloadRef.current) return;
       event.preventDefault();
@@ -554,7 +645,7 @@ export default function App() {
     };
     window.addEventListener("beforeunload", preventAccidentalExit);
     return () => window.removeEventListener("beforeunload", preventAccidentalExit);
-  }, [hasUnsavedChanges]);
+  }, [hasDirtyTabs]);
 
   const selectNode = (node: WorkspaceNode) => {
     if (selectedNode?.id === node.id) return;
@@ -562,18 +653,101 @@ export default function App() {
   };
 
   const selectTable = (table: TableSummary) => {
+    rememberTableSelection(tableQueryRef.current, table.id);
     if (selectedTableId === table.id) return;
-    const activeQuery = tableQueryRef.current;
-    requestContextChange(() => {
-      if (smartRankingEnabled && activeQuery?.query.trim()) {
-        const key = searchMemoryKey(activeQuery);
-        const nextMemory = recordSearchSelection(loadSearchMemory(), key, table.id);
-        saveSearchMemory(nextMemory);
-        setHasSearchMemory(nextMemory.length > 0);
-      }
-      setSelectedTableId(table.id);
-    });
+    addTableTab(table);
+    setSelectedTableId(table.id);
   };
+
+  const removeTableTabs = useCallback((tableIds: string[], preferredId: string | null) => {
+    const closingIds = new Set(tableIds);
+    if (!closingIds.size) return;
+    const remainingTabs = openTableTabs.filter((tab) => !closingIds.has(tab.id));
+    const nextSelectedId = preferredId && remainingTabs.some((tab) => tab.id === preferredId)
+      ? preferredId
+      : selectedTableId && !closingIds.has(selectedTableId) && remainingTabs.some((tab) => tab.id === selectedTableId)
+        ? selectedTableId
+        : remainingTabs[0]?.id || null;
+    setOpenTableTabs(remainingTabs);
+    setDirtyTableIds((current) => {
+      const next = new Set(current);
+      closingIds.forEach((id) => next.delete(id));
+      return next;
+    });
+    setSelectedTableId(nextSelectedId);
+  }, [openTableTabs, selectedTableId]);
+
+  const requestCloseTableTabs = useCallback((tableIds: string[], preferredId: string | null) => {
+    const targetIds = Array.from(new Set(tableIds)).filter((id) => openTableTabs.some((tab) => tab.id === id));
+    if (!targetIds.length) return;
+    const dirtyIds = targetIds.filter((id) => dirtyTableIds.has(id));
+    if (dirtyIds.length) {
+      setPendingClose({ targetIds, dirtyIds, preferredId });
+      if (selectedTableId !== dirtyIds[0]) setSelectedTableId(dirtyIds[0]);
+      return;
+    }
+    removeTableTabs(targetIds, preferredId);
+  }, [dirtyTableIds, openTableTabs, removeTableTabs, selectedTableId]);
+
+  const closeTableTab = useCallback((tableId: string) => {
+    const tabIndex = openTableTabs.findIndex((tab) => tab.id === tableId);
+    if (tabIndex < 0) return;
+    const replacement = openTableTabs[tabIndex + 1] || openTableTabs[tabIndex - 1] || null;
+    const preferredId = selectedTableId === tableId ? replacement?.id || null : selectedTableId;
+    requestCloseTableTabs([tableId], preferredId);
+  }, [openTableTabs, requestCloseTableTabs, selectedTableId]);
+
+  const closeOtherTableTabs = useCallback((tableId: string) => {
+    requestCloseTableTabs(
+      openTableTabs.filter((tab) => tab.id !== tableId).map((tab) => tab.id),
+      tableId,
+    );
+  }, [openTableTabs, requestCloseTableTabs]);
+
+  const closeTableTabsToLeft = useCallback((tableId: string) => {
+    const tabIndex = openTableTabs.findIndex((tab) => tab.id === tableId);
+    if (tabIndex < 0) return;
+    requestCloseTableTabs(openTableTabs.slice(0, tabIndex).map((tab) => tab.id), tableId);
+  }, [openTableTabs, requestCloseTableTabs]);
+
+  const closeTableTabsToRight = useCallback((tableId: string) => {
+    const tabIndex = openTableTabs.findIndex((tab) => tab.id === tableId);
+    if (tabIndex < 0) return;
+    requestCloseTableTabs(openTableTabs.slice(tabIndex + 1).map((tab) => tab.id), tableId);
+  }, [openTableTabs, requestCloseTableTabs]);
+
+  const advancePendingClose = useCallback(() => {
+    const current = pendingClose;
+    if (!current) return;
+    const remainingDirtyIds = current.dirtyIds.slice(1);
+    if (remainingDirtyIds.length) {
+      setPendingClose({ ...current, dirtyIds: remainingDirtyIds });
+      setSelectedTableId(remainingDirtyIds[0]);
+      return;
+    }
+    setPendingClose(null);
+    removeTableTabs(current.targetIds, current.preferredId);
+  }, [pendingClose, removeTableTabs]);
+
+  const handleCloseTabDiscard = useCallback(() => {
+    if (!pendingClose?.dirtyIds.length) return;
+    fieldPanelRef.current?.discard();
+    advancePendingClose();
+  }, [advancePendingClose, pendingClose]);
+
+  const handleCloseTabSave = useCallback(async () => {
+    const tableId = pendingClose?.dirtyIds[0];
+    if (!tableId || detail?.id !== tableId || detailLoading) return;
+    setClosingTab(true);
+    try {
+      const saved = await fieldPanelRef.current?.save();
+      if (saved) advancePendingClose();
+    } catch {
+      // 保存失败时保留标签和编辑稿，错误已由保存流程提示。
+    } finally {
+      setClosingTab(false);
+    }
+  }, [advancePendingClose, detail?.id, detailLoading, pendingClose]);
 
   const changeSmartRanking = (enabled: boolean) => {
     writeSmartSearchPreference(enabled);
@@ -696,9 +870,19 @@ export default function App() {
       const deletedIds = new Set(result.deleted_ids);
       setTableDeleteDialog(null);
       setSelectedTableIds(new Set());
-      if (selectedTableId && deletedIds.has(selectedTableId)) {
-        setSelectedTableId(null);
-        setDetail(null);
+      const deletedActiveTab = selectedTableId ? deletedIds.has(selectedTableId) : false;
+      const remainingTabs = openTableTabs.filter((tab) => !deletedIds.has(tab.id));
+      setOpenTableTabs(remainingTabs);
+      setDirtyTableIds((current) => {
+        const next = new Set(current);
+        deletedIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      if (deletedActiveTab) {
+        const activeIndex = openTableTabs.findIndex((tab) => tab.id === selectedTableId);
+        const replacement = openTableTabs[activeIndex + 1] || openTableTabs[activeIndex - 1] || null;
+        setSelectedTableId(replacement?.id || null);
+        if (!replacement) setDetail(null);
       }
       await refreshAfterMutation(selectedNode);
       message.success(
@@ -725,7 +909,12 @@ export default function App() {
   };
 
   const handleBackupImported = async (_result: BackupImportResult) => {
-    setHasUnsavedChanges(false);
+    fieldPanelRef.current?.discard();
+    setDirtyTableIds(new Set());
+    setPendingClose(null);
+    setOpenTableTabs([]);
+    setSelectedTableId(null);
+    setDetail(null);
     await refreshAfterMutation(null);
   };
 
@@ -978,6 +1167,14 @@ export default function App() {
     }
   };
 
+  const pendingCloseTableId = pendingClose?.dirtyIds[0] || null;
+  const pendingCloseTab = pendingCloseTableId
+    ? openTableTabs.find((tab) => tab.id === pendingCloseTableId) || null
+    : null;
+  const closeTabDialogReady = Boolean(
+    pendingCloseTab && selectedTableId === pendingCloseTab.id && detail?.id === pendingCloseTab.id && !detailLoading,
+  );
+
   const saveDictionary = async (table: TableMetadataUpdate, fields: FieldDefinition[]) => {
     if (!detail) return;
     const previousFieldCount = detail.field_count;
@@ -990,6 +1187,14 @@ export default function App() {
         fields,
       );
       setDetail(updated);
+      setOpenTableTabs((current) => current.map((tab) => (
+        tab.id === updated.id ? toTableTab(updated) : tab
+      )));
+      setDirtyTableIds((current) => {
+        const next = new Set(current);
+        next.delete(updated.id);
+        return next;
+      });
       setTables((current) =>
         current.map((item) => {
           if (!item || item.pdm_id !== updated.pdm_id) return item;
@@ -1149,12 +1354,22 @@ export default function App() {
               onClearSearchMemory={clearSearchMemory}
             />
             <FieldPanel
+              ref={fieldPanelRef}
               detail={detail}
               loading={detailLoading}
               saving={saving}
               highlightQuery={searchMode === "field" ? searchQuery : ""}
               onSave={saveDictionary}
               onDirtyChange={handleDirtyChange}
+              onTabDirtyChange={handleTabDirtyChange}
+              tabs={openTableTabs}
+              activeTableId={selectedTableId}
+              dirtyTableIds={dirtyTableIds}
+              onSelectTab={activateTableTab}
+              onCloseTab={closeTableTab}
+              onCloseOtherTabs={closeOtherTableTabs}
+              onCloseTabsToLeft={closeTableTabsToLeft}
+              onCloseTabsToRight={closeTableTabsToRight}
               bindingRevision={dictionaryBindingRevision}
               onOpenRelations={openRelations}
             />
@@ -1239,6 +1454,41 @@ export default function App() {
         onAiModeChange={changeAiLayoutMode}
         onOpenAiTable={openAiEvidenceTable}
       />
+
+      <Modal
+        open={closeTabDialogReady}
+        title="当前标签有未保存修改"
+        onCancel={() => {
+          if (!closingTab) setPendingClose(null);
+        }}
+        closable={!closingTab}
+        maskClosable={!closingTab}
+        keyboard={!closingTab}
+        okButtonProps={{ loading: closingTab }}
+        footer={[
+          <Button key="cancel" onClick={() => setPendingClose(null)} disabled={closingTab}>
+            继续编辑
+          </Button>,
+          <Button key="discard" danger onClick={handleCloseTabDiscard} disabled={closingTab}>
+            放弃修改
+          </Button>,
+          <Button
+            key="save"
+            type="primary"
+            loading={closingTab}
+            onClick={() => void handleCloseTabSave()}
+          >
+            保存并关闭
+          </Button>,
+        ]}
+      >
+        <p>关闭“{pendingCloseTab?.name || pendingCloseTab?.code || "当前表"}”后，当前字段修改将会丢失。</p>
+        <div className="table-tab-close-summary">
+          <strong>{pendingCloseTab?.name || pendingCloseTab?.code || "当前表"}</strong>
+          {pendingCloseTab?.code ? <code>{pendingCloseTab.code}</code> : null}
+          <span>请先选择处理方式</span>
+        </div>
+      </Modal>
 
       <Modal
         open={refreshProgress !== null}

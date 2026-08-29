@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   loadSearchMemory,
+  loadTableTabsState,
   prioritizeTables,
   recordSearchSelection,
+  saveTableTabsState,
   searchMemoryKey,
   writeSmartSearchPreference,
   readSmartSearchPreference,
@@ -63,20 +65,39 @@ describe("table search memory", () => {
     expect(ranked.items.map((item) => item.id)).toEqual(["table-1", "table-2", "table-3"]);
   });
 
-  it("keeps at most three preferred tables per search context and caps memory", () => {
+  it("keeps the recent badge for a single matching table", () => {
+    const key = searchMemoryKey(query);
+    const records = recordSearchSelection([], key, "table-1", 100);
+    const ranked = prioritizeTables([{ id: "table-1" }], records, key);
+
+    expect(ranked.preferredIds).toEqual(["table-1"]);
+  });
+
+  it("keeps at most ten preferred tables per search context and caps memory", () => {
     const key = searchMemoryKey(query);
     let records: SearchMemoryRecord[] = [];
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 12; index += 1) {
       records = recordSearchSelection(records, key, `table-${index}`, index + 1);
     }
     const ranked = prioritizeTables(
-      Array.from({ length: 5 }, (_, index) => ({ id: `table-${index}` })),
+      Array.from({ length: 12 }, (_, index) => ({ id: `table-${index}` })),
       records,
       key,
     );
 
-    expect(ranked.preferredIds).toEqual(["table-4", "table-3", "table-2"]);
-    expect(records).toHaveLength(3);
+    expect(ranked.preferredIds).toEqual([
+      "table-11",
+      "table-10",
+      "table-9",
+      "table-8",
+      "table-7",
+      "table-6",
+      "table-5",
+      "table-4",
+      "table-3",
+      "table-2",
+    ]);
+    expect(records).toHaveLength(10);
   });
 
   it("ignores malformed and expired local records", () => {
@@ -109,5 +130,35 @@ describe("table search memory", () => {
     expect(readSmartSearchPreference(storage)).toBe(true);
     writeSmartSearchPreference(false, storage);
     expect(readSmartSearchPreference(storage)).toBe(false);
+  });
+});
+
+describe("table tabs persistence", () => {
+  it("restores open tabs and the active tab after a page reload", () => {
+    const storage = window.localStorage;
+    const tabs = [
+      {
+        id: "table-1",
+        name: "用户表",
+        code: "t_user",
+        project_id: "project-1",
+        project_name: "测试项目",
+        pdm_id: "pdm-1",
+        relative_path: "sample.pdm",
+      },
+      {
+        id: "table-2",
+        name: "订单表",
+        code: "t_order",
+        project_id: "project-1",
+        project_name: "测试项目",
+        pdm_id: "pdm-1",
+        relative_path: "sample.pdm",
+      },
+    ];
+
+    saveTableTabsState({ tabs, activeTableId: "table-2" }, storage);
+
+    expect(loadTableTabsState(storage)).toEqual({ tabs, activeTableId: "table-2" });
   });
 });
