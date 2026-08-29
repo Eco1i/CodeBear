@@ -1,6 +1,9 @@
 import { json, request } from "../../shared/api/client";
 import type {
   FieldDefinition,
+  TableDeletePreview,
+  TableDeleteResult,
+  TableDeleteTarget,
   TableDetail,
   TableMetadataUpdate,
   TableSearchResult,
@@ -34,6 +37,10 @@ export const tablesApi = {
   },
   detail: (tableId: string, signal?: AbortSignal) =>
     request<TableDetail>(`/api/tables/${tableId}`, { signal }),
+  previewDelete: (tables: TableDeleteTarget[]) =>
+    request<TableDeletePreview>("/api/tables/delete-preview", json("POST", { tables })),
+  deleteTables: (tables: TableDeleteTarget[]) =>
+    request<TableDeleteResult>("/api/tables/delete", json("POST", { tables })),
   saveFields: (tableId: string, expected_hash: string, fields: FieldDefinition[]) =>
     request<TableDetail>(
       `/api/tables/${tableId}/fields`,

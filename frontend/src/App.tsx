@@ -16,6 +16,7 @@ import { FieldPanel } from "./components/FieldPanel";
 import { ProjectNavigator } from "./components/ProjectNavigator";
 import { ProjectGlyph } from "./components/PrototypeGlyphs";
 import { TablePanel } from "./components/TablePanel";
+import { TableDeleteConfirmModal } from "./features/tables/components/TableDeleteConfirmModal";
 import { useAiLayout } from "./features/ai/useAiLayout";
 import { LazyFeatureOverlays } from "./features/shell/LazyFeatureOverlays";
 import {
@@ -42,6 +43,8 @@ import type {
   SearchMode,
   Settings,
   TableDetail,
+  TableDeletePreview,
+  TableDeleteTarget,
   TableMetadataUpdate,
   TableSummary,
   TrashItem,
@@ -70,6 +73,11 @@ interface TableQuery {
   allNodes: boolean;
 }
 
+interface TableDeleteDialogState {
+  preview: TableDeletePreview;
+  targets: TableDeleteTarget[];
+}
+
 
 export default function App() {
   const { message, modal } = AntApp.useApp();
@@ -86,6 +94,9 @@ export default function App() {
   const [tablePdmTotal, setTablePdmTotal] = useState(0);
   const [tableDatasetRevision, setTableDatasetRevision] = useState(0);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [selectedTableIds, setSelectedTableIds] = useState<Set<string>>(() => new Set());
+  const [deletingTables, setDeletingTables] = useState(false);
+  const [tableDeleteDialog, setTableDeleteDialog] = useState<TableDeleteDialogState | null>(null);
   const [navigatorLocateRevision, setNavigatorLocateRevision] = useState(0);
   const [tableLoading, setTableLoading] = useState(false);
   const [detail, setDetail] = useState<TableDetail | null>(null);
@@ -407,6 +418,7 @@ export default function App() {
     setTableFieldTotal(0);
     setTablePdmTotal(0);
     setSelectedTableId(null);
+    setSelectedTableIds(new Set());
     setTableDatasetRevision((value) => value + 1);
 
     const projectId = getProjectId(selectedNode);
@@ -475,7 +487,10 @@ export default function App() {
   }, []);
 
   const requestContextChange = useCallback(
-    (action: () => void) => {
+    (
+      action: () => void,
+      copy?: { title: string; content: string; okText: string },
+    ) => {
       if (!hasUnsavedChanges) {
         action();
         return;
@@ -483,9 +498,9 @@ export default function App() {
       if (discardConfirmOpenRef.current) return;
       discardConfirmOpenRef.current = true;
       modal.confirm({
-        title: "放弃未保存的修改？",
-        content: "当前表的字段修改尚未保存。切换后这些修改会丢失。",
-        okText: "放弃并切换",
+        title: copy?.title || "放弃未保存的修改？",
+        content: copy?.content || "当前表的字段修改尚未保存。切换后这些修改会丢失。",
+        okText: copy?.okText || "放弃并切换",
         cancelText: "继续编辑",
         okButtonProps: { danger: true },
         onOk: () => {
@@ -579,6 +594,7 @@ export default function App() {
         : "当前项目 · 展示范围内的数据表";
   const submitTableSearch = (mode: SearchMode, query: string, searchAllNodes: boolean) => {
     requestContextChange(() => {
+      setSelectedTableIds(new Set());
       setSearchMode(mode);
       setSearchQuery(query.trim());
       setAllNodes(searchAllNodes);
@@ -589,6 +605,75 @@ export default function App() {
   const refreshAfterMutation = async (preferred?: WorkspaceNode | null) => {
     await loadWorkspace(preferred);
     setRevision((value) => value + 1);
+  };
+
+  const toggleTableSelection = useCallback((table: TableSummary, checked: boolean) => {
+    setSelectedTableIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(table.id);
+      else next.delete(table.id);
+      return next;
+    });
+  }, []);
+
+  const clearTableSelection = useCallback(() => {
+    setSelectedTableIds(new Set());
+  }, []);
+
+  const confirmTableDeletion = async (candidates: TableSummary[]) => {
+    const tablesById = new Map(candidates.map((table) => [table.id, table]));
+    const targetTables = [...tablesById.values()];
+    if (targetTables.length === 0) return;
+
+    const targets = targetTables.map((table) => ({
+      id: table.id,
+      expected_hash: table.source_hash,
+    }));
+    setDeletingTables(true);
+    try {
+      const preview = await tablesApi.previewDelete(targets);
+      setTableDeleteDialog({ preview, targets });
+    } catch (error) {
+      message.error(errorMessage(error));
+    } finally {
+      setDeletingTables(false);
+    }
+  };
+
+  const confirmPendingTableDeletion = async () => {
+    if (!tableDeleteDialog) return;
+    setDeletingTables(true);
+    try {
+      const result = await tablesApi.deleteTables(tableDeleteDialog.targets);
+      const deletedIds = new Set(result.deleted_ids);
+      setTableDeleteDialog(null);
+      setSelectedTableIds(new Set());
+      if (selectedTableId && deletedIds.has(selectedTableId)) {
+        setSelectedTableId(null);
+        setDetail(null);
+      }
+      await refreshAfterMutation(selectedNode);
+      message.success(
+        result.table_count === 1
+          ? "数据表已删除，PDM 原文件备份已保留"
+          : `${result.table_count} 张数据表已删除，PDM 原文件备份已保留`,
+      );
+    } catch (error) {
+      message.error(errorMessage(error));
+    } finally {
+      setDeletingTables(false);
+    }
+  };
+
+  const requestTableDeletion = (candidates: TableSummary[]) => {
+    requestContextChange(
+      () => void confirmTableDeletion(candidates),
+      {
+        title: "放弃未保存的字典修改？",
+        content: "删除数据表会改写 PDM。当前字典修改尚未保存，继续后这些编辑稿会丢失。",
+        okText: "放弃修改并继续",
+      },
+    );
   };
 
   const handleBackupImported = async (_result: BackupImportResult) => {
@@ -847,6 +932,7 @@ export default function App() {
 
   const saveDictionary = async (table: TableMetadataUpdate, fields: FieldDefinition[]) => {
     if (!detail) return;
+    const previousFieldCount = detail.field_count;
     setSaving(true);
     try {
       const updated = await tablesApi.saveDictionary(
@@ -857,18 +943,20 @@ export default function App() {
       );
       setDetail(updated);
       setTables((current) =>
-        current.map((item) =>
-          item?.id === updated.id
-            ? {
-                ...item,
-                name: updated.name,
-                code: updated.code,
-                comment: updated.comment,
-                source_hash: updated.source_hash,
-              }
-            : item,
-        ),
+        current.map((item) => {
+          if (!item || item.pdm_id !== updated.pdm_id) return item;
+          if (item.id !== updated.id) return { ...item, source_hash: updated.source_hash };
+          return {
+            ...item,
+            name: updated.name,
+            code: updated.code,
+            comment: updated.comment,
+            field_count: updated.field_count,
+            source_hash: updated.source_hash,
+          };
+        }),
       );
+      setTableFieldTotal((current) => Math.max(0, current + updated.field_count - previousFieldCount));
       message.success("数据字典已写回项目 PDM，原文件备份已保留");
     } catch (error) {
       message.error(errorMessage(error));
@@ -994,12 +1082,17 @@ export default function App() {
               total={tableTotal}
               datasetRevision={tableDatasetRevision}
               selectedTableId={selectedTableId}
+              selectedTableIds={selectedTableIds}
               loading={tableLoading}
+              deleting={deletingTables}
               mode={searchMode}
               query={searchQuery}
               allNodes={allNodes}
               onSearch={submitTableSearch}
               onSelect={selectTable}
+              onToggleSelection={toggleTableSelection}
+              onClearSelection={clearTableSelection}
+              onDelete={requestTableDeletion}
               onRequestRange={requestTableRange}
             />
             <FieldPanel
@@ -1041,6 +1134,16 @@ export default function App() {
         items={trashItems}
         onClose={() => setTrashOpen(false)}
         onRestore={restoreTrash}
+      />
+
+      <TableDeleteConfirmModal
+        open={tableDeleteDialog !== null}
+        preview={tableDeleteDialog?.preview || null}
+        confirming={deletingTables}
+        onCancel={() => {
+          if (!deletingTables) setTableDeleteDialog(null);
+        }}
+        onConfirm={() => void confirmPendingTableDeletion()}
       />
 
       <LazyFeatureOverlays

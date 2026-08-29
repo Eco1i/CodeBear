@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   CheckOutlined,
   CloseOutlined,
+  DeleteOutlined,
   EditOutlined,
   InfoCircleOutlined,
+  PlusOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
 import { Button, Checkbox, Drawer, Empty, Input, Spin, Table, Tag, Tooltip } from "antd";
@@ -29,6 +32,13 @@ interface FieldPanelProps {
 }
 
 const cloneFields = (fields: FieldDefinition[]): FieldDefinition[] => fields.map((field) => ({ ...field }));
+let draftFieldSequence = 0;
+const nextDraftFieldId = () => {
+  draftFieldSequence += 1;
+  return `draft-${Date.now()}-${draftFieldSequence}`;
+};
+const renumberFields = (fields: FieldDefinition[]): FieldDefinition[] =>
+  fields.map((field, index) => ({ ...field, ordinal: index + 1 }));
 const tableMetadata = (detail?: TableDetail | null): TableMetadataUpdate => ({
   name: detail?.name || "",
   code: detail?.code || "",
@@ -101,8 +111,59 @@ export function FieldPanel({
   const searchRef = useRef<InputRef>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const scrollBodyRef = useRef<HTMLDivElement>(null);
+  const gutterHighlightRef = useRef<HTMLSpanElement>(null);
+  const pointerPositionRef = useRef<{ x: number; y: number } | null>(null);
 
   useGridScrollbarGutter(gridRef, scrollBodyRef);
+
+  const hideGutterHighlight = () => {
+    if (gutterHighlightRef.current) gutterHighlightRef.current.hidden = true;
+  };
+
+  const syncGutterHighlight = (target: EventTarget | null) => {
+    const grid = gridRef.current;
+    const body = scrollBodyRef.current;
+    const highlight = gutterHighlightRef.current;
+    const row = target instanceof Element
+      ? target.closest<HTMLElement>(".data-grid-row")
+      : null;
+    if (!grid || !body || !highlight || !row || !body.contains(row)) {
+      hideGutterHighlight();
+      return;
+    }
+
+    const gridRect = grid.getBoundingClientRect();
+    const bodyRect = body.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    const visibleTop = Math.max(rowRect.top, bodyRect.top);
+    const visibleBottom = Math.min(rowRect.bottom, bodyRect.bottom);
+    if (visibleBottom <= visibleTop) {
+      hideGutterHighlight();
+      return;
+    }
+
+    highlight.hidden = false;
+    highlight.style.top = `${Math.round(visibleTop - gridRect.top)}px`;
+    highlight.style.height = `${Math.round(visibleBottom - visibleTop)}px`;
+    highlight.style.backgroundColor = window.getComputedStyle(row).backgroundColor;
+  };
+
+  const handleFieldPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    pointerPositionRef.current = { x: event.clientX, y: event.clientY };
+    syncGutterHighlight(event.target);
+  };
+
+  const handleFieldScroll = () => {
+    const pointer = pointerPositionRef.current;
+    syncGutterHighlight(pointer
+      ? document.elementFromPoint(pointer.x, pointer.y)
+      : null);
+  };
+
+  const handleFieldPointerLeave = () => {
+    pointerPositionRef.current = null;
+    hideGutterHighlight();
+  };
 
   useEffect(() => {
     setEditing(false);
@@ -111,6 +172,7 @@ export function FieldPanel({
     setSearchOpen(false);
     setQuery("");
     setDraftQuery("");
+    hideGutterHighlight();
   }, [detail?.id]);
 
   useEffect(() => {
@@ -184,6 +246,19 @@ export function FieldPanel({
     [sourceFields, query],
   );
   const activeHighlightQuery = query.trim() || highlightQuery.trim();
+  const draftValidation = useMemo(() => {
+    if (!editing) return "";
+    const codes = new Set<string>();
+    for (const [index, field] of draft.entries()) {
+      const code = field.code.trim();
+      if (!code) return `第 ${index + 1} 行字段英文名不能为空`;
+      if (!field.data_type.trim()) return `第 ${index + 1} 行数据类型不能为空`;
+      const normalized = code.toLocaleLowerCase();
+      if (codes.has(normalized)) return `字段英文名重复：${code}`;
+      codes.add(normalized);
+    }
+    return "";
+  }, [draft, editing]);
 
   useEffect(() => {
     onDirtyChange(dirty);
@@ -203,6 +278,38 @@ export function FieldPanel({
     setDraft((current) => current.map((field) => (field.id === id ? { ...field, [key]: value } : field)));
   };
 
+  const addField = () => {
+    if (!detail) return;
+    setQuery("");
+    setDraftQuery("");
+    setDraft((current) => [
+      ...current,
+      {
+        id: nextDraftFieldId(),
+        is_new: true,
+        table_id: detail.id,
+        xml_id: "",
+        ordinal: current.length + 1,
+        name: "",
+        code: "",
+        data_type: "",
+        length: "",
+        nullable: true,
+        default_value: "",
+        comment: "",
+        is_primary_key: false,
+      },
+    ]);
+    window.requestAnimationFrame(() => {
+      const body = scrollBodyRef.current;
+      if (body) body.scrollTop = body.scrollHeight;
+    });
+  };
+
+  const removeField = (id: string) => {
+    setDraft((current) => renumberFields(current.filter((field) => field.id !== id)));
+  };
+
   const startEditing = () => {
     setDraft(cloneFields(detail?.fields || []));
     setDraftTable(tableMetadata(detail));
@@ -216,6 +323,7 @@ export function FieldPanel({
   };
 
   const save = async () => {
+    if (draftValidation) return;
     await onSave(draftTable, draft);
     setEditing(false);
   };
@@ -343,12 +451,18 @@ export function FieldPanel({
             )}
             {editing ? (
               <>
+                {draftValidation && (
+                  <span className="field-edit-error" role="alert" title={draftValidation}>
+                    {draftValidation}
+                  </span>
+                )}
+                <Button icon={<PlusOutlined />} disabled={saving} onClick={addField}>新增字段</Button>
                 <Button icon={<CloseOutlined />} disabled={saving} onClick={cancelEditing}>取消</Button>
                 <Button
                   type="primary"
                   icon={<CheckOutlined />}
                   loading={saving}
-                  disabled={!dirty}
+                  disabled={!dirty || Boolean(draftValidation)}
                   onClick={save}
                 >
                   保存修改
@@ -361,6 +475,12 @@ export function FieldPanel({
         )}
       </header>
       <div ref={gridRef} className="field-grid data-grid">
+        <span
+          ref={gutterHighlightRef}
+          className="field-grid-gutter-highlight"
+          aria-hidden="true"
+          hidden
+        />
         <div className="data-grid-head field-grid-columns">
           <span>#</span>
           <span>主键</span>
@@ -371,8 +491,16 @@ export function FieldPanel({
           <span>可空</span>
           <span>缺省值</span>
           <span>字段备注</span>
+          <span>操作</span>
         </div>
-        <div ref={scrollBodyRef} className="field-grid-body" data-testid="field-scroll-body">
+        <div
+          ref={scrollBodyRef}
+          className="field-grid-body"
+          data-testid="field-scroll-body"
+          onPointerMove={handleFieldPointerMove}
+          onPointerLeave={handleFieldPointerLeave}
+          onScroll={handleFieldScroll}
+        >
           {loading && (
             <div className="grid-loading"><Spin size="small" /> 正在读取字段字典…</div>
           )}
@@ -383,19 +511,26 @@ export function FieldPanel({
           )}
           {!loading && detail && visibleFields.length === 0 && (
             <div className="field-placeholder">
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前表中没有匹配字段" />
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={editing && !query.trim() ? "当前表暂无字段，可点击“新增字段”" : "当前表中没有匹配字段"}
+              />
             </div>
           )}
           {!loading &&
             visibleFields.map((field) => (
-              <div className="data-grid-row field-grid-columns" key={field.id}>
+              <div className={`data-grid-row field-grid-columns${field.is_new ? " is-new-field" : ""}`} key={field.id}>
                 <span className="grid-index">{String(field.ordinal).padStart(2, "0")}</span>
                 <span>
-                  {field.is_primary_key ? <b className="pk-badge">PK</b> : <span className="pk-empty">—</span>}
+                  {field.is_primary_key ? <b className="pk-badge">PK</b> : null}
                 </span>
                 <span>
                   {editing ? (
-                    <Input value={field.code} onChange={(event) => updateField(field.id, "code", event.target.value)} />
+                    <Input
+                      aria-label={`第 ${field.ordinal} 行字段英文名`}
+                      value={field.code}
+                      onChange={(event) => updateField(field.id, "code", event.target.value)}
+                    />
                   ) : (
                     bindings.has(field.id) ? (
                       <button
@@ -404,40 +539,53 @@ export function FieldPanel({
                         title={`查看“${bindings.get(field.id)?.dictionary_name}”字典`}
                         onClick={() => void openDictionaryDrawer(bindings.get(field.id)!)}
                       >
-                        <HighlightedText text={field.code || "—"} query={activeHighlightQuery} />
+                        <HighlightedText text={field.code || ""} query={activeHighlightQuery} />
                       </button>
                     ) : (
                       <code title={field.code}>
-                        <HighlightedText text={field.code || "—"} query={activeHighlightQuery} />
+                        <HighlightedText text={field.code || ""} query={activeHighlightQuery} />
                       </code>
                     )
                   )}
                 </span>
                 <span>
                   {editing ? (
-                    <Input value={field.name} onChange={(event) => updateField(field.id, "name", event.target.value)} />
+                    <Input
+                      aria-label={`第 ${field.ordinal} 行字段描述`}
+                      value={field.name}
+                      onChange={(event) => updateField(field.id, "name", event.target.value)}
+                    />
                   ) : (
                     <span title={field.name}>
-                      <HighlightedText text={field.name || "—"} query={activeHighlightQuery} />
+                      <HighlightedText text={field.name || ""} query={activeHighlightQuery} />
                     </span>
                   )}
                 </span>
                 <span>
                   {editing ? (
-                    <Input value={field.data_type} onChange={(event) => updateField(field.id, "data_type", event.target.value)} />
+                    <Input
+                      aria-label={`第 ${field.ordinal} 行数据类型`}
+                      value={field.data_type}
+                      onChange={(event) => updateField(field.id, "data_type", event.target.value)}
+                    />
                   ) : (
-                    <code>{field.data_type || "—"}</code>
+                    <code>{field.data_type || ""}</code>
                   )}
                 </span>
                 <span>
                   {editing ? (
-                    <Input value={field.length} onChange={(event) => updateField(field.id, "length", event.target.value)} />
+                    <Input
+                      aria-label={`第 ${field.ordinal} 行长度`}
+                      value={field.length}
+                      onChange={(event) => updateField(field.id, "length", event.target.value)}
+                    />
                   ) : (
-                    field.length || "—"
+                    field.length || null
                   )}
                 </span>
                 <span>
                   <Checkbox
+                    aria-label={`第 ${field.ordinal} 行可空`}
                     checked={field.nullable}
                     disabled={!editing}
                     onChange={(event) => updateField(field.id, "nullable", event.target.checked)}
@@ -446,16 +594,21 @@ export function FieldPanel({
                 <span>
                   {editing ? (
                     <Input
+                      aria-label={`第 ${field.ordinal} 行缺省值`}
                       value={field.default_value}
                       onChange={(event) => updateField(field.id, "default_value", event.target.value)}
                     />
                   ) : (
-                    <span title={field.default_value}>{field.default_value || "—"}</span>
+                    field.default_value ? <span title={field.default_value}>{field.default_value}</span> : null
                   )}
                 </span>
                 <span>
                   {editing ? (
-                    <Input value={field.comment} onChange={(event) => updateField(field.id, "comment", event.target.value)} />
+                    <Input
+                      aria-label={`第 ${field.ordinal} 行字段备注`}
+                      value={field.comment}
+                      onChange={(event) => updateField(field.id, "comment", event.target.value)}
+                    />
                   ) : field.comment ? (
                     <FullTextPopover title={`${field.code || "字段"} · 字段备注`} text={field.comment}>
                       <button
@@ -468,7 +621,34 @@ export function FieldPanel({
                       </button>
                     </FullTextPopover>
                   ) : (
-                    "—"
+                    null
+                  )}
+                </span>
+                <span className="field-row-action">
+                  {editing ? (
+                    <Tooltip
+                      title={
+                        field.is_primary_key
+                          ? "主键字段不能直接删除"
+                          : bindings.has(field.id)
+                            ? "请先在字典中心解除字段绑定"
+                            : "删除字段（保存前可取消）"
+                      }
+                    >
+                      <span>
+                        <Button
+                          type="text"
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          aria-label={`删除字段 ${field.code || `第 ${field.ordinal} 行`}`}
+                          disabled={field.is_primary_key || bindings.has(field.id)}
+                          onClick={() => removeField(field.id)}
+                        />
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    null
                   )}
                 </span>
               </div>

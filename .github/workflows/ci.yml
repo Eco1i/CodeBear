@@ -55,7 +55,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-15]
+        include:
+          - os: windows-latest
+            browser: chromium
+          - os: macos-15
+            browser: webkit
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -72,9 +76,9 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
-      - run: npx playwright install chromium
+      - run: npx playwright install ${{ matrix.browser }}
         working-directory: frontend
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --project=${{ matrix.browser }}
         working-directory: frontend
 
   package-macos:

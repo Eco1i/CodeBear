@@ -23,7 +23,7 @@ from .config import APP_VERSION, INTERNAL_DIR_NAMES, SettingsStore
 from .database import Database
 from .ddl import ddl_options as build_ddl_options
 from .ddl import generate_ddl as render_ddl
-from .pdm import ParsedPdm, file_sha256, parse_pdm, update_pdm_dictionary
+from .pdm import ParsedPdm, delete_pdm_tables, file_sha256, parse_pdm, update_pdm_dictionary
 
 
 logger = logging.getLogger("backend.app.service")
@@ -1967,6 +1967,237 @@ class WorkspaceService:
         ]
         return result
 
+    def _table_delete_context(
+        self,
+        targets: list[dict[str, Any]],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        if not targets:
+            raise ServiceError(422, "请选择至少一张待删除数据表", code="empty_table_selection")
+        if len(targets) > 5000:
+            raise ServiceError(422, "单次最多删除 5000 张数据表", code="table_selection_too_large")
+
+        expected_hashes: dict[str, str] = {}
+        ordered_ids: list[str] = []
+        for target in targets:
+            table_id = str(target.get("id", "")).strip()
+            expected_hash = str(target.get("expected_hash", "")).strip()
+            if not table_id or not expected_hash:
+                raise ServiceError(422, "删除请求缺少数据表或版本信息", code="invalid_table_selection")
+            if table_id in expected_hashes:
+                raise ServiceError(422, "删除请求包含重复数据表", code="invalid_table_selection")
+            expected_hashes[table_id] = expected_hash
+            ordered_ids.append(table_id)
+
+        rows_by_id: dict[str, sqlite3.Row] = {}
+        relation_ids: set[str] = set()
+        binding_field_ids: set[str] = set()
+        with self.database.connect() as connection:
+            for start in range(0, len(ordered_ids), 400):
+                chunk = ordered_ids[start:start + 400]
+                placeholders = ", ".join("?" for _ in chunk)
+                rows = connection.execute(
+                    f"""
+                    SELECT t.id, t.xml_id, t.name, t.code, t.field_count,
+                           pf.id AS pdm_id, pf.relative_path, pf.source_hash,
+                           pf.table_count AS pdm_table_count,
+                           pf.field_count AS pdm_field_count,
+                           p.id AS project_id, p.name AS project_name,
+                           p.root_path AS project_root
+                    FROM model_tables t
+                    JOIN pdm_files pf ON pf.id = t.pdm_id
+                    JOIN projects p ON p.id = pf.project_id
+                    WHERE t.id IN ({placeholders})
+                    """,
+                    chunk,
+                ).fetchall()
+                rows_by_id.update({str(row["id"]): row for row in rows})
+                relation_ids.update(
+                    str(row["id"])
+                    for row in connection.execute(
+                        f"""
+                        SELECT id FROM table_relations
+                        WHERE source_table_id IN ({placeholders})
+                           OR target_table_id IN ({placeholders})
+                        """,
+                        [*chunk, *chunk],
+                    ).fetchall()
+                )
+                binding_field_ids.update(
+                    str(row["field_id"])
+                    for row in connection.execute(
+                        f"""
+                        SELECT db.field_id
+                        FROM dictionary_field_bindings db
+                        JOIN model_fields mf ON mf.id = db.field_id
+                        WHERE mf.table_id IN ({placeholders})
+                        """,
+                        chunk,
+                    ).fetchall()
+                )
+
+        missing = [table_id for table_id in ordered_ids if table_id not in rows_by_id]
+        if missing:
+            raise ServiceError(
+                404,
+                "部分数据表不存在或索引已更新，请刷新后重试",
+                code="table_not_found",
+                data={"table_ids": missing[:20]},
+            )
+
+        groups_by_pdm: dict[str, dict[str, Any]] = {}
+        table_items: list[dict[str, Any]] = []
+        for table_id in ordered_ids:
+            row = rows_by_id[table_id]
+            expected_hash = expected_hashes[table_id]
+            if expected_hash != str(row["source_hash"]):
+                raise ServiceError(
+                    409,
+                    "数据表所属 PDM 已更新，请刷新列表后重试",
+                    code="pdm_changed",
+                )
+            pdm_id = str(row["pdm_id"])
+            group = groups_by_pdm.setdefault(
+                pdm_id,
+                {
+                    "pdm_id": pdm_id,
+                    "project_id": str(row["project_id"]),
+                    "project_name": str(row["project_name"]),
+                    "project_root": str(row["project_root"]),
+                    "relative_path": str(row["relative_path"]),
+                    "source_hash": str(row["source_hash"]),
+                    "pdm_table_count": int(row["pdm_table_count"]),
+                    "pdm_field_count": int(row["pdm_field_count"]),
+                    "table_xml_ids": set(),
+                    "selected_field_count": 0,
+                },
+            )
+            group["table_xml_ids"].add(str(row["xml_id"]))
+            group["selected_field_count"] += int(row["field_count"])
+            table_items.append(
+                {
+                    "id": table_id,
+                    "name": str(row["name"]),
+                    "code": str(row["code"]),
+                    "field_count": int(row["field_count"]),
+                    "pdm_id": pdm_id,
+                    "relative_path": str(row["relative_path"]),
+                    "project_name": str(row["project_name"]),
+                }
+            )
+
+        for group in groups_by_pdm.values():
+            path = resolve_relative(Path(group["project_root"]), str(group["relative_path"]))
+            if not path.is_file():
+                raise ServiceError(404, "数据表所属 PDM 文件不存在", code="pdm_not_found")
+            current_hash = file_sha256(path)
+            if current_hash != str(group["source_hash"]):
+                raise ServiceError(
+                    409,
+                    "数据表所属 PDM 文件已发生变化，请刷新后重试",
+                    code="pdm_changed",
+                    data={"current_hash": current_hash},
+                )
+            group["path"] = path
+            group["current_hash"] = current_hash
+
+        summary = {
+            "table_count": len(ordered_ids),
+            "field_count": sum(int(item["field_count"]) for item in table_items),
+            "pdm_count": len(groups_by_pdm),
+            "relation_count": len(relation_ids),
+            "binding_count": len(binding_field_ids),
+            "tables": table_items,
+        }
+        return summary, list(groups_by_pdm.values())
+
+    def preview_table_deletion(self, targets: list[dict[str, Any]]) -> dict[str, Any]:
+        summary, _ = self._table_delete_context(targets)
+        return summary
+
+    def delete_tables(self, targets: list[dict[str, Any]]) -> dict[str, Any]:
+        with self._write_lock:
+            summary, groups = self._table_delete_context(targets)
+            prepared: list[dict[str, Any]] = []
+            replaced: list[dict[str, Any]] = []
+            temp_paths: list[Path] = []
+            try:
+                for group in groups:
+                    path = Path(group["path"])
+                    temp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+                    temp_paths.append(temp)
+                    try:
+                        delete_pdm_tables(path, temp, set(group["table_xml_ids"]))
+                        parsed = parse_pdm(temp)
+                    except ValueError as exc:
+                        temp.unlink(missing_ok=True)
+                        raise ServiceError(422, str(exc), code="table_dependency") from exc
+                    expected_tables = int(group["pdm_table_count"]) - len(group["table_xml_ids"])
+                    expected_fields = int(group["pdm_field_count"]) - int(group["selected_field_count"])
+                    if len(parsed.tables) != expected_tables or parsed.field_count != expected_fields:
+                        temp.unlink(missing_ok=True)
+                        raise ServiceError(
+                            422,
+                            "删除校验失败：PDM 表或字段数量与预期不一致",
+                            code="validation_failed",
+                        )
+                    project = {
+                        "root_path": str(group["project_root"]),
+                        "name": str(group["project_name"]),
+                    }
+                    backup = self._backup_existing(project, path, "数据表删除")
+                    prepared.append({**group, "temp": temp, "parsed": parsed, "backup": backup})
+
+                for item in prepared:
+                    os.replace(Path(item["temp"]), Path(item["path"]))
+                    replaced.append(item)
+
+                pdm_ids = [str(item["pdm_id"]) for item in prepared]
+                with self.database.transaction() as connection:
+                    with self.database.defer_fts_updates(connection, pdm_ids) as updated_pdm_ids:
+                        for item in prepared:
+                            pdm_id = self._index_parsed(
+                                connection,
+                                str(item["project_id"]),
+                                str(item["relative_path"]),
+                                Path(item["path"]),
+                                item["parsed"],
+                                pdm_id=str(item["pdm_id"]),
+                            )
+                            updated_pdm_ids.add(pdm_id)
+                            connection.execute(
+                                """
+                                INSERT INTO save_history(
+                                    id, pdm_id, project_id, relative_path, backup_path,
+                                    before_hash, after_hash, saved_at
+                                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+                                """,
+                                (
+                                    str(uuid.uuid4()),
+                                    item["pdm_id"],
+                                    item["project_id"],
+                                    item["relative_path"],
+                                    str(item["backup"]),
+                                    item["current_hash"],
+                                    item["parsed"].source_hash,
+                                    utc_now(),
+                                ),
+                            )
+            except Exception:
+                for item in reversed(replaced):
+                    try:
+                        shutil.copy2(Path(item["backup"]), Path(item["path"]))
+                    except OSError:
+                        logger.exception("数据表删除失败后无法恢复 PDM：%s", item["path"])
+                raise
+            finally:
+                for temp in temp_paths:
+                    temp.unlink(missing_ok=True)
+
+            return {
+                **summary,
+                "deleted_ids": [str(target["id"]) for target in targets],
+            }
+
     # ---- 表关系 ----
 
     @staticmethod
@@ -2452,6 +2683,8 @@ class WorkspaceService:
         table: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         with self._write_lock:
+            if len(fields) > 50_000:
+                raise ServiceError(422, "单张表不能超过 50000 个字段", code="field_selection_too_large")
             detail = self.table_detail(table_id)
             project = self.get_project(str(detail["project_id"]))
             path = resolve_relative(Path(project["root_path"]), str(detail["relative_path"]))
@@ -2465,24 +2698,41 @@ class WorkspaceService:
                 )
             known_fields = {str(field["id"]): field for field in detail["fields"]}
             changes: dict[str, dict[str, object]] = {}
-            for field in fields:
-                field_id = str(field.get("id", ""))
-                original = known_fields.get(field_id)
-                if original is None:
-                    raise ServiceError(422, "提交内容包含不属于该表的字段", code="invalid_field")
+            new_fields: list[dict[str, object]] = []
+            retained_field_ids: set[str] = set()
+            normalized_codes: set[str] = set()
+            for index, field in enumerate(fields, start=1):
                 code = str(field.get("code", "")).strip()
                 data_type = str(field.get("data_type", "")).strip()
                 if not code or not data_type:
-                    raise ServiceError(422, "字段英文名和数据类型不能为空", code="invalid_field")
+                    raise ServiceError(
+                        422,
+                        f"第 {index} 个字段的英文名和数据类型不能为空",
+                        code="invalid_field",
+                    )
+                folded_code = code.casefold()
+                if folded_code in normalized_codes:
+                    raise ServiceError(422, f"字段英文名重复：{code}", code="duplicate_field_code")
+                normalized_codes.add(folded_code)
                 candidate = {
-                    "name": str(field.get("name", "")),
+                    "name": str(field.get("name", "")).strip(),
                     "code": code,
                     "data_type": data_type,
-                    "length": str(field.get("length", "")),
+                    "length": str(field.get("length", "")).strip(),
                     "nullable": bool(field.get("nullable", True)),
                     "default_value": str(field.get("default_value", "")),
                     "comment": str(field.get("comment", "")),
                 }
+                if bool(field.get("is_new", False)):
+                    new_fields.append(candidate)
+                    continue
+                field_id = str(field.get("id", "")).strip()
+                original = known_fields.get(field_id)
+                if original is None:
+                    raise ServiceError(422, "提交内容包含不属于该表的字段", code="invalid_field")
+                if field_id in retained_field_ids:
+                    raise ServiceError(422, "提交内容包含重复字段", code="invalid_field")
+                retained_field_ids.add(field_id)
                 current = {
                     "name": str(original["name"]),
                     "code": str(original["code"]),
@@ -2494,8 +2744,62 @@ class WorkspaceService:
                 }
                 if candidate != current:
                     changes[str(original["xml_id"])] = candidate
-            if set(known_fields) != {str(field.get("id", "")) for field in fields}:
-                raise ServiceError(422, "保存时必须提交当前表的全部字段", code="incomplete_fields")
+
+            deleted_field_ids = set(known_fields) - retained_field_ids
+            primary_fields = [
+                known_fields[field_id]
+                for field_id in deleted_field_ids
+                if bool(known_fields[field_id]["is_primary_key"])
+            ]
+            if primary_fields:
+                raise ServiceError(
+                    422,
+                    "主键字段不能直接删除，请先在 PowerDesigner 中调整主键",
+                    code="field_dependency",
+                    data={"field_ids": [str(field["id"]) for field in primary_fields]},
+                )
+            relation_ids: set[str] = set()
+            binding_ids: set[str] = set()
+            if deleted_field_ids:
+                ordered_deleted = list(deleted_field_ids)
+                with self.database.connect() as connection:
+                    for start in range(0, len(ordered_deleted), 400):
+                        chunk = ordered_deleted[start:start + 400]
+                        placeholders = ", ".join("?" for _ in chunk)
+                        relation_ids.update(
+                            str(row["id"])
+                            for row in connection.execute(
+                                f"""
+                                SELECT id FROM table_relations
+                                WHERE source_field_id IN ({placeholders})
+                                   OR target_field_id IN ({placeholders})
+                                """,
+                                [*chunk, *chunk],
+                            ).fetchall()
+                        )
+                        binding_ids.update(
+                            str(row["field_id"])
+                            for row in connection.execute(
+                                f"""
+                                SELECT field_id FROM dictionary_field_bindings
+                                WHERE field_id IN ({placeholders})
+                                """,
+                                chunk,
+                            ).fetchall()
+                        )
+            if relation_ids or binding_ids:
+                parts: list[str] = []
+                if relation_ids:
+                    parts.append(f"{len(relation_ids)} 条表关系")
+                if binding_ids:
+                    parts.append(f"{len(binding_ids)} 个字典绑定")
+                raise ServiceError(
+                    422,
+                    f"待删除字段仍关联{'和'.join(parts)}，请先解除依赖",
+                    code="field_dependency",
+                    data={"relation_count": len(relation_ids), "binding_count": len(binding_ids)},
+                )
+            deleted_xml_ids = {str(known_fields[field_id]["xml_id"]) for field_id in deleted_field_ids}
 
             table_changes: dict[str, dict[str, object]] = {}
             if table is not None:
@@ -2512,48 +2816,92 @@ class WorkspaceService:
                 if candidate_table != current_table:
                     table_changes[str(detail["xml_id"])] = candidate_table
 
-            if not table_changes and not changes:
+            structural_change = bool(new_fields or deleted_xml_ids)
+            if not table_changes and not changes and not structural_change:
                 return detail
 
-            backup = self._backup_existing(project, path, "字典编辑")
             temp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+            backup: Path | None = None
+            replaced = False
             try:
-                update_pdm_dictionary(path, temp, table_changes, changes)
+                try:
+                    update_pdm_dictionary(
+                        path,
+                        temp,
+                        table_changes,
+                        changes,
+                        field_additions_by_table_xml_id=(
+                            {str(detail["xml_id"]): new_fields} if new_fields else {}
+                        ),
+                        field_deletions_by_xml_id=deleted_xml_ids,
+                    )
+                except ValueError as exc:
+                    code = "field_dependency" if "引用" in str(exc) else "validation_failed"
+                    raise ServiceError(422, str(exc), code=code) from exc
                 parsed = parse_pdm(temp)
                 with self.database.connect() as connection:
                     pdm_row = connection.execute("SELECT * FROM pdm_files WHERE id = ?", (detail["pdm_id"],)).fetchone()
                 if pdm_row is None:
                     raise ServiceError(409, "PDM 索引已变化，请刷新后再保存", code="pdm_changed")
-                if len(parsed.tables) != int(pdm_row["table_count"]) or parsed.field_count != int(pdm_row["field_count"]):
+                expected_field_count = int(pdm_row["field_count"]) + len(new_fields) - len(deleted_xml_ids)
+                if len(parsed.tables) != int(pdm_row["table_count"]) or parsed.field_count != expected_field_count:
                     raise ServiceError(422, "保存校验失败：表或字段数量发生了意外变化", code="validation_failed")
+                parsed_table = next(
+                    (candidate for candidate in parsed.tables if candidate.xml_id == str(detail["xml_id"])),
+                    None,
+                )
+                if parsed_table is None or len(parsed_table.fields) != len(fields):
+                    raise ServiceError(422, "保存校验失败：当前表字段未完整写入", code="validation_failed")
+                desired_codes = [str(field.get("code", "")).strip().casefold() for field in fields]
+                saved_codes = [field.code.casefold() for field in parsed_table.fields]
+                if saved_codes != desired_codes:
+                    raise ServiceError(422, "保存校验失败：当前表字段顺序或名称不一致", code="validation_failed")
+                backup = self._backup_existing(project, path, "字典编辑")
                 os.replace(temp, path)
+                replaced = True
                 after_hash = parsed.source_hash
-                with self.database.transaction() as connection:
-                    self._update_saved_table_index(
-                        connection,
-                        detail,
-                        path,
-                        parsed,
-                    )
-                    connection.execute(
-                        """
-                        INSERT INTO save_history(
-                            id, pdm_id, project_id, relative_path, backup_path,
-                            before_hash, after_hash, saved_at
-                        ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            str(uuid.uuid4()),
-                            detail["pdm_id"],
-                            detail["project_id"],
-                            detail["relative_path"],
-                            str(backup),
-                            current_hash,
-                            after_hash,
-                            utc_now(),
-                        ),
-                    )
+                try:
+                    with self.database.transaction() as connection:
+                        if structural_change:
+                            with self.database.defer_fts_updates(connection, [str(detail["pdm_id"])]) as updated_pdm_ids:
+                                pdm_id = self._index_parsed(
+                                    connection,
+                                    str(detail["project_id"]),
+                                    str(detail["relative_path"]),
+                                    path,
+                                    parsed,
+                                    pdm_id=str(detail["pdm_id"]),
+                                )
+                                updated_pdm_ids.add(pdm_id)
+                        else:
+                            self._update_saved_table_index(
+                                connection,
+                                detail,
+                                path,
+                                parsed,
+                            )
+                        connection.execute(
+                            """
+                            INSERT INTO save_history(
+                                id, pdm_id, project_id, relative_path, backup_path,
+                                before_hash, after_hash, saved_at
+                            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                str(uuid.uuid4()),
+                                detail["pdm_id"],
+                                detail["project_id"],
+                                detail["relative_path"],
+                                str(backup),
+                                current_hash,
+                                after_hash,
+                                utc_now(),
+                            ),
+                        )
+                except Exception:
+                    if replaced and backup is not None:
+                        shutil.copy2(backup, path)
+                    raise
             finally:
-                if temp.exists():
-                    temp.unlink()
+                temp.unlink(missing_ok=True)
             return self.table_detail(table_id)

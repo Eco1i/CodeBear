@@ -4,17 +4,19 @@
 
 码熊是一款本地运行的 PowerDesigner PDM 数据字典工具。它可以集中管理 PDM，查看和搜索表字段，维护数据字典与表关系，也可以直接生成建表脚本。
 
-> 当前稳定版本：`v1.4.0` · 支持 Windows 10/11 x64 与 macOS 13+ Apple Silicon
+> 当前稳定版本：`v1.5.5` · 支持 Windows 10/11 x64 与 macOS 13+ Apple Silicon
 
 ## 功能
 
 - 按项目和目录管理 `.pdm` 文件，浏览表、字段、主键、类型和备注。
 - 按表名、描述、注释或字段快速搜索。
-- 支持字段编辑、回收站和备份迁移。
+- 在“编辑字典”中新增、修改或删除字段，并可维护表名称、代码和描述。
+- 数据表支持单独删除和批量删除；结构变更前自动备份 PDM。
+- 支持回收站和备份迁移。
 - 从 Excel 导入业务字典，将字典绑定到字段后随时查询。
 - 查看 PDM 外键关系，也可以手工补充和维护表关系。
 - 生成 MySQL、Oracle、达梦、TDSQL MySQL 版和 Apache Ignite 建表脚本。
-- 可选接入 DeepSeek AI 助手，通过自然语言查询数据字典。
+- 可选接入 DeepSeek AI 助手，通过自然语言查询数据字典；悬浮入口可自由拖动并记忆位置。
 - 自动检查新版本，并根据当前系统提供对应的安装包。
 
 ## 界面预览
@@ -57,10 +59,10 @@
 
 ## 下载
 
-- Windows 10/11 x64：`CodeBear-v1.4.0-win-x64.zip`
-- macOS 13 及以上 Apple Silicon：`CodeBear-v1.4.0-mac-arm64.dmg`
+- Windows 10/11 x64：`CodeBear-v1.5.5-win-x64.zip`
+- macOS 13 及以上 Apple Silicon：`CodeBear-v1.5.5-mac-arm64.dmg`
 
-请前往 [GitHub Releases](https://github.com/Eco1i/CodeBear/releases/tag/v1.4.0) 下载。Windows 和 macOS 是两个独立安装包，请按自己的系统选择。
+请前往 [GitHub Releases](https://github.com/Eco1i/CodeBear/releases/tag/v1.5.5) 下载。Windows 和 macOS 是两个独立安装包，请按自己的系统选择。
 
 当前 Mac 版只支持 M 系列芯片，暂不支持 Intel Mac。
 

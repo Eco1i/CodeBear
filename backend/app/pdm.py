@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import re
+import time
+import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -289,11 +292,107 @@ def _build_data_type(data_type: str, length: str) -> str:
     return f"{base}({length.strip()})"
 
 
+def _ensure_collection(parent: etree._Element, local_name: str) -> etree._Element:
+    collection = parent.find(f"{C}{local_name}")
+    if collection is not None:
+        return collection
+    collection = etree.Element(f"{C}{local_name}")
+    insert_at = len(parent)
+    for index, sibling in enumerate(parent):
+        if isinstance(sibling.tag, str) and sibling.tag.startswith(C):
+            insert_at = index
+            break
+    parent.insert(insert_at, collection)
+    return collection
+
+
+def _xml_id_sequence(known_ids: set[str]) -> Iterator[str]:
+    """生成 PowerDesigner 使用的递增数字对象标识（例如 o128）。"""
+    next_number = max(
+        (int(match.group(1)) for value in known_ids if (match := re.fullmatch(r"o(\d+)", value))),
+        default=0,
+    ) + 1
+    while True:
+        candidate = f"o{next_number}"
+        next_number += 1
+        if candidate in known_ids:
+            continue
+        known_ids.add(candidate)
+        yield candidate
+
+
+def _seed_new_column(column_node: etree._Element, table_node: etree._Element) -> None:
+    """补齐 PowerDesigner 新字段对象的标准身份与审计属性。"""
+    table_attributes = _attribute_texts(table_node)
+    author = table_attributes.get("Modifier") or table_attributes.get("Creator") or "CodeBear"
+    timestamp = str(int(time.time()))
+    for local_name, value in (
+        ("ObjectID", str(uuid.uuid4()).upper()),
+        ("Name", ""),
+        ("Code", ""),
+        ("CreationDate", timestamp),
+        ("Creator", author),
+        ("ModificationDate", timestamp),
+        ("Modifier", author),
+        ("Comment", ""),
+        ("DefaultValue", ""),
+        ("DataType", ""),
+        ("Length", ""),
+        ("Precision", ""),
+        ("Mandatory", ""),
+    ):
+        child = etree.SubElement(column_node, f"{A}{local_name}")
+        child.text = value
+
+
+def _write_column(column_node: etree._Element, change: dict[str, object]) -> None:
+    name = str(change.get("name", "")).strip()
+    code = str(change.get("code", "")).strip()
+    data_type = str(change.get("data_type", "")).strip()
+    length = str(change.get("length", "")).strip()
+    nullable = bool(change.get("nullable", True))
+    default_value = str(change.get("default_value", ""))
+    comment = str(change.get("comment", ""))
+
+    _set_text(column_node, "Name", name)
+    _set_text(column_node, "Code", code)
+    _set_text(column_node, "DataType", _build_data_type(data_type, length))
+    precision = ""
+    stored_length = length
+    if "," in length:
+        stored_length, precision = (part.strip() for part in length.split(",", 1))
+    _set_text(column_node, "Length", stored_length, remove_empty=True)
+    _set_text(column_node, "Precision", precision, remove_empty=True)
+    _set_text(column_node, "Mandatory", "" if nullable else "1", remove_empty=True)
+    _set_text(column_node, "DefaultValue", default_value, remove_empty=True)
+    _set_text(column_node, "Comment", comment, remove_empty=True)
+
+
+def _referencing_nodes(root: etree._Element, object_ids: set[str]) -> list[etree._Element]:
+    if not object_ids:
+        return []
+    return [
+        element
+        for element in root.iter()
+        if element.get("Ref") in object_ids
+    ]
+
+
+def _local_name(element: etree._Element) -> str:
+    tag = element.tag
+    if not isinstance(tag, str):
+        return ""
+    return etree.QName(tag).localname
+
+
 def update_pdm_dictionary(
     source: Path,
     destination: Path,
     table_changes_by_xml_id: dict[str, dict[str, object]],
     field_changes_by_xml_id: dict[str, dict[str, object]],
+    *,
+    field_additions_by_table_xml_id: dict[str, list[dict[str, object]]] | None = None,
+    field_deletions_by_xml_id: set[str] | None = None,
 ) -> tuple[int, int]:
     parser = etree.XMLParser(
         resolve_entities=False,
@@ -306,6 +405,24 @@ def update_pdm_dictionary(
     root = tree.getroot()
     found_tables: set[str] = set()
     found_fields: set[str] = set()
+    additions = field_additions_by_table_xml_id or {}
+    deletions = field_deletions_by_xml_id or set()
+    table_nodes = {
+        str(node.get("Id")): node
+        for node in root.iter(f"{O}Table")
+        if node.get("Id")
+    }
+    field_nodes = {
+        str(node.get("Id")): node
+        for node in root.iter(f"{O}Column")
+        if node.get("Id")
+    }
+
+    missing_deletions = deletions - set(field_nodes)
+    if missing_deletions:
+        raise ValueError(f"PDM 中找不到 {len(missing_deletions)} 个待删除字段")
+    if _referencing_nodes(root, deletions):
+        raise ValueError("待删除字段被主键、索引或表关系引用，请先解除依赖")
 
     for table_node in root.iter(f"{O}Table"):
         xml_id = table_node.get("Id")
@@ -328,26 +445,33 @@ def update_pdm_dictionary(
             continue
         change = field_changes_by_xml_id[xml_id]
         found_fields.add(str(xml_id))
-        name = str(change.get("name", "")).strip()
-        code = str(change.get("code", "")).strip()
-        data_type = str(change.get("data_type", "")).strip()
-        length = str(change.get("length", "")).strip()
-        nullable = bool(change.get("nullable", True))
-        default_value = str(change.get("default_value", ""))
-        comment = str(change.get("comment", ""))
+        _write_column(column_node, change)
 
-        _set_text(column_node, "Name", name)
-        _set_text(column_node, "Code", code)
-        _set_text(column_node, "DataType", _build_data_type(data_type, length))
-        precision = ""
-        stored_length = length
-        if "," in length:
-            stored_length, precision = (part.strip() for part in length.split(",", 1))
-        _set_text(column_node, "Length", stored_length, remove_empty=True)
-        _set_text(column_node, "Precision", precision, remove_empty=True)
-        _set_text(column_node, "Mandatory", "" if nullable else "1", remove_empty=True)
-        _set_text(column_node, "DefaultValue", default_value, remove_empty=True)
-        _set_text(column_node, "Comment", comment, remove_empty=True)
+    for xml_id in deletions:
+        column_node = field_nodes[xml_id]
+        parent = column_node.getparent()
+        if parent is None:
+            raise ValueError("待删除字段缺少 PDM 父节点")
+        parent.remove(column_node)
+
+    known_ids = {
+        str(element.get("Id"))
+        for element in root.iter()
+        if element.get("Id")
+    }
+    xml_ids = _xml_id_sequence(known_ids)
+    for table_xml_id, new_fields in additions.items():
+        table_node = table_nodes.get(table_xml_id)
+        if table_node is None:
+            raise ValueError("PDM 中找不到待新增字段的数据表")
+        columns = _ensure_collection(table_node, "Columns")
+        for new_field in new_fields:
+            column_node = etree.Element(f"{O}Column", Id=next(xml_ids))
+            _seed_new_column(column_node, table_node)
+            _write_column(column_node, new_field)
+            if len(columns):
+                column_node.tail = columns[-1].tail
+            columns.append(column_node)
 
     missing_tables = set(table_changes_by_xml_id) - found_tables
     if missing_tables:
@@ -363,6 +487,98 @@ def update_pdm_dictionary(
         pretty_print=False,
     )
     return len(found_tables), len(found_fields)
+
+
+def delete_pdm_tables(
+    source: Path,
+    destination: Path,
+    table_xml_ids: set[str],
+) -> dict[str, int]:
+    """删除 PDM 表及其原生关系、图形符号，并拒绝留下悬空引用。"""
+    if not table_xml_ids:
+        raise ValueError("请选择至少一张待删除数据表")
+    parser = etree.XMLParser(
+        resolve_entities=False,
+        no_network=True,
+        remove_blank_text=False,
+        strip_cdata=False,
+        huge_tree=True,
+    )
+    tree = etree.parse(str(source), parser)
+    root = tree.getroot()
+    table_nodes = {
+        str(node.get("Id")): node
+        for node in root.iter(f"{O}Table")
+        if node.get("Id") and str(node.get("Id")) in table_xml_ids
+    }
+    missing = table_xml_ids - set(table_nodes)
+    if missing:
+        raise ValueError(f"PDM 中找不到 {len(missing)} 张待删除数据表")
+
+    column_ids: set[str] = set()
+    for table_node in table_nodes.values():
+        columns = table_node.find(f"{C}Columns")
+        if columns is None:
+            continue
+        column_ids.update(
+            str(column.get("Id"))
+            for column in columns
+            if column.tag == f"{O}Column" and column.get("Id")
+        )
+
+    dependency_ids = set(table_xml_ids) | column_ids
+    reference_nodes: list[etree._Element] = []
+    reference_ids: set[str] = set()
+    for reference in root.iter(f"{O}Reference"):
+        reference_id = reference.get("Id")
+        if not reference_id:
+            continue
+        if any(descendant.get("Ref") in dependency_ids for descendant in reference.iter()):
+            reference_nodes.append(reference)
+            reference_ids.add(str(reference_id))
+
+    removed_ids = dependency_ids | reference_ids
+    for reference in reference_nodes:
+        parent = reference.getparent()
+        if parent is not None:
+            parent.remove(reference)
+    for table_node in table_nodes.values():
+        parent = table_node.getparent()
+        if parent is None:
+            raise ValueError("待删除数据表缺少 PDM 父节点")
+        parent.remove(table_node)
+
+    # PowerDesigner 图中会用 Symbol 对象引用表和 Reference；随模型对象一起清理。
+    for element in list(root.iter()):
+        if not element.get("Id") or not _local_name(element).endswith("Symbol"):
+            continue
+        if any(descendant.get("Ref") in removed_ids for descendant in element.iter()):
+            parent = element.getparent()
+            if parent is not None:
+                parent.remove(element)
+
+    dangling = _referencing_nodes(root, removed_ids)
+    if dangling:
+        kinds = sorted(
+            {
+                _local_name(node.getparent()) if node.getparent() is not None else _local_name(node)
+                for node in dangling
+            }
+        )
+        suffix = f"（{', '.join(kinds[:3])}）" if kinds else ""
+        raise ValueError(f"待删除数据表仍被其他 PDM 对象引用{suffix}，已停止删除")
+
+    tree.write(
+        str(destination),
+        encoding="UTF-8",
+        xml_declaration=True,
+        pretty_print=False,
+    )
+    return {
+        "table_count": len(table_nodes),
+        "field_count": len(column_ids),
+        "reference_count": len(reference_nodes),
+    }
 
 
 def update_pdm_fields(

@@ -44,6 +44,7 @@ import type {
   ScopeOption,
 } from "../features/ai/model";
 import { tablesApi } from "../features/tables/api";
+import { useAssistantExitGate } from "../features/ai/useAssistantExitGate";
 import type {
   AiAccessory,
   AiClarification,
@@ -61,6 +62,7 @@ import type {
   TableDetail,
   WorkspaceNode,
 } from "../types";
+import { AiLauncher } from "./AiLauncher";
 import { PolarBearMark } from "./AiMascot";
 import { AiPersonalizeModal } from "./AiPersonalizeModal";
 import { TableGlyph } from "./PrototypeGlyphs";
@@ -74,6 +76,15 @@ interface AiAssistantProps {
   onOpenChange: (open: boolean) => void;
   onModeChange: (mode: AiLayoutMode) => void;
   onOpenTable: (evidence: AiEvidenceTable, options?: { exitFullscreen?: boolean }) => void;
+}
+
+export function isAssistantToggleShortcut(event: KeyboardEvent): boolean {
+  const hasSinglePrimaryModifier = event.ctrlKey !== event.metaKey;
+  return !event.repeat
+    && hasSinglePrimaryModifier
+    && !event.altKey
+    && !event.shiftKey
+    && event.key.toLowerCase() === "j";
 }
 
 const AI_LAYOUT_OPTIONS: Array<{ mode: AiLayoutMode; label: string; description: string }> = [
@@ -820,6 +831,7 @@ export function AiAssistant({
   );
   const scopeOptionsRef = useRef(scopeOptions);
   scopeOptionsRef.current = scopeOptions;
+  const { launcherVisible, onAssistantTransitionEnd } = useAssistantExitGate(open);
   const [scopeType, setScopeType] = useState<AiScopeType>(readStoredScopeType);
   const [restoredScopeOption, setRestoredScopeOption] = useState<ScopeOption | null>(null);
   const matchingRestoredScope = restoredScopeOption
@@ -978,9 +990,7 @@ export function AiAssistant({
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
-      if (event.repeat || !event.ctrlKey || event.altKey || event.shiftKey || event.key.toLowerCase() !== "j") {
-        return;
-      }
+      if (!isAssistantToggleShortcut(event)) return;
       event.preventDefault();
       onOpenChange(!open);
     };
@@ -1403,23 +1413,19 @@ export function AiAssistant({
 
   return (
     <>
-      {!open ? (
-        <button
-          className="ai-launcher"
-          type="button"
-          aria-label={`打开 ${displayName}`}
-          aria-expanded="false"
-          onClick={() => onOpenChange(true)}
-        >
-          <span className="ai-launcher-hint" aria-hidden="true">
-            <span>和{displayName}聊聊</span>
-            <kbd>Ctrl+J</kbd>
-          </span>
-          <PolarBearMark accessory={assistantAccessory} />
-        </button>
-      ) : null}
+      <AiLauncher
+        assistantName={displayName}
+        assistantAccessory={assistantAccessory}
+        shortcutEnabled={false}
+        visible={launcherVisible}
+        onOpen={() => onOpenChange(true)}
+      />
 
-      <aside className={`ai-assistant is-${mode}${open ? " is-open" : ""}${!conversationLoading && (!historyOpen || mode === "fullscreen") && !messages.length && !sending && !settingsOpen ? " is-empty" : ""}${historyOpen ? " is-history" : ""}${tablePeekEvidence ? " has-table-peek" : ""}`} aria-hidden={!open}>
+      <aside
+        className={`ai-assistant is-${mode}${open ? " is-open" : ""}${!conversationLoading && (!historyOpen || mode === "fullscreen") && !messages.length && !sending && !settingsOpen ? " is-empty" : ""}${historyOpen ? " is-history" : ""}${tablePeekEvidence ? " has-table-peek" : ""}`}
+        aria-hidden={!open}
+        onTransitionEnd={onAssistantTransitionEnd}
+      >
         <header className="ai-assistant-header">
           <span className="ai-assistant-identity">
             <span className="ai-header-avatar"><PolarBearMark compact accessory={assistantAccessory} /></span>

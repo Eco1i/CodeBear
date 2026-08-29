@@ -7,6 +7,7 @@ import pytest
 from backend.app.backup import extract_relation_payload, inspect_backup_archive
 from backend.app.config import AppPaths, SettingsStore
 from backend.app.database import Database
+from backend.app.pdm import parse_pdm
 from backend.app.service import ServiceError, WorkspaceService
 
 RELATION_SAMPLE_PDM = """<?xml version="1.0" encoding="UTF-8"?>
@@ -114,6 +115,28 @@ def test_pdm_reference_parsed_as_auto_relation(tmp_path: Path) -> None:
     assert relation["target_field"]["code"] == "order_id"
     order_relations = service.list_table_relations(str(order["id"]))
     assert order_relations["incoming"][0]["name"] == "FK_ITEM_ORDER"
+
+
+def test_table_delete_cascades_native_reference(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    order, order_item = import_sample(service, tmp_path)
+
+    preview = service.preview_table_deletion([
+        {"id": order["id"], "expected_hash": order["source_hash"]},
+    ])
+    assert preview["relation_count"] == 1
+
+    service.delete_tables([
+        {"id": order["id"], "expected_hash": order["source_hash"]},
+    ])
+
+    remaining = service.table_detail(str(order_item["id"]))
+    assert remaining["code"] == "t_order_item"
+    assert service.list_table_relations(str(order_item["id"]))["outgoing"] == []
+    project = service.get_project(str(order["project_id"]))
+    parsed = parse_pdm(Path(project["root_path"]) / str(order["relative_path"]))
+    assert [table.code for table in parsed.tables] == ["t_order_item"]
+    assert parsed.references == ()
 
 
 def test_manual_relation_crud_and_validation(tmp_path: Path) -> None:

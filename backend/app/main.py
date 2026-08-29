@@ -124,7 +124,8 @@ class TrashPayload(BaseModel):
 
 
 class FieldUpdate(BaseModel):
-    id: str
+    id: str = ""
+    is_new: bool = False
     name: str = ""
     code: str
     data_type: str
@@ -143,7 +144,16 @@ class TableUpdate(BaseModel):
 class FieldsSavePayload(BaseModel):
     expected_hash: str
     table: TableUpdate | None = None
-    fields: list[FieldUpdate]
+    fields: list[FieldUpdate] = Field(max_length=50_000)
+
+
+class TableDeleteTarget(BaseModel):
+    id: str = Field(min_length=1, max_length=100)
+    expected_hash: str = Field(min_length=1, max_length=128)
+
+
+class TableDeletePayload(BaseModel):
+    tables: list[TableDeleteTarget] = Field(min_length=1, max_length=5000)
 
 
 class DdlConfigPayload(BaseModel):
@@ -792,6 +802,16 @@ def updates_refresh() -> dict:
 @app.post("/api/updates/ignore")
 def updates_ignore(payload: IgnoreUpdatePayload) -> dict:
     return update_service.ignore_version(payload.version)
+
+
+@app.post("/api/tables/delete-preview")
+def preview_table_deletion(payload: TableDeletePayload) -> dict:
+    return service.preview_table_deletion([table.model_dump() for table in payload.tables])
+
+
+@app.post("/api/tables/delete")
+def delete_tables(payload: TableDeletePayload) -> dict:
+    return service.delete_tables([table.model_dump() for table in payload.tables])
 
 
 @app.get("/api/tables/{table_id}")

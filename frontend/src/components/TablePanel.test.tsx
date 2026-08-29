@@ -26,12 +26,17 @@ describe("TablePanel", () => {
         total={1}
         datasetRevision={1}
         selectedTableId={null}
+        selectedTableIds={new Set()}
         loading={false}
+        deleting={false}
         mode="table"
         query=""
         allNodes={false}
         onSearch={onSearch}
         onSelect={vi.fn()}
+        onToggleSelection={vi.fn()}
+        onClearSelection={vi.fn()}
+        onDelete={vi.fn()}
         onRequestRange={vi.fn()}
       />,
     );
@@ -53,17 +58,53 @@ describe("TablePanel", () => {
         total={1}
         datasetRevision={1}
         selectedTableId={null}
+        selectedTableIds={new Set()}
         loading={false}
+        deleting={false}
         mode="table"
         query="user"
         allNodes={false}
         onSearch={vi.fn()}
         onSelect={onSelect}
+        onToggleSelection={vi.fn()}
+        onClearSelection={vi.fn()}
+        onDelete={vi.fn()}
         onRequestRange={vi.fn()}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /t_user/ }));
+    await user.click(screen.getByRole("button", { name: /^01.*t_user/ }));
     expect(onSelect).toHaveBeenCalledWith(table);
+  });
+
+  it("selects tables and exposes the batch delete action", async () => {
+    const user = userEvent.setup();
+    const onToggleSelection = vi.fn();
+    const onDelete = vi.fn();
+    const commonProps = {
+      tables: [table],
+      total: 1,
+      datasetRevision: 1,
+      selectedTableId: null,
+      loading: false,
+      deleting: false,
+      mode: "table" as const,
+      query: "",
+      allNodes: false,
+      onSearch: vi.fn(),
+      onSelect: vi.fn(),
+      onToggleSelection,
+      onClearSelection: vi.fn(),
+      onDelete,
+      onRequestRange: vi.fn(),
+    };
+    const view = render(<TablePanel {...commonProps} selectedTableIds={new Set()} />);
+
+    await user.click(screen.getByRole("checkbox", { name: "选择数据表 t_user" }));
+    expect(onToggleSelection).toHaveBeenCalledWith(table, true);
+
+    view.rerender(<TablePanel {...commonProps} selectedTableIds={new Set([table.id])} />);
+    await user.click(screen.getByRole("button", { name: /批量删除/ }));
+    expect(onDelete).toHaveBeenCalledWith([table]);
   });
 });

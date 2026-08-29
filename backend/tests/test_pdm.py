@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from backend.app.pdm import file_sha256, parse_pdm, update_pdm_dictionary, update_pdm_fields
+import pytest
+from lxml import etree
+
+from backend.app.pdm import (
+    delete_pdm_tables,
+    file_sha256,
+    parse_pdm,
+    update_pdm_dictionary,
+    update_pdm_fields,
+)
 
 
 SAMPLE_PDM = """<?xml version="1.0" encoding="UTF-8"?>
@@ -129,3 +138,79 @@ def test_update_table_metadata_preserves_valid_pdm(tmp_path: Path) -> None:
         "t_account_user",
         "保存账户用户及其状态",
     )
+
+
+def test_add_and_delete_unreferenced_field(tmp_path: Path) -> None:
+    source = write_sample(tmp_path / "source.pdm")
+    destination = tmp_path / "updated.pdm"
+
+    update_pdm_dictionary(
+        source,
+        destination,
+        {},
+        {},
+        field_additions_by_table_xml_id={
+            "o10": [
+                {
+                    "name": "电子邮箱",
+                    "code": "email",
+                    "data_type": "VARCHAR2",
+                    "length": "128",
+                    "nullable": True,
+                    "default_value": "",
+                    "comment": "登录邮箱",
+                }
+            ]
+        },
+        field_deletions_by_xml_id={"o12"},
+    )
+
+    fields = parse_pdm(destination).tables[0].fields
+    assert [field.code for field in fields] == ["user_id", "email"]
+    assert fields[1].xml_id.startswith("o")
+    assert fields[1].xml_id[1:].isdigit()
+    assert fields[1].length == "128"
+    assert fields[1].comment == "登录邮箱"
+    tree = etree.parse(str(destination))
+    new_column = next(
+        node for node in tree.getroot().iter("{object}Column") if node.get("Id") == fields[1].xml_id
+    )
+    attributes = {
+        etree.QName(child.tag).localname: child.text or ""
+        for child in new_column
+        if isinstance(child.tag, str) and child.tag.startswith("{attribute}")
+    }
+    assert len(attributes["ObjectID"]) == 36
+    assert attributes["CreationDate"].isdigit()
+    assert attributes["Creator"]
+
+
+def test_delete_referenced_field_is_blocked(tmp_path: Path) -> None:
+    source = write_sample(tmp_path / "source.pdm")
+    with pytest.raises(ValueError, match="引用"):
+        update_pdm_dictionary(
+            source,
+            tmp_path / "updated.pdm",
+            {},
+            {},
+            field_deletions_by_xml_id={"o11"},
+        )
+
+
+def test_delete_table_removes_table_symbol(tmp_path: Path) -> None:
+    source = write_sample(tmp_path / "source.pdm")
+    content = source.read_text(encoding="utf-8").replace(
+        "      </o:Model>",
+        """        <c:Symbols>
+          <o:TableSymbol Id="o30"><c:Object><o:Table Ref="o10" /></c:Object></o:TableSymbol>
+        </c:Symbols>
+      </o:Model>""",
+    )
+    source.write_text(content, encoding="utf-8", newline="\n")
+    destination = tmp_path / "deleted.pdm"
+
+    result = delete_pdm_tables(source, destination, {"o10"})
+
+    assert result == {"table_count": 1, "field_count": 2, "reference_count": 0}
+    assert parse_pdm(destination).tables == ()
+    assert "TableSymbol" not in destination.read_text(encoding="utf-8")

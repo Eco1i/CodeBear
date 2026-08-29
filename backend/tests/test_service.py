@@ -217,6 +217,225 @@ def test_dictionary_save_updates_only_the_changed_table_index(
     assert history_count == 1
 
 
+def test_dictionary_save_adds_and_deletes_fields(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    source = write_sample(tmp_path / "字段增删.pdm")
+    project = service.create_project("字段增删测试")
+    project_id = str(project["id"])
+    result = service.import_staged_files(project_id, "", [(source.name, source)], overwrite=False)
+    assert result["errors"] == []
+    table = service.search_tables(
+        project_id=project_id,
+        scope_type="project",
+        scope_path="",
+        mode="table",
+        query="t_user",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+    )["items"][0]
+    detail = service.table_detail(str(table["id"]))
+    desired_fields = [detail["fields"][0], {
+        "id": "draft-email",
+        "is_new": True,
+        "name": "电子邮箱",
+        "code": "email",
+        "data_type": "VARCHAR2",
+        "length": "128",
+        "nullable": True,
+        "default_value": "",
+        "comment": "登录邮箱",
+    }]
+
+    saved = service.save_table_fields(
+        str(detail["id"]),
+        str(detail["source_hash"]),
+        desired_fields,
+        table={"name": detail["name"], "code": detail["code"], "comment": detail["comment"]},
+    )
+
+    assert [field["code"] for field in saved["fields"]] == ["user_id", "email"]
+    assert saved["fields"][1]["xml_id"].startswith("o")
+    assert service.search_tables(
+        project_id=project_id,
+        scope_type="project",
+        scope_path="",
+        mode="field",
+        query="登录邮箱",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+    )["total"] == 1
+    copied = Path(project["root_path"]) / source.name
+    assert [field.code for field in parse_pdm(copied).tables[0].fields] == ["user_id", "email"]
+
+
+def test_dictionary_save_blocks_primary_key_deletion(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    source = write_sample(tmp_path / "主键保护.pdm")
+    project = service.create_project("主键保护测试")
+    project_id = str(project["id"])
+    service.import_staged_files(project_id, "", [(source.name, source)], overwrite=False)
+    table = service.search_tables(
+        project_id=project_id,
+        scope_type="project",
+        scope_path="",
+        mode="table",
+        query="t_user",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+    )["items"][0]
+    detail = service.table_detail(str(table["id"]))
+
+    with pytest.raises(ServiceError) as exc_info:
+        service.save_table_fields(
+            str(detail["id"]),
+            str(detail["source_hash"]),
+            detail["fields"][1:],
+        )
+
+    assert exc_info.value.code == "field_dependency"
+    assert len(parse_pdm(Path(project["root_path"]) / source.name).tables[0].fields) == 2
+
+
+def test_dictionary_save_rejects_duplicate_field_codes(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    source = write_sample(tmp_path / "字段重名保护.pdm")
+    project = service.create_project("字段重名保护测试")
+    project_id = str(project["id"])
+    service.import_staged_files(project_id, "", [(source.name, source)], overwrite=False)
+    table = service.search_tables(
+        project_id=project_id,
+        scope_type="project",
+        scope_path="",
+        mode="table",
+        query="t_user",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+    )["items"][0]
+    detail = service.table_detail(str(table["id"]))
+    original_hash = file_sha256(Path(project["root_path"]) / source.name)
+    fields = [
+        *detail["fields"],
+        {
+            "id": "draft-duplicate",
+            "is_new": True,
+            "code": "USER_ID",
+            "data_type": "VARCHAR2",
+        },
+    ]
+
+    with pytest.raises(ServiceError) as exc_info:
+        service.save_table_fields(str(detail["id"]), str(detail["source_hash"]), fields)
+
+    assert exc_info.value.code == "duplicate_field_code"
+    assert file_sha256(Path(project["root_path"]) / source.name) == original_hash
+
+
+def test_batch_delete_tables_across_pdms(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    first = write_sample(tmp_path / "删除_A.pdm")
+    second = write_sample(tmp_path / "删除_B.pdm")
+    project = service.create_project("批量删表测试")
+    project_id = str(project["id"])
+    result = service.import_staged_files(
+        project_id,
+        "",
+        [(first.name, first), (second.name, second)],
+        overwrite=False,
+    )
+    assert result["errors"] == []
+    tables = service.search_tables(
+        project_id=project_id,
+        scope_type="project",
+        scope_path="",
+        mode="table",
+        query="",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+    )["items"]
+    targets = [{"id": table["id"], "expected_hash": table["source_hash"]} for table in tables]
+
+    preview = service.preview_table_deletion(targets)
+    assert preview["table_count"] == 2
+    assert preview["field_count"] == 4
+    assert preview["pdm_count"] == 2
+
+    deleted = service.delete_tables(targets)
+
+    assert set(deleted["deleted_ids"]) == {str(table["id"]) for table in tables}
+    remaining = service.search_tables(
+        project_id=project_id,
+        scope_type="project",
+        scope_path="",
+        mode="table",
+        query="",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+    )
+    assert remaining["total"] == 0
+    assert parse_pdm(Path(project["root_path"]) / first.name).tables == ()
+    assert parse_pdm(Path(project["root_path"]) / second.name).tables == ()
+    backup_root = Path(project["root_path"]).parent / ".码熊备份" / "批量删表测试" / "数据表删除"
+    assert len(list(backup_root.rglob("*.pdm"))) == 2
+
+
+def test_batch_delete_restores_all_pdms_when_index_update_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = make_service(tmp_path)
+    first = write_sample(tmp_path / "回滚_A.pdm")
+    second = write_sample(tmp_path / "回滚_B.pdm")
+    project = service.create_project("批量删表回滚测试")
+    project_id = str(project["id"])
+    service.import_staged_files(
+        project_id,
+        "",
+        [(first.name, first), (second.name, second)],
+        overwrite=False,
+    )
+    tables = service.search_tables(
+        project_id=project_id,
+        scope_type="project",
+        scope_path="",
+        mode="table",
+        query="",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+    )["items"]
+    copied_paths = [Path(project["root_path"]) / name for name in (first.name, second.name)]
+    original_hashes = [file_sha256(path) for path in copied_paths]
+
+    def fail_index_update(*_args, **_kwargs):
+        raise RuntimeError("模拟索引写入失败")
+
+    monkeypatch.setattr(service, "_index_parsed", fail_index_update)
+    with pytest.raises(RuntimeError, match="模拟索引写入失败"):
+        service.delete_tables([
+            {"id": table["id"], "expected_hash": table["source_hash"]}
+            for table in tables
+        ])
+
+    assert [file_sha256(path) for path in copied_paths] == original_hashes
+    remaining = service.search_tables(
+        project_id=project_id,
+        scope_type="project",
+        scope_path="",
+        mode="table",
+        query="",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+    )
+    assert remaining["total"] == 2
+
+
 def test_table_search_paginates_without_truncating_scope_totals(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     first_source = write_sample(tmp_path / "用户模型_A.pdm")

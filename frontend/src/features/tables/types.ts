@@ -15,6 +15,7 @@ export interface TableSummary {
 
 export interface FieldDefinition {
   id: string;
+  is_new?: boolean;
   table_id: string;
   xml_id: string;
   ordinal: number;
@@ -49,4 +50,30 @@ export interface TableSearchResult {
   pdm_total: number;
   limit: number;
   offset: number;
+}
+
+export interface TableDeleteTarget {
+  id: string;
+  expected_hash: string;
+}
+
+export interface TableDeletePreview {
+  table_count: number;
+  field_count: number;
+  pdm_count: number;
+  relation_count: number;
+  binding_count: number;
+  tables: Array<{
+    id: string;
+    name: string;
+    code: string;
+    field_count: number;
+    pdm_id: string;
+    relative_path: string;
+    project_name: string;
+  }>;
+}
+
+export interface TableDeleteResult extends TableDeletePreview {
+  deleted_ids: string[];
 }

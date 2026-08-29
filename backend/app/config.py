@@ -16,7 +16,7 @@ from backend.platform_support import default_data_dir
 
 
 APP_NAME = "码熊"
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.5.5"
 INTERNAL_DIR_NAMES = {".码熊回收站", ".码熊备份"}
 AI_PROVIDER = "deepseek"
 AI_MODEL = "deepseek-v4-flash"

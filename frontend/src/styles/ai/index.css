@@ -1,7 +1,9 @@
 /* 0.5.1 · 可命名 AI 助手 */
 .ai-launcher {
+  --launcher-hover-y: 0px;
   position: fixed;
-  z-index: 78;
+  /* Keep the returning launcher above a retiring floating assistant compositor layer. */
+  z-index: 82;
   right: 18px;
   bottom: 18px;
   width: 58px;
@@ -13,16 +15,34 @@
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 10px 26px rgba(30, 51, 80, 0.17), 0 2px 8px rgba(30, 51, 80, 0.08);
-  cursor: pointer;
+  cursor: grab;
   opacity: 1;
-  transform: translateY(0);
-  transition: border-color 160ms ease, box-shadow 160ms ease, opacity 160ms ease, transform 160ms ease;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  transform: translateY(var(--launcher-hover-y));
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 200ms ease-out;
 }
 
 .ai-launcher:hover {
+  --launcher-hover-y: -2px;
   border-color: #b9c9dc;
   box-shadow: 0 13px 30px rgba(30, 51, 80, 0.2), 0 2px 8px rgba(30, 51, 80, 0.08);
-  transform: translateY(-2px);
+}
+
+.ai-launcher.is-dragging,
+.ai-launcher.is-dragging:hover {
+  cursor: grabbing;
+  box-shadow: 0 15px 34px rgba(30, 51, 80, 0.22), 0 3px 9px rgba(30, 51, 80, 0.1);
+  transform: none;
+  transition: none;
+}
+
+.ai-launcher.is-dragging .ai-launcher-hint {
+  opacity: 0;
 }
 
 .ai-launcher-hint {
@@ -66,6 +86,17 @@
   transform: translate(0, -50%);
 }
 
+.ai-launcher.is-hint-right .ai-launcher-hint {
+  right: auto;
+  left: calc(100% + 10px);
+  transform: translate(-6px, -50%);
+}
+
+.ai-launcher.is-hint-right:hover .ai-launcher-hint,
+.ai-launcher.is-hint-right:focus-visible .ai-launcher-hint {
+  transform: translate(0, -50%);
+}
+
 .ai-launcher:focus-visible,
 .ai-assistant button:focus-visible,
 .ai-scope-control:focus-visible {
@@ -75,8 +106,12 @@
 
 .app-root.ai-assistant-open .ai-launcher {
   pointer-events: none;
-  opacity: 0;
-  transform: translateY(8px);
+  visibility: hidden;
+}
+
+.ai-launcher.is-hidden {
+  pointer-events: none;
+  visibility: hidden;
 }
 
 .ai-bear-mark {
