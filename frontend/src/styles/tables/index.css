@@ -53,7 +53,7 @@
 }
 
 .table-search-settings-popover .ant-popover-inner {
-  width: min(304px, calc(100vw - 32px));
+  width: min(270px, calc(100vw - 24px));
   padding: 0;
   overflow: hidden;
   border: 1px solid #d9e5f3;
@@ -62,18 +62,18 @@
 }
 
 .table-search-settings {
-  width: 304px;
-  max-width: calc(100vw - 32px);
+  width: 270px;
+  max-width: calc(100vw - 24px);
   color: #526682;
   font-size: 11px;
 }
 
 .table-search-settings-heading {
-  min-height: 58px;
-  padding: 12px 14px;
+  min-height: 46px;
+  padding: 9px 11px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   background: linear-gradient(135deg, #f5f9ff 0%, #ffffff 78%);
   border-bottom: 1px solid #e7eef7;
 }
@@ -89,8 +89,8 @@
 }
 
 .table-search-settings-icon {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -118,8 +118,8 @@
 }
 
 .table-search-setting-card {
-  margin: 12px 12px 0;
-  padding: 10px 11px;
+  margin: 8px 10px 0;
+  padding: 8px 9px;
   background: #fbfcfe;
   border: 1px solid #e5ebf4;
   border-radius: 8px;
@@ -145,7 +145,7 @@
 }
 
 .table-search-setting-note {
-  margin: 11px 12px 0;
+  margin: 8px 10px 0;
   padding: 0 1px;
   display: flex;
   align-items: center;
@@ -167,8 +167,8 @@
 }
 
 .table-search-clear-row {
-  margin: 12px;
-  padding: 10px 11px;
+  margin: 8px 10px 10px;
+  padding: 8px 9px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -194,8 +194,8 @@
 }
 
 .table-search-clear-confirm {
-  margin: 12px;
-  padding: 11px;
+  margin: 8px 10px 10px;
+  padding: 9px;
   background: #fff9f7;
   border: 1px solid #ffd8d2;
   border-radius: 8px;

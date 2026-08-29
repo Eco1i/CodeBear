@@ -148,7 +148,7 @@ export function TablePanel({
         </span>
         <span>
           <strong>搜索偏好</strong>
-          <small>仅影响本机的搜索结果排序</small>
+          <small>仅影响本机的结果排序</small>
         </span>
       </div>
 
@@ -156,7 +156,7 @@ export function TablePanel({
         <div className="table-search-setting-row">
           <span className="table-search-setting-copy">
             <strong>智能排序</strong>
-            <small>优先显示当前关键词下最近打开的表</small>
+            <small>精确匹配优先；其余结果优先最近打开的表</small>
           </span>
           <Switch
             size="small"

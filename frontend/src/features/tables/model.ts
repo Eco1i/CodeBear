@@ -4,7 +4,7 @@ export const SEARCH_MEMORY_STORAGE_KEY = "codebear.search-memory.v1";
 export const SMART_SEARCH_PREFERENCE_KEY = "codebear.smart-search.enabled.v1";
 
 const MAX_MEMORY_RECORDS = 100;
-const MAX_PREFERRED_TABLES_PER_QUERY = 3;
+const MAX_PREFERRED_TABLES_PER_CONTEXT = 3;
 const MEMORY_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 
 export interface SearchMemoryQuery {
@@ -50,9 +50,20 @@ export function searchMemoryKey(query: SearchMemoryQuery): string {
     scopeType: query.scopeType,
     scopePath: query.scopePath.trim().replaceAll("\\", "/"),
     mode: query.mode,
-    query: normalizeSearchQuery(query.query),
     allNodes: query.allNodes,
   });
+}
+
+function migrateSearchMemoryKey(key: string): string {
+  try {
+    const parsed: unknown = JSON.parse(key);
+    if (!parsed || typeof parsed !== "object" || !("query" in parsed)) return key;
+    const migrated = { ...(parsed as Record<string, unknown>) };
+    delete migrated.query;
+    return JSON.stringify(migrated);
+  } catch {
+    return key;
+  }
 }
 
 function normalizeRecord(value: unknown): SearchMemoryRecord | null {
@@ -70,7 +81,7 @@ function normalizeRecord(value: unknown): SearchMemoryRecord | null {
     return null;
   }
   return {
-    key: candidate.key,
+    key: migrateSearchMemoryKey(candidate.key),
     tableId: candidate.tableId,
     lastSelectedAt: candidate.lastSelectedAt,
     selectionCount: Math.max(1, Math.floor(candidate.selectionCount)),
@@ -83,10 +94,19 @@ export function loadSearchMemory(storage?: Storage, now = Date.now()): SearchMem
   try {
     const parsed: unknown = JSON.parse(target.getItem(SEARCH_MEMORY_STORAGE_KEY) || "[]");
     if (!Array.isArray(parsed)) return [];
-    return parsed
+    const deduplicated = new Map<string, SearchMemoryRecord>();
+    parsed
       .map(normalizeRecord)
       .filter((record): record is SearchMemoryRecord => Boolean(record))
       .filter((record) => now - record.lastSelectedAt <= MEMORY_MAX_AGE_MS)
+      .forEach((record) => {
+        const dedupeKey = `${record.key}\u0000${record.tableId}`;
+        const existing = deduplicated.get(dedupeKey);
+        if (!existing || record.lastSelectedAt >= existing.lastSelectedAt) {
+          deduplicated.set(dedupeKey, record);
+        }
+      });
+    return [...deduplicated.values()]
       .sort((left, right) => right.lastSelectedAt - left.lastSelectedAt)
       .slice(0, MAX_MEMORY_RECORDS);
   } catch {
@@ -123,7 +143,7 @@ export function recordSearchSelection(
   const preferredForKey = next
     .filter((record) => record.key === key)
     .sort((left, right) => right.lastSelectedAt - left.lastSelectedAt)
-    .slice(0, MAX_PREFERRED_TABLES_PER_QUERY);
+    .slice(0, MAX_PREFERRED_TABLES_PER_CONTEXT);
   const preferredIds = new Set(preferredForKey.map((record) => record.tableId));
   const withoutExtraPreferences = next.filter(
     (record) => record.key !== key || preferredIds.has(record.tableId),
@@ -133,6 +153,25 @@ export function recordSearchSelection(
     .slice(0, MAX_MEMORY_RECORDS);
 }
 
+export function preferredTableIdsForSearch(
+  records: SearchMemoryRecord[],
+  key: string,
+): string[] {
+  if (!key) return [];
+  const preferredIds = new Set<string>();
+  return records
+    .filter((record) => record.key === key)
+    .sort((left, right) => right.lastSelectedAt - left.lastSelectedAt)
+    .filter((record) => {
+      if (preferredIds.has(record.tableId) || preferredIds.size >= MAX_PREFERRED_TABLES_PER_CONTEXT) {
+        return false;
+      }
+      preferredIds.add(record.tableId);
+      return true;
+    })
+    .map((record) => record.tableId);
+}
+
 export function prioritizeTables<T extends TableRankingItem>(
   items: T[],
   records: SearchMemoryRecord[],
@@ -140,12 +179,9 @@ export function prioritizeTables<T extends TableRankingItem>(
   options?: { mode?: SearchMode | string; query?: string },
 ): { items: T[]; preferredIds: string[] } {
   if (!key || items.length < 2) return { items, preferredIds: [] };
+  const preferredForSearch = preferredTableIdsForSearch(records, key);
   const itemIds = new Set(items.map((item) => item.id));
-  const preferredIds = records
-    .filter((record) => record.key === key && itemIds.has(record.tableId))
-    .sort((left, right) => right.lastSelectedAt - left.lastSelectedAt)
-    .slice(0, MAX_PREFERRED_TABLES_PER_QUERY)
-    .map((record) => record.tableId);
+  const preferredIds = preferredForSearch.filter((tableId) => itemIds.has(tableId));
   if (!preferredIds.length) return { items, preferredIds: [] };
 
   const preferredOrder = new Map(preferredIds.map((id, index) => [id, index]));
@@ -155,7 +191,7 @@ export function prioritizeTables<T extends TableRankingItem>(
     if (options?.mode !== "table" || !needle) return 0;
     const searchable = [item.code || "", item.name || ""];
     if (searchable.some((value) => normalizeSearchQuery(value) === needle)) return 0;
-    if (searchable.some((value) => normalizeSearchQuery(value).startsWith(needle))) return 1;
+    if (preferredOrder.has(item.id)) return 1;
     return 2;
   };
   return {

@@ -19,6 +19,7 @@ import { TablePanel } from "./components/TablePanel";
 import { TableDeleteConfirmModal } from "./features/tables/components/TableDeleteConfirmModal";
 import {
   loadSearchMemory,
+  preferredTableIdsForSearch,
   prioritizeTables,
   readSmartSearchPreference,
   recordSearchSelection,
@@ -357,17 +358,20 @@ export default function App() {
 
       try {
         const offset = page * TABLE_PAGE_SIZE;
+        const rankingKey = searchMemoryKey(query);
+        const rankingRecords = smartRankingEnabled ? loadSearchMemory() : [];
         const result = await tablesApi.search({
           ...query,
           limit: TABLE_PAGE_SIZE,
           offset,
+          preferredTableIds: preferredTableIdsForSearch(rankingRecords, rankingKey),
           signal: controller.signal,
         });
         if (generation !== tableGenerationRef.current) return;
 
         loadedTablePagesRef.current.add(page);
         const ranking = smartRankingEnabled
-          ? prioritizeTables(result.items, loadSearchMemory(), searchMemoryKey(query), {
+          ? prioritizeTables(result.items, rankingRecords, rankingKey, {
               mode: query.mode,
               query: query.query,
             })

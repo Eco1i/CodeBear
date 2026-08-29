@@ -199,6 +199,24 @@ def test_search_results_prioritize_exact_and_prefix_matches(tmp_path: Path) -> N
         "V_RISK_TPENDSETTLE",
     ]
 
+    personalized = service.search_tables(
+        project_id=project_id,
+        scope_type="project",
+        scope_path="",
+        mode="table",
+        query="tpendsettle",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+        preferred_table_ids=["table-contains-1"],
+    )
+    assert [item["code"] for item in personalized["items"]] == [
+        "TPendSettle",
+        "VOUT_DEPOSITTPENDSETTLE",
+        "TPendSettleTmp",
+        "V_RISK_TPENDSETTLE",
+    ]
+
 
 def test_dictionary_save_updates_only_the_changed_table_index(
     tmp_path: Path,

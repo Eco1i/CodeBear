@@ -614,6 +614,7 @@ def search_tables(
     all_nodes: bool = False,
     limit: int = Query(2000, ge=1, le=5000),
     offset: int = Query(0, ge=0),
+    preferred_ids: str = Query("", max_length=1000),
 ) -> dict:
     return service.search_tables(
         project_id=project_id,
@@ -624,6 +625,7 @@ def search_tables(
         all_nodes=all_nodes,
         limit=limit,
         offset=offset,
+        preferred_table_ids=[value for value in preferred_ids.split(",") if value][:3],
     )
 
 

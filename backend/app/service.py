@@ -1822,7 +1822,9 @@ class WorkspaceService:
         all_nodes: bool,
         limit: int,
         offset: int,
+        preferred_table_ids: list[str] | None = None,
     ) -> dict[str, Any]:
+        preferred_ids = [value for value in (preferred_table_ids or []) if value][:3]
         where: list[str] = []
         params: list[Any] = []
         if not all_nodes:
@@ -1896,42 +1898,79 @@ class WorkspaceService:
             prefix = f"{_like_escape(needle)}%"
             contains = f"%{_like_escape(needle)}%"
             if mode == "field":
-                order_by = """
-                    CASE
-                        WHEN t.id IN (
-                            SELECT mf_order.table_id FROM model_fields mf_order
-                            WHERE mf_order.code = ? COLLATE NOCASE
-                               OR mf_order.name = ? COLLATE NOCASE
-                        ) THEN 0
-                        WHEN t.id IN (
-                            SELECT mf_order.table_id FROM model_fields mf_order
-                            WHERE mf_order.code LIKE ? ESCAPE '\\' COLLATE NOCASE
-                               OR mf_order.name LIKE ? ESCAPE '\\' COLLATE NOCASE
-                        ) THEN 1
-                        WHEN t.id IN (
-                            SELECT mf_order.table_id FROM model_fields mf_order
-                            WHERE mf_order.code LIKE ? ESCAPE '\\' COLLATE NOCASE
-                               OR mf_order.name LIKE ? ESCAPE '\\' COLLATE NOCASE
-                        ) THEN 2
-                        ELSE 3
-                    END,
-                    p.name COLLATE NOCASE, pf.relative_path COLLATE NOCASE, t.ordinal
+                exact_match = """
+                    t.id IN (
+                        SELECT mf_order.table_id FROM model_fields mf_order
+                        WHERE mf_order.code = ? COLLATE NOCASE
+                           OR mf_order.name = ? COLLATE NOCASE
+                    )
                 """
-                order_params = [needle, needle, prefix, prefix, contains, contains]
+                prefix_match = """
+                    t.id IN (
+                        SELECT mf_order.table_id FROM model_fields mf_order
+                        WHERE mf_order.code LIKE ? ESCAPE '\\' COLLATE NOCASE
+                           OR mf_order.name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    )
+                """
+                contains_match = """
+                    t.id IN (
+                        SELECT mf_order.table_id FROM model_fields mf_order
+                        WHERE mf_order.code LIKE ? ESCAPE '\\' COLLATE NOCASE
+                           OR mf_order.name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                           OR mf_order.comment LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    )
+                """
+                match_params = [needle, needle, prefix, prefix, contains, contains, contains]
             else:
-                order_by = """
+                exact_match = "t.code = ? COLLATE NOCASE OR t.name = ? COLLATE NOCASE"
+                prefix_match = """
+                    t.code LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    OR t.name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                """
+                contains_match = """
+                    t.code LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    OR t.name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    OR t.comment LIKE ? ESCAPE '\\' COLLATE NOCASE
+                """
+                match_params = [needle, needle, prefix, prefix, contains, contains, contains]
+            if preferred_ids:
+                placeholders = ", ".join("?" for _ in preferred_ids)
+                order_by = f"""
                     CASE
-                        WHEN t.code = ? COLLATE NOCASE OR t.name = ? COLLATE NOCASE THEN 0
-                        WHEN t.code LIKE ? ESCAPE '\\' COLLATE NOCASE
-                             OR t.name LIKE ? ESCAPE '\\' COLLATE NOCASE THEN 1
-                        WHEN t.code LIKE ? ESCAPE '\\' COLLATE NOCASE
-                             OR t.name LIKE ? ESCAPE '\\' COLLATE NOCASE
-                             OR t.comment LIKE ? ESCAPE '\\' COLLATE NOCASE THEN 2
+                        WHEN {exact_match} THEN 0
+                        WHEN t.id IN ({placeholders}) THEN 1
+                        ELSE 2
+                    END,
+                    CASE
+                        WHEN {prefix_match} THEN 0
+                        WHEN {contains_match} THEN 1
+                        ELSE 2
+                    END,
+                    p.name COLLATE NOCASE, pf.relative_path COLLATE NOCASE, t.ordinal
+                """
+                order_params = [*match_params[:2], *preferred_ids, *match_params[2:]]
+            elif mode == "field":
+                order_by = f"""
+                    CASE
+                        WHEN {exact_match} THEN 0
+                        WHEN {prefix_match} THEN 1
+                        WHEN {contains_match} THEN 2
                         ELSE 3
                     END,
                     p.name COLLATE NOCASE, pf.relative_path COLLATE NOCASE, t.ordinal
                 """
-                order_params = [needle, needle, prefix, prefix, contains, contains, contains]
+                order_params = match_params
+            else:
+                order_by = f"""
+                    CASE
+                        WHEN {exact_match} THEN 0
+                        WHEN {prefix_match} THEN 1
+                        WHEN {contains_match} THEN 2
+                        ELSE 3
+                    END,
+                    p.name COLLATE NOCASE, pf.relative_path COLLATE NOCASE, t.ordinal
+                """
+                order_params = match_params
         else:
             order_by = "p.name COLLATE NOCASE, pf.relative_path COLLATE NOCASE, t.ordinal"
         try:
@@ -1969,6 +2008,7 @@ class WorkspaceService:
                 all_nodes=all_nodes,
                 limit=limit,
                 offset=offset,
+                preferred_table_ids=preferred_ids,
             )
         return {
             "items": [dict(row) for row in rows],
