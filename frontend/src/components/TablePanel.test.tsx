@@ -109,12 +109,12 @@ describe("TablePanel", () => {
 
     expect(screen.getByText("最近打开")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "搜索设置" }));
-    expect(screen.getByText("精确匹配优先；其余结果优先最近打开的表")).toBeInTheDocument();
+    expect(screen.getByText("智能排序")).toBeInTheDocument();
     await user.click(screen.getByRole("switch", { name: "启用智能排序" }));
     expect(onSmartRankingChange).toHaveBeenCalledWith(false, expect.anything());
-    await user.click(screen.getByRole("button", { name: /清除记录/ }));
-    expect(screen.getByRole("alert")).toHaveTextContent("确认清除搜索记忆？");
-    await user.click(screen.getByRole("button", { name: /清除记录/ }));
+    await user.click(screen.getByRole("button", { name: /清除/ }));
+    expect(screen.getByText("确认清除搜索记忆？")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /确\s*认/ }));
     expect(onClearSearchMemory).toHaveBeenCalledTimes(1);
   });
 
