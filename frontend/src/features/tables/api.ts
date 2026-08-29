@@ -18,6 +18,7 @@ export interface TableSearchParams {
   allNodes: boolean;
   limit: number;
   offset: number;
+  preferredTableIds?: string[];
   signal?: AbortSignal;
 }
 
@@ -33,6 +34,9 @@ export const tablesApi = {
       offset: String(params.offset),
     });
     if (params.projectId) query.set("project_id", params.projectId);
+    if (params.preferredTableIds?.length) {
+      query.set("preferred_ids", params.preferredTableIds.slice(0, 3).join(","));
+    }
     return request<TableSearchResult>(`/api/tables?${query}`, { signal: params.signal });
   },
   detail: (tableId: string, signal?: AbortSignal) =>

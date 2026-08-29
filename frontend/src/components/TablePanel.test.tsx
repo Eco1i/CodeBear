@@ -77,6 +77,49 @@ describe("TablePanel", () => {
     expect(onSelect).toHaveBeenCalledWith(table);
   });
 
+  it("exposes search memory settings and marks promoted tables", async () => {
+    const user = userEvent.setup();
+    const onSmartRankingChange = vi.fn();
+    const onClearSearchMemory = vi.fn();
+    render(
+      <TablePanel
+        tables={[table]}
+        total={1}
+        datasetRevision={1}
+        selectedTableId={null}
+        selectedTableIds={new Set()}
+        loading={false}
+        deleting={false}
+        mode="table"
+        query="user"
+        allNodes={false}
+        onSearch={vi.fn()}
+        onSelect={vi.fn()}
+        onToggleSelection={vi.fn()}
+        onClearSelection={vi.fn()}
+        onDelete={vi.fn()}
+        onRequestRange={vi.fn()}
+        smartRankingEnabled
+        hasSearchMemory
+        preferredTableIds={new Set([table.id])}
+        onSmartRankingChange={onSmartRankingChange}
+        onClearSearchMemory={onClearSearchMemory}
+      />,
+    );
+
+    expect(screen.getByText("最近打开")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "搜索设置" }));
+    expect(screen.getByText("搜索偏好")).toBeInTheDocument();
+    expect(screen.getByText("智能排序")).toBeInTheDocument();
+    expect(screen.getByText("精确匹配优先，最近打开优先")).toBeInTheDocument();
+    await user.click(screen.getByRole("switch", { name: "启用智能排序" }));
+    expect(onSmartRankingChange).toHaveBeenCalledWith(false, expect.anything());
+    await user.click(screen.getByRole("button", { name: /清除/ }));
+    expect(screen.getByText("确认清除搜索记忆？")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /确\s*认/ }));
+    expect(onClearSearchMemory).toHaveBeenCalledTimes(1);
+  });
+
   it("selects tables and exposes the batch delete action", async () => {
     const user = userEvent.setup();
     const onToggleSelection = vi.fn();

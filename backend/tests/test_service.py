@@ -148,6 +148,76 @@ def test_workspace_import_search_edit_move_and_restore(tmp_path: Path) -> None:
     )["total"] == 1
 
 
+def test_search_results_prioritize_exact_and_prefix_matches(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    project = service.create_project("搜索排序测试")
+    project_id = str(project["id"])
+    now = "2026-08-29T00:00:00+00:00"
+    with service.database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO pdm_files(
+                id, project_id, relative_path, file_name, source_hash, parsed_at,
+                table_count, field_count
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("pdm-search", project_id, "search.pdm", "search.pdm", "hash", now, 4, 0),
+        )
+        tables = [
+            ("table-contains-1", "VOUT_DEPOSITTPENDSETTLE", 1),
+            ("table-contains-2", "V_RISK_TPENDSETTLE", 2),
+            ("table-prefix", "TPendSettleTmp", 3),
+            ("table-exact", "TPendSettle", 4),
+        ]
+        connection.executemany(
+            """
+            INSERT INTO model_tables(
+                id, pdm_id, xml_id, ordinal, name, code, comment, field_count
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (table_id, "pdm-search", table_id, ordinal, code, code, "", 0)
+                for table_id, code, ordinal in tables
+            ],
+        )
+
+    result = service.search_tables(
+        project_id=project_id,
+        scope_type="project",
+        scope_path="",
+        mode="table",
+        query="tpendsettle",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+    )
+
+    assert [item["code"] for item in result["items"]] == [
+        "TPendSettle",
+        "TPendSettleTmp",
+        "VOUT_DEPOSITTPENDSETTLE",
+        "V_RISK_TPENDSETTLE",
+    ]
+
+    personalized = service.search_tables(
+        project_id=project_id,
+        scope_type="project",
+        scope_path="",
+        mode="table",
+        query="tpendsettle",
+        all_nodes=False,
+        limit=100,
+        offset=0,
+        preferred_table_ids=["table-contains-1"],
+    )
+    assert [item["code"] for item in personalized["items"]] == [
+        "TPendSettle",
+        "VOUT_DEPOSITTPENDSETTLE",
+        "TPendSettleTmp",
+        "V_RISK_TPENDSETTLE",
+    ]
+
+
 def test_dictionary_save_updates_only_the_changed_table_index(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
