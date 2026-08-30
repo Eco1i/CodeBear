@@ -1,101 +1,125 @@
-# 码熊 CodeBear
+# CodeBear — PowerDesigner PDM Tool
 
-![码熊图标](frontend/public/codebear-icon-v3.png)
+[中文说明](README.zh-CN.md) · **English**
 
-码熊是一款本地运行的 PowerDesigner PDM 数据字典工具。它可以集中管理 PDM，查看和搜索表字段，维护数据字典与表关系，也可以直接生成建表脚本。
+![CodeBear icon](frontend/public/codebear-icon-v3.png)
 
-> 当前稳定版本：`v1.5.16` · 支持 Windows 10/11 x64 与 macOS 13+ Apple Silicon
+> Open your PowerDesigner PDM files, find the table or field you need, keep data dictionaries and table relationships up to date, and export DDL—all in one local desktop app.
 
-## 功能
+[![Latest Release](https://img.shields.io/github/v/release/Eco1i/CodeBear?display_name=tag&sort=semver)](https://github.com/Eco1i/CodeBear/releases)
+[![License](https://img.shields.io/github/license/Eco1i/CodeBear)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/Eco1i/CodeBear)](https://github.com/Eco1i/CodeBear/stargazers)
 
-- 按项目和目录管理 `.pdm` 文件，浏览表、字段、主键、类型和备注。
-- 按表名、描述、注释或字段快速搜索，并记住最近打开的数据表以优化后续排序。
-- 表详情支持多标签浏览，可同时查看多张表并保留各表的编辑草稿。
-- 可在搜索偏好中关闭或清除搜索记忆。
-- 在“编辑字典”中新增、修改或删除字段，并可维护表名称、代码和描述。
-- 数据表支持单独删除和批量删除；结构变更前自动备份 PDM。
-- 支持回收站和备份迁移。
-- 从 Excel 导入业务字典，将字典绑定到字段后随时查询。
-- 查看 PDM 外键关系，也可以手工补充和维护表关系。
-- 生成 MySQL、Oracle、达梦、TDSQL MySQL 版和 Apache Ignite 建表脚本。
-- 可选接入 DeepSeek AI 助手，通过自然语言查询数据字典；悬浮入口可自由拖动并记忆位置。
-- 自动检查新版本，并根据当前系统提供对应的安装包。
+If you work with PowerDesigner, CodeBear gives you a faster way to look through PDM files and keep their documentation in order. Search tables and fields, maintain business dictionaries and relationships, and export database scripts without leaving your local workspace.
 
-## 界面预览
+- **Latest stable version:** `v1.5.16`
+- **Supported systems:** Windows 10/11 x64 and macOS 13+ Apple Silicon
+- **Privacy:** CodeBear runs locally. The optional AI assistant sends your question, recent conversation, and the retrieved project/PDM paths plus table/field metadata to DeepSeek; complete PDM files stay local.
 
-### 浏览 PDM 数据字典
+## 10-second overview
 
-按项目目录集中管理 PDM，在同一工作区查看数据表及其字段明细。
+![CodeBear 10-second demo: browse PDM, search fields, manage dictionaries, view relationships, and export DDL](docs/images/codebear-demo.en.gif)
 
-![码熊工作区：浏览 PDM 数据字典](docs/images/workspace-overview.png)
+## Features
 
-### 搜索表与字段
+- Manage `.pdm` files by project and directory.
+- Browse tables, fields, primary keys, data types, comments, and descriptions.
+- Open multiple table details in tabs while keeping each table's editing draft.
+- Search tables and fields by name, description, comment, or column content.
+- Edit table names, codes, descriptions, and field definitions.
+- Automatically back up PDM files before structural changes.
+- Use the recycle bin and migrate backups between installations.
+- Import business dictionaries from Excel and bind dictionary entries to fields.
+- Parse PDM foreign-key relationships and maintain additional manual relationships.
+- Explore table relationships in both list and graph views.
+- Generate DDL for MySQL, Oracle, Dameng, TDSQL MySQL, and Apache Ignite.
+- Optionally ask questions about your local data dictionary with the DeepSeek AI assistant.
 
-按表名、描述、注释或字段快速检索，并在结果中高亮匹配内容。
+## Screenshots
 
-![码熊工作区：搜索表与字段](docs/images/data-search.png)
+### Browse a PDM data dictionary
 
-### AI 助手
+Organize PDM projects and inspect tables and field details in one workspace.
 
-使用自然语言查询本地数据字典。AI 功能完全可选，需要配置用户自己的 DeepSeek API Key。
+![CodeBear workspace](docs/images/workspace-overview.png)
 
-![码熊小码 AI 助手](docs/images/ai-assistant.png)
+### Search tables and fields
 
-### 字典中心
+Find matching tables, columns, descriptions, and comments with highlighted results.
 
-统一维护业务字典：手工编辑、Excel 批量导入（字典值列可多选组合唯一值）以及字段绑定查询。
+![CodeBear data search](docs/images/data-search.png)
 
-![码熊字典中心](docs/images/dictionary-center.png)
+### Data dictionary center
 
-### 表关系
+Maintain business dictionaries manually or import values from Excel, then bind them to fields.
 
-自动解析 PDM 外键，也可以手工维护表关系，并通过列表或关系图查看。
+![CodeBear dictionary center](docs/images/dictionary-center.png)
 
-![码熊：表关系浏览](docs/images/table-relations.png)
+### Table relationships
 
-### 导出建表脚本
+Review relationships parsed from PDM foreign keys or maintained manually.
 
-选择 PDM 或数据表，配置目标数据库参数，预览并下载生成的 DDL。
+![CodeBear table relationships](docs/images/table-relations.png)
 
-![码熊：导出数据库建表脚本](docs/images/ddl-export.png)
+### DDL export
 
-## 下载
+Select a PDM or table, configure the target database, preview the script, and download it.
 
-- Windows 10/11 x64：`CodeBear-v1.5.16-win-x64.zip`
-- macOS 13 及以上 Apple Silicon：`CodeBear-v1.5.16-mac-arm64.dmg`
+![CodeBear DDL export](docs/images/ddl-export.png)
 
-请前往 [GitHub Releases](https://github.com/Eco1i/CodeBear/releases/tag/v1.5.16) 下载。Windows 和 macOS 是两个独立安装包，请按自己的系统选择。
+### Optional AI assistant
 
-当前 Mac 版只支持 M 系列芯片，暂不支持 Intel Mac。
+Ask natural-language questions about the tables and fields in your local data dictionary.
 
-## 安装与升级
+![CodeBear AI assistant](docs/images/ai-assistant.png)
+
+## Download
+
+Download the latest release packages from [GitHub Releases](https://github.com/Eco1i/CodeBear/releases).
+
+| Platform | Package |
+| --- | --- |
+| Windows 10/11 x64 | `CodeBear-v1.5.16-win-x64.zip` |
+| macOS 13+ Apple Silicon | `CodeBear-v1.5.16-mac-arm64.dmg` |
+
+The Windows and macOS packages are independent. The macOS build currently supports Apple Silicon only and does not support Intel Macs.
+
+## Quick start
 
 ### Windows
 
-完整解压 ZIP 后，双击 `CodeBear.exe` 即可使用。程序启动后会自动打开浏览器。
+1. Download and extract the ZIP package.
+2. Double-click `CodeBear.exe`.
+3. The application opens in your browser.
 
-升级时建议把新版本解压到新目录，再通过码熊的“备份迁移”导入旧版数据。Windows 数据保存在程序同级的 `data` 目录。
+Windows data is stored in the `data` directory beside the application. For an upgrade, extract the new version into a new directory and use **备份迁移（Backup Migration）** to import existing data.
 
 ### macOS
 
-打开 DMG，把 `CodeBear.app` 拖入“应用程序”即可。码熊启动后会显示在菜单栏。
+1. Open the DMG image.
+2. Drag `CodeBear.app` to **Applications**.
+3. Launch CodeBear from Finder.
 
-当前版本未经过 Apple 公证。首次启动时，请在 Finder 中右键 `CodeBear.app`，选择“打开”；如果系统仍然拦截，请前往“系统设置 > 隐私与安全性”选择仍要打开。
+The current macOS build is not notarized. On first launch, right-click `CodeBear.app` in Finder and choose **Open**. If macOS still blocks it, use **System Settings > Privacy & Security > Open Anyway**.
 
-升级时先退出旧版，再把新版拖入“应用程序”并选择替换。数据保存在 `~/Library/Application Support/CodeBear`，替换应用不会删除原有数据。
+macOS data is stored in `~/Library/Application Support/CodeBear`. Replacing the application does not remove existing data.
 
-## 数据与隐私
+## Privacy and AI
 
-- 码熊只操作导入到工作区的 PDM 副本，不会修改原始 PDM。
-- Windows 的数据保存在程序同级 `data`；macOS 的数据保存在 `~/Library/Application Support/CodeBear`。
-- AI 助手需要你自己的 DeepSeek API Key。密钥由当前系统账户加密保存，在 Mac 上使用登录钥匙串。
-- 使用 AI 提问时，相关问题和表字段信息会发送给 DeepSeek，但不会上传完整 PDM 文件。
-- 码熊仅在本机运行，不会向局域网或公网开放服务。
+- CodeBear runs locally and does not expose a service to your LAN or the public internet.
+- CodeBear works on a copy of imported PDM files and does not modify the original PDM.
+- The optional AI assistant requires your own DeepSeek API key.
+- When you ask the AI assistant a question, your question, recent conversation, and the retrieved project/PDM paths plus table/field metadata are sent to DeepSeek; the complete PDM file is not uploaded.
+- An API key saved through the app settings is encrypted for the current system account; macOS uses the login Keychain. You can also provide `DEEPSEEK_API_KEY` as an environment variable.
 
-## 更新记录
+## Development
 
-版本发布说明见 [CHANGELOG.md](CHANGELOG.md)，各平台发行包见 [GitHub Releases](https://github.com/Eco1i/CodeBear/releases)。
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, testing, cross-platform requirements, and contribution guidelines.
 
-## 许可证
+## Release notes
 
-码熊使用 [MIT License](LICENSE)。
+See [CHANGELOG.md](CHANGELOG.md) and the [release notes](docs/releases) for changes in each version.
+
+## License
+
+CodeBear is released under the [MIT License](LICENSE).
