@@ -42,6 +42,7 @@
   font-size: 12px;
   font-weight: 800;
   color: #536581;
+  white-space: nowrap;
 }
 
 .navigator-title i {
@@ -124,22 +125,32 @@
   transform: rotate(-90deg);
 }
 
-.navigator-tree .ant-tree-treenode:not(.navigator-tree-node-selected):hover > .ant-tree-switcher,
-.navigator-tree .ant-tree-treenode:not(.navigator-tree-node-selected):hover > .ant-tree-node-content-wrapper {
+.navigator-tree
+  .ant-tree-treenode:not(.navigator-tree-node-selected):hover
+  > .ant-tree-switcher,
+.navigator-tree
+  .ant-tree-treenode:not(.navigator-tree-node-selected):hover
+  > .ant-tree-node-content-wrapper {
   background: #f6f9fd;
 }
 
-.navigator-tree .ant-tree-treenode:not(.navigator-tree-node-selected):hover > .ant-tree-switcher {
+.navigator-tree
+  .ant-tree-treenode:not(.navigator-tree-node-selected):hover
+  > .ant-tree-switcher {
   border-radius: 5px 0 0 5px;
 }
 
-.navigator-tree .ant-tree-treenode:not(.navigator-tree-node-selected):hover > .ant-tree-node-content-wrapper {
+.navigator-tree
+  .ant-tree-treenode:not(.navigator-tree-node-selected):hover
+  > .ant-tree-node-content-wrapper {
   border-radius: 0 5px 5px 0;
 }
 
 .navigator-tree .navigator-tree-node-selected > .ant-tree-switcher,
 .navigator-tree .navigator-tree-node-selected > .ant-tree-node-content-wrapper,
-.navigator-tree .navigator-tree-node-selected > .ant-tree-node-content-wrapper:hover {
+.navigator-tree
+  .navigator-tree-node-selected
+  > .ant-tree-node-content-wrapper:hover {
   border-color: #c8ddf9;
   background: var(--blue-soft) !important;
   color: #315d99 !important;
@@ -155,7 +166,9 @@
   background: var(--blue-soft) !important;
 }
 
-.navigator-tree .ant-tree-treenode:not(.navigator-tree-node-selected):hover > .ant-tree-switcher:hover {
+.navigator-tree
+  .ant-tree-treenode:not(.navigator-tree-node-selected):hover
+  > .ant-tree-switcher:hover {
   background: #f6f9fd !important;
 }
 
@@ -167,7 +180,9 @@
   box-shadow: none;
 }
 
-.navigator-tree .navigator-tree-node-selected > .ant-tree-node-content-wrapper::after {
+.navigator-tree
+  .navigator-tree-node-selected
+  > .ant-tree-node-content-wrapper::after {
   position: absolute;
   top: 5px;
   bottom: 5px;
@@ -396,6 +411,7 @@
 }
 
 .workspace-stack {
+  min-width: 0;
   min-height: 0;
   padding: 10px;
   display: grid;

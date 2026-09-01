@@ -19,7 +19,6 @@ import {
   Checkbox,
   Input,
   InputNumber,
-  Modal,
   Select,
   Spin,
   Tag,
@@ -27,6 +26,8 @@ import {
 } from "antd";
 
 import { ddlApi } from "../features/ddl/api";
+import { useI18n } from "../features/preferences/PreferencesProvider";
+import { DraggableModal } from "./DraggableModal";
 import {
   cacheCatalogTables,
   cleanFileName,
@@ -53,11 +54,11 @@ import type {
 } from "../types";
 import { DdlTableTree } from "./DdlTableTree";
 
-
 const DdlScriptEditor = lazy(() =>
-  import("./DdlScriptEditor").then((module) => ({ default: module.DdlScriptEditor })),
+  import("./DdlScriptEditor").then((module) => ({
+    default: module.DdlScriptEditor,
+  })),
 );
-
 
 interface DdlExportModalProps {
   open: boolean;
@@ -70,6 +71,24 @@ interface DdlExportModalProps {
 type PreviewTab = "script" | "problems";
 type DdlGenerateMeta = Omit<DdlGenerateResult, "script">;
 
+const ENGLISH_DATABASE_LABELS: Record<DdlDatabase, string> = {
+  mysql: "MySQL",
+  oracle: "Oracle",
+  dameng: "Dameng",
+  tdsql: "TDSQL for MySQL",
+  ignite: "Apache Ignite",
+};
+
+function databaseLabel(
+  database: DdlDatabase,
+  label: string | undefined,
+  language: string,
+): string {
+  return language === "en-US"
+    ? ENGLISH_DATABASE_LABELS[database]
+    : label || database;
+}
+
 function DatabaseLogo({ database }: { database: DdlDatabase }) {
   if (database === "mysql") {
     return (
@@ -77,7 +96,9 @@ function DatabaseLogo({ database }: { database: DdlDatabase }) {
         <svg viewBox="0 0 42 30">
           <path d="M6 20c5-9 12-13 23-12-3 2-5 5-5 8 4-1 8 0 11 3-4-1-8 0-11 2-5 3-11 3-18-1Z" />
           <path d="M28 8c4 1 7 3 9 6-3-1-6-1-9 0" />
-          <text x="7" y="26">MySQL</text>
+          <text x="7" y="26">
+            MySQL
+          </text>
         </svg>
       </span>
     );
@@ -87,7 +108,9 @@ function DatabaseLogo({ database }: { database: DdlDatabase }) {
       <span className="ddl-database-logo is-oracle" aria-hidden="true">
         <svg viewBox="0 0 42 30">
           <path d="M12 7h18a8 8 0 0 1 0 16H12A8 8 0 0 1 12 7Zm1 5a3 3 0 0 0 0 6h16a3 3 0 0 0 0-6Z" />
-          <text x="9" y="28">ORACLE</text>
+          <text x="9" y="28">
+            ORACLE
+          </text>
         </svg>
       </span>
     );
@@ -98,7 +121,9 @@ function DatabaseLogo({ database }: { database: DdlDatabase }) {
         <svg viewBox="0 0 42 30">
           <ellipse cx="16" cy="8" rx="10" ry="4" />
           <path d="M6 8v12c0 2 4 4 10 4s10-2 10-4V8M6 14c0 2 4 4 10 4s10-2 10-4" />
-          <text x="27" y="19">DM</text>
+          <text x="27" y="19">
+            DM
+          </text>
         </svg>
       </span>
     );
@@ -111,7 +136,9 @@ function DatabaseLogo({ database }: { database: DdlDatabase }) {
           <circle cx="9" cy="22" r="4" />
           <circle cx="31" cy="15" r="5" />
           <path d="m13 9 13 4M13 21l13-4" />
-          <text x="15" y="28">TDSQL</text>
+          <text x="15" y="28">
+            TDSQL
+          </text>
         </svg>
       </span>
     );
@@ -119,14 +146,21 @@ function DatabaseLogo({ database }: { database: DdlDatabase }) {
   return (
     <span className="ddl-database-logo is-ignite" aria-hidden="true">
       <svg viewBox="0 0 42 30">
-        <path className="ignite-flame-a" d="M18 3c2 6-5 7-3 14 1 4 5 7 9 6 5-2 6-8 2-12-1 4-4 4-4 0 0-3-1-6-4-8Z" />
-        <path className="ignite-flame-b" d="M14 8c-5 5-4 12 1 16-7-2-9-9-5-14 1-1 2-2 4-2Z" />
-        <text x="27" y="19">IG</text>
+        <path
+          className="ignite-flame-a"
+          d="M18 3c2 6-5 7-3 14 1 4 5 7 9 6 5-2 6-8 2-12-1 4-4 4-4 0 0-3-1-6-4-8Z"
+        />
+        <path
+          className="ignite-flame-b"
+          d="M14 8c-5 5-4 12 1 16-7-2-9-9-5-14 1-1 2-2 4-2Z"
+        />
+        <text x="27" y="19">
+          IG
+        </text>
       </svg>
     </span>
   );
 }
-
 
 function ValueSelect({
   value,
@@ -141,6 +175,7 @@ function ValueSelect({
   searchable?: boolean;
   ariaLabel: string;
 }) {
+  const { t } = useI18n();
   return (
     <Select
       aria-label={ariaLabel}
@@ -150,7 +185,9 @@ function ValueSelect({
       showSearch={searchable}
       optionFilterProp="searchText"
       filterOption={(input, option) =>
-        String(option?.searchText || "").toLocaleLowerCase().includes(input.toLocaleLowerCase())
+        String(option?.searchText || "")
+          .toLocaleLowerCase()
+          .includes(input.toLocaleLowerCase())
       }
       options={options.map((option) => ({
         value: option.value,
@@ -164,15 +201,23 @@ function ValueSelect({
           <div className="ddl-select-option">
             <span>
               <b>{option.label || option.value}</b>
-              {option.recommended ? <em>推荐</em> : null}
-              {option.default_for_charset && !option.recommended ? <em>默认</em> : null}
-              {option.deprecated ? <em className="is-muted">已弃用</em> : null}
-              {option.optional ? <em className="is-muted">可选组件</em> : null}
+              {option.recommended ? <em>{t("ddl.recommended")}</em> : null}
+              {option.default_for_charset && !option.recommended ? (
+                <em>{t("ddl.default")}</em>
+              ) : null}
+              {option.deprecated ? (
+                <em className="is-muted">{t("ddl.deprecated")}</em>
+              ) : null}
+              {option.optional ? (
+                <em className="is-muted">{t("ddl.optionalComponent")}</em>
+              ) : null}
             </span>
             {option.description || option.default_collation ? (
               <small>
                 {option.description}
-                {option.default_collation ? ` · 默认排序规则 ${option.default_collation}` : ""}
+                {option.default_collation
+                  ? ` · ${t("ddl.defaultCollation", { value: option.default_collation })}`
+                  : ""}
               </small>
             ) : null}
           </div>
@@ -183,7 +228,6 @@ function ValueSelect({
   );
 }
 
-
 function DatabaseSelect({
   value,
   options,
@@ -193,19 +237,26 @@ function DatabaseSelect({
   options: DdlDatabaseOption[];
   onChange: (value: DdlDatabase) => void;
 }) {
+  const { t, language } = useI18n();
   const selected = options.find((option) => option.value === value);
   return (
     <Select
-      aria-label="目标数据库"
+      aria-label={t("ddl.targetDatabase")}
       className="ddl-system-select ddl-database-select"
-      classNames={{ popup: { root: "ddl-system-select-popup ddl-database-select-popup" } }}
+      classNames={{
+        popup: { root: "ddl-system-select-popup ddl-database-select-popup" },
+      }}
       value={value}
-      options={options.map((option) => ({ value: option.value, label: option.label, source: option }))}
+      options={options.map((option) => ({
+        value: option.value,
+        label: databaseLabel(option.value, option.label, language),
+        source: option,
+      }))}
       labelRender={() => (
         <span className="ddl-database-selection">
           <DatabaseLogo database={value} />
           <span>
-            <b>{selected?.label || value}</b>
+            <b>{databaseLabel(value, selected?.label, language)}</b>
             <small>{selected?.description || ""}</small>
           </span>
         </span>
@@ -216,8 +267,10 @@ function DatabaseSelect({
           <div className="ddl-database-option">
             <DatabaseLogo database={option.value} />
             <span>
-              <b>{option.label}</b>
-              <small>{option.description} · {option.versions.join(" / ")}</small>
+              <b>{databaseLabel(option.value, option.label, language)}</b>
+              <small>
+                {option.description} · {option.versions.join(" / ")}
+              </small>
             </span>
           </div>
         );
@@ -227,13 +280,11 @@ function DatabaseSelect({
   );
 }
 
-
 function warningIcon(warning: DdlWarning) {
   if (warning.severity === "error") return <ExclamationCircleOutlined />;
   if (warning.severity === "info") return <InfoCircleOutlined />;
   return <WarningOutlined />;
 }
-
 
 export function DdlExportModal({
   open,
@@ -243,6 +294,7 @@ export function DdlExportModal({
   onClose,
 }: DdlExportModalProps) {
   const { message } = AntApp.useApp();
+  const { t, language, errorText } = useI18n();
   const [options, setOptions] = useState<DdlOptions | null>(null);
   const [catalog, setCatalog] = useState<DdlCatalog | null>(null);
   const [loading, setLoading] = useState(false);
@@ -250,25 +302,38 @@ export function DdlExportModal({
   const [reloadRevision, setReloadRevision] = useState(0);
   const [draftQuery, setDraftQuery] = useState("");
   const [query, setQuery] = useState("");
-  const [searchGroups, setSearchGroups] = useState<DdlCatalogGroup[] | null>(null);
+  const [searchGroups, setSearchGroups] = useState<DdlCatalogGroup[] | null>(
+    null,
+  );
   const [searching, setSearching] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [loadingGroupIds, setLoadingGroupIds] = useState<Set<string>>(new Set());
-  const [groupErrors, setGroupErrors] = useState<Map<string, string>>(new Map());
+  const [loadingGroupIds, setLoadingGroupIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [groupErrors, setGroupErrors] = useState<Map<string, string>>(
+    new Map(),
+  );
   const [allSelecting, setAllSelecting] = useState(false);
   const [config, setConfig] = useState<DdlConfig>(DEFAULT_CONFIG);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<DdlGenerateMeta | null>(null);
   const [scriptDirty, setScriptDirty] = useState(false);
   const [editorRevision, setEditorRevision] = useState(0);
-  const [editorStats, setEditorStats] = useState({ lineCount: 0, charCount: 0 });
+  const [editorStats, setEditorStats] = useState({
+    lineCount: 0,
+    charCount: 0,
+  });
   const [generatedSignature, setGeneratedSignature] = useState("");
   const [activeTab, setActiveTab] = useState<PreviewTab>("script");
   const generateAbortRef = useRef<AbortController | null>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
-  const groupLoadControllersRef = useRef<Map<string, AbortController>>(new Map());
-  const groupLoadPromisesRef = useRef<Map<string, Promise<DdlCatalogGroup | null>>>(new Map());
+  const groupLoadControllersRef = useRef<Map<string, AbortController>>(
+    new Map(),
+  );
+  const groupLoadPromisesRef = useRef<
+    Map<string, Promise<DdlCatalogGroup | null>>
+  >(new Map());
   const tableByIdRef = useRef<Map<string, DdlCatalogTable>>(new Map());
   const preSearchExpandedRef = useRef<Set<string> | null>(null);
   const scriptEditorViewRef = useRef<EditorView | null>(null);
@@ -302,17 +367,26 @@ export function DdlExportModal({
       try {
         const [nextOptions, summaryCatalog] = await Promise.all([
           ddlApi.options(),
-          ddlApi.catalog(project.id, { includeTables: false }, controller.signal),
+          ddlApi.catalog(
+            project.id,
+            { includeTables: false },
+            controller.signal,
+          ),
         ]);
         if (controller.signal.aborted) return;
         const projectScope = !selectedNode || selectedNode.type === "project";
         const scopedGroups = projectScope
           ? summaryCatalog.groups
-          : summaryCatalog.groups.filter((group) => scopeIncludesGroup(selectedNode, group));
-        const expansionSource = scopedGroups.length ? scopedGroups : summaryCatalog.groups;
-        const initialExpandedGroups = expansionSource.length > 8
-          ? expansionSource.slice(0, 2)
-          : expansionSource;
+          : summaryCatalog.groups.filter((group) =>
+              scopeIncludesGroup(selectedNode, group),
+            );
+        const expansionSource = scopedGroups.length
+          ? scopedGroups
+          : summaryCatalog.groups;
+        const initialExpandedGroups =
+          expansionSource.length > 8
+            ? expansionSource.slice(0, 2)
+            : expansionSource;
         const hydrateIds = projectScope
           ? initialExpandedGroups.map((group) => group.id)
           : scopedGroups.map((group) => group.id);
@@ -329,7 +403,9 @@ export function DdlExportModal({
         }
         setOptions(nextOptions);
         setCatalog(nextCatalog);
-        const database = nextOptions.databases.find((item) => item.value === "mysql") || nextOptions.databases[0];
+        const database =
+          nextOptions.databases.find((item) => item.value === "mysql") ||
+          nextOptions.databases[0];
         setConfig({
           ...DEFAULT_CONFIG,
           database: database.value,
@@ -337,16 +413,20 @@ export function DdlExportModal({
         });
         const hydratedScopeGroups = projectScope
           ? []
-          : nextCatalog.groups.filter((group) => scopeIncludesGroup(selectedNode, group));
-        const scopedTableIds = hydratedScopeGroups.flatMap((group) => group.tables.map((table) => table.id));
+          : nextCatalog.groups.filter((group) =>
+              scopeIncludesGroup(selectedNode, group),
+            );
+        const scopedTableIds = hydratedScopeGroups.flatMap((group) =>
+          group.tables.map((table) => table.id),
+        );
         setSelectedIds(new Set(scopedTableIds));
         if (!projectScope && !scopedGroups.length) {
-          message.warning("当前节点下没有可导出的数据表");
+          message.warning(t("ddl.noExportTables"));
         }
         setExpandedIds(new Set(initialExpandedGroups.map((group) => group.id)));
       } catch (error) {
         if (!controller.signal.aborted) {
-          setLoadError(error instanceof Error ? error.message : "无法读取导出数据");
+          setLoadError(errorText(error, "ddl.loadFailed"));
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -356,7 +436,9 @@ export function DdlExportModal({
     return () => {
       controller.abort();
       searchAbortRef.current?.abort();
-      groupLoadControllersRef.current.forEach((pendingController) => pendingController.abort());
+      groupLoadControllersRef.current.forEach((pendingController) =>
+        pendingController.abort(),
+      );
       groupLoadControllersRef.current.clear();
       groupLoadPromisesRef.current.clear();
     };
@@ -366,19 +448,22 @@ export function DdlExportModal({
     () => () => {
       generateAbortRef.current?.abort();
       searchAbortRef.current?.abort();
-      groupLoadControllersRef.current.forEach((controller) => controller.abort());
+      groupLoadControllersRef.current.forEach((controller) =>
+        controller.abort(),
+      );
     },
     [],
   );
 
-  const currentDatabase = options?.databases.find((item) => item.value === config.database) || null;
+  const currentDatabase =
+    options?.databases.find((item) => item.value === config.database) || null;
   const currentSignature = useMemo(
     () => JSON.stringify({ tableIds: [...selectedIds].sort(), config }),
     [config, selectedIds],
   );
   const stale = Boolean(result && generatedSignature !== currentSignature);
   const edited = Boolean(result && scriptDirty);
-  const visibleGroups = query ? (searchGroups || []) : (catalog?.groups || []);
+  const visibleGroups = query ? searchGroups || [] : catalog?.groups || [];
 
   const selectionMetrics = useMemo(() => {
     let fieldCount = 0;
@@ -394,7 +479,10 @@ export function DdlExportModal({
   const selectedFieldCount = selectionMetrics.fieldCount;
   const selectedPdmCount = selectionMetrics.pdmCount;
 
-  const updateConfig = <K extends keyof DdlConfig>(key: K, value: DdlConfig[K]) => {
+  const updateConfig = <K extends keyof DdlConfig>(
+    key: K,
+    value: DdlConfig[K],
+  ) => {
     setConfig((current) => ({ ...current, [key]: value }));
   };
 
@@ -438,7 +526,7 @@ export function DdlExportModal({
     } catch (error) {
       if (!controller.signal.aborted) {
         setSearchGroups([]);
-        message.error(error instanceof Error ? error.message : "搜索数据表失败");
+        message.error(errorText(error, "ddl.readTablesFailed"));
       }
     } finally {
       if (searchAbortRef.current === controller) {
@@ -449,28 +537,44 @@ export function DdlExportModal({
   };
 
   const changeCharset = (charset: string) => {
-    const charsetOption = options?.mysql_character_sets.find((item) => item.value === charset);
-    const defaultCollation = charsetOption?.default_collation
-      || options?.mysql_collations.find((item) => item.charset === charset && item.default_for_charset)?.value
-      || "";
-    setConfig((current) => ({ ...current, charset, collation: defaultCollation }));
+    const charsetOption = options?.mysql_character_sets.find(
+      (item) => item.value === charset,
+    );
+    const defaultCollation =
+      charsetOption?.default_collation ||
+      options?.mysql_collations.find(
+        (item) => item.charset === charset && item.default_for_charset,
+      )?.value ||
+      "";
+    setConfig((current) => ({
+      ...current,
+      charset,
+      collation: defaultCollation,
+    }));
   };
 
   const changeDatabase = (database: DdlDatabase) => {
-    const databaseOption = options?.databases.find((item) => item.value === database);
+    const databaseOption = options?.databases.find(
+      (item) => item.value === database,
+    );
     if (!databaseOption) return;
     setConfig((current) => ({
       ...current,
       database,
       version: databaseOption.default_version,
-      schema: database === "ignite" && !current.schema ? "PUBLIC" : current.schema,
+      schema:
+        database === "ignite" && !current.schema ? "PUBLIC" : current.schema,
     }));
   };
 
-  const ensureGroupTables = (groupId: string, force = false): Promise<DdlCatalogGroup | null> => {
+  const ensureGroupTables = (
+    groupId: string,
+    force = false,
+  ): Promise<DdlCatalogGroup | null> => {
     if (!project) return Promise.resolve(null);
     const cachedGroup = catalog?.groups.find((group) => group.id === groupId);
-    if (!force && cachedGroup?.tables_loaded) return Promise.resolve(cachedGroup);
+    if (!force && cachedGroup?.tables_loaded)
+      return Promise.resolve(cachedGroup);
     const pending = groupLoadPromisesRef.current.get(groupId);
     if (pending) return pending;
     const controller = new AbortController();
@@ -481,23 +585,28 @@ export function DdlExportModal({
       next.delete(groupId);
       return next;
     });
-    const promise = ddlApi.catalog(
-      project.id,
-      { includeTables: true, pdmIds: [groupId] },
-      controller.signal,
-    )
+    const promise = ddlApi
+      .catalog(
+        project.id,
+        { includeTables: true, pdmIds: [groupId] },
+        controller.signal,
+      )
       .then((nextCatalog) => {
         if (controller.signal.aborted) return null;
         const hydratedGroup = nextCatalog.groups[0] || null;
-        if (!hydratedGroup) throw new Error("该 PDM 已不存在，请重新打开导出窗口");
+        if (!hydratedGroup) throw new Error(t("ddl.pdmMissing"));
         cacheCatalogTables(tableByIdRef.current, [hydratedGroup]);
-        setCatalog((current) => current ? mergeCatalogGroups(current, nextCatalog) : current);
+        setCatalog((current) =>
+          current ? mergeCatalogGroups(current, nextCatalog) : current,
+        );
         return hydratedGroup;
       })
       .catch((error) => {
         if (controller.signal.aborted) return null;
-        const errorMessage = error instanceof Error ? error.message : "读取数据表失败";
-        setGroupErrors((current) => new Map(current).set(groupId, errorMessage));
+        const errorMessage = errorText(error, "ddl.readTablesFailed");
+        setGroupErrors((current) =>
+          new Map(current).set(groupId, errorMessage),
+        );
         return null;
       })
       .finally(() => {
@@ -519,7 +628,9 @@ export function DdlExportModal({
         setSelectedIds(new Set());
         return;
       }
-      const visibleTableIds = visibleGroups.flatMap((group) => group.tables.map((table) => table.id));
+      const visibleTableIds = visibleGroups.flatMap((group) =>
+        group.tables.map((table) => table.id),
+      );
       setSelectedIds((current) => {
         const next = new Set(current);
         visibleTableIds.forEach((tableId) => next.delete(tableId));
@@ -529,31 +640,46 @@ export function DdlExportModal({
     }
     if (query) {
       cacheCatalogTables(tableByIdRef.current, visibleGroups);
-      const visibleTableIds = visibleGroups.flatMap((group) => group.tables.map((table) => table.id));
+      const visibleTableIds = visibleGroups.flatMap((group) =>
+        group.tables.map((table) => table.id),
+      );
       setSelectedIds((current) => new Set([...current, ...visibleTableIds]));
       return;
     }
     if (!project) return;
     setAllSelecting(true);
     try {
-      const fullCatalog = await ddlApi.catalog(project.id, { includeTables: true });
+      const fullCatalog = await ddlApi.catalog(project.id, {
+        includeTables: true,
+      });
       cacheCatalogTables(tableByIdRef.current, fullCatalog.groups);
-      setCatalog((current) => current ? mergeCatalogGroups(current, fullCatalog) : fullCatalog);
-      setSelectedIds(new Set(fullCatalog.groups.flatMap((group) => group.tables.map((table) => table.id))));
+      setCatalog((current) =>
+        current ? mergeCatalogGroups(current, fullCatalog) : fullCatalog,
+      );
+      setSelectedIds(
+        new Set(
+          fullCatalog.groups.flatMap((group) =>
+            group.tables.map((table) => table.id),
+          ),
+        ),
+      );
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "全选数据表失败");
+      message.error(errorText(error, "ddl.selectAllFailed"));
     } finally {
       setAllSelecting(false);
     }
   };
 
   const toggleGroup = async (group: DdlCatalogGroup, checked: boolean) => {
-    const targetGroup = query || group.tables_loaded ? group : await ensureGroupTables(group.id);
+    const targetGroup =
+      query || group.tables_loaded ? group : await ensureGroupTables(group.id);
     if (!targetGroup) return;
     cacheCatalogTables(tableByIdRef.current, [targetGroup]);
     setSelectedIds((current) => {
       const next = new Set(current);
-      targetGroup.tables.forEach((table) => (checked ? next.add(table.id) : next.delete(table.id)));
+      targetGroup.tables.forEach((table) =>
+        checked ? next.add(table.id) : next.delete(table.id),
+      );
       return next;
     });
   };
@@ -576,7 +702,8 @@ export function DdlExportModal({
       else next.delete(group.id);
       return next;
     });
-    if (expanding && !query && !group.tables_loaded) void ensureGroupTables(group.id);
+    if (expanding && !query && !group.tables_loaded)
+      void ensureGroupTables(group.id);
   };
 
   const markScriptDirty = () => {
@@ -585,7 +712,8 @@ export function DdlExportModal({
     setScriptDirty(true);
   };
 
-  const getCurrentScript = () => scriptEditorViewRef.current?.state.doc.toString() ?? scriptValueRef.current;
+  const getCurrentScript = () =>
+    scriptEditorViewRef.current?.state.doc.toString() ?? scriptValueRef.current;
 
   const activatePreviewTab = (tab: PreviewTab) => {
     if (tab !== "script" && scriptEditorViewRef.current) {
@@ -598,7 +726,7 @@ export function DdlExportModal({
 
   const generateScript = async () => {
     if (!selectedIds.size) {
-      message.warning("请至少选择一张数据表");
+      message.warning(t("ddl.selectOneRequired"));
       return;
     }
     generateAbortRef.current?.abort();
@@ -607,21 +735,37 @@ export function DdlExportModal({
     const signature = currentSignature;
     setGenerating(true);
     try {
-      const nextResult = await ddlApi.generate([...selectedIds], config, controller.signal);
+      const nextResult = await ddlApi.generate(
+        [...selectedIds],
+        config,
+        controller.signal,
+      );
       if (controller.signal.aborted) return;
       const { script: nextScript, ...nextMeta } = nextResult;
       scriptValueRef.current = nextScript;
       scriptDirtyRef.current = false;
       setResult(nextMeta);
       setScriptDirty(false);
-      setEditorStats({ lineCount: nextResult.line_count, charCount: nextResult.char_count });
+      setEditorStats({
+        lineCount: nextResult.line_count,
+        charCount: nextResult.char_count,
+      });
       setEditorRevision((value) => value + 1);
       setGeneratedSignature(signature);
       setActiveTab("script");
-      message.success(`已生成 ${nextResult.table_count} 张表的 ${nextResult.database_label} 脚本`);
+      message.success(
+        t("ddl.generated", {
+          count: nextResult.table_count,
+          database: databaseLabel(
+            config.database,
+            nextResult.database_label,
+            language,
+          ),
+        }),
+      );
     } catch (error) {
       if (!controller.signal.aborted) {
-        message.error(error instanceof Error ? error.message : "生成脚本失败");
+        message.error(errorText(error, "ddl.generateFailed"));
       }
     } finally {
       if (generateAbortRef.current === controller) {
@@ -636,7 +780,7 @@ export function DdlExportModal({
     if (!script) return;
     try {
       await navigator.clipboard.writeText(script);
-      message.success("SQL 已复制到剪贴板");
+      message.success(t("ddl.sqlCopied"));
     } catch {
       const textArea = document.createElement("textarea");
       textArea.value = script;
@@ -646,18 +790,22 @@ export function DdlExportModal({
       textArea.select();
       const copied = document.execCommand("copy");
       textArea.remove();
-      if (copied) message.success("SQL 已复制到剪贴板");
-      else message.error("复制失败，请在编辑区手动复制");
+      if (copied) message.success(t("ddl.sqlCopied"));
+      else message.error(t("ddl.copyFailed"));
     }
   };
 
   const downloadScript = () => {
     const script = getCurrentScript();
     if (!script || !project) return;
-    const fileName = cleanFileName(
-      `${project.name}_${result?.database_label || currentDatabase?.label || config.database}_${result?.version || config.version}`,
-    ) + (result?.extension || ".sql");
-    const url = URL.createObjectURL(new Blob([script], { type: "text/sql;charset=utf-8" }));
+    const fileName =
+      cleanFileName(
+        `${project.name}_${databaseLabel(config.database, result?.database_label || currentDatabase?.label, language)}_${result?.version || config.version}`,
+        language,
+      ) + (result?.extension || ".sql");
+    const url = URL.createObjectURL(
+      new Blob([script], { type: "text/sql;charset=utf-8" }),
+    );
     const link = document.createElement("a");
     link.href = url;
     link.download = fileName;
@@ -665,7 +813,7 @@ export function DdlExportModal({
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    message.success(`已下载 ${fileName}`);
+    message.success(t("ddl.downloaded", { file: fileName }));
   };
 
   const closeModal = () => {
@@ -683,13 +831,15 @@ export function DdlExportModal({
   const renderDynamicConfig = () => {
     if (!options) return null;
     if (config.database === "mysql") {
-      const collations = options.mysql_collations.filter((item) => item.charset === config.charset);
+      const collations = options.mysql_collations.filter(
+        (item) => item.charset === config.charset,
+      );
       return (
         <>
           <label className="ddl-config-field">
-            <span>存储引擎</span>
+            <span>{t("ddl.storageEngine")}</span>
             <ValueSelect
-              ariaLabel="存储引擎"
+              ariaLabel={t("ddl.storageEngine")}
               value={config.engine}
               options={options.mysql_storage_engines}
               searchable
@@ -698,13 +848,17 @@ export function DdlExportModal({
           </label>
           <label className="ddl-config-field">
             <span>
-              字符集（{options.mysql_character_sets.length}）
-              <Tooltip title="MySQL 8.x 完整字符集清单；utf8mb4 为推荐默认值">
+              {t("ddl.charsets", {
+                count: options.mysql_character_sets.length,
+              })}
+              <Tooltip title={t("ddl.mysqlCharsetHint")}>
                 <InfoCircleOutlined />
               </Tooltip>
             </span>
             <ValueSelect
-              ariaLabel="字符集"
+              ariaLabel={t("ddl.charsets", {
+                count: options.mysql_character_sets.length,
+              })}
               value={config.charset}
               options={options.mysql_character_sets}
               searchable
@@ -713,13 +867,13 @@ export function DdlExportModal({
           </label>
           <label className="ddl-config-field">
             <span>
-              排序规则（{collations.length}）
-              <Tooltip title="排序规则随字符集联动；utf8mb4 包含 utf8mb4_0900_bin 等 89 项规则">
+              {t("ddl.collations", { count: collations.length })}
+              <Tooltip title={t("ddl.collationHint")}>
                 <InfoCircleOutlined />
               </Tooltip>
             </span>
             <ValueSelect
-              ariaLabel="排序规则"
+              ariaLabel={t("ddl.collations", { count: collations.length })}
               value={config.collation}
               options={collations}
               searchable
@@ -733,18 +887,26 @@ export function DdlExportModal({
       return (
         <>
           <label className="ddl-config-field">
-            <span>表类型</span>
+            <span>{t("ddl.tableType")}</span>
             <ValueSelect
-              ariaLabel="TDSQL 表类型"
+              ariaLabel={t("ddl.tableType")}
               value={config.tdsql_mode}
               options={options.tdsql_table_modes}
-              onChange={(value) => updateConfig("tdsql_mode", value as DdlConfig["tdsql_mode"])}
+              onChange={(value) =>
+                updateConfig("tdsql_mode", value as DdlConfig["tdsql_mode"])
+              }
             />
           </label>
           <label className="ddl-config-field">
-            <span>字符集（{options.mysql_character_sets.length}）</span>
+            <span>
+              {t("ddl.charsets", {
+                count: options.mysql_character_sets.length,
+              })}
+            </span>
             <ValueSelect
-              ariaLabel="TDSQL 字符集"
+              ariaLabel={t("ddl.charsets", {
+                count: options.mysql_character_sets.length,
+              })}
               value={config.charset}
               options={options.mysql_character_sets}
               searchable
@@ -757,11 +919,11 @@ export function DdlExportModal({
     if (config.database === "oracle" || config.database === "dameng") {
       return (
         <label className="ddl-config-field">
-          <span>表空间（可选）</span>
+          <span>{t("ddl.tablespace")}</span>
           <Input
-            aria-label="表空间"
+            aria-label={t("ddl.tablespace")}
             value={config.tablespace}
-            placeholder="留空则使用数据库默认表空间"
+            placeholder={t("ddl.tablespacePlaceholder")}
             onChange={(event) => updateConfig("tablespace", event.target.value)}
           />
         </label>
@@ -770,18 +932,23 @@ export function DdlExportModal({
     return (
       <>
         <label className="ddl-config-field">
-          <span>缓存模板</span>
+          <span>{t("ddl.cacheTemplate")}</span>
           <ValueSelect
-            ariaLabel="Ignite 缓存模板"
+            ariaLabel={t("ddl.cacheTemplate")}
             value={config.ignite_template}
             options={options.ignite_templates}
-            onChange={(value) => updateConfig("ignite_template", value as DdlConfig["ignite_template"])}
+            onChange={(value) =>
+              updateConfig(
+                "ignite_template",
+                value as DdlConfig["ignite_template"],
+              )
+            }
           />
         </label>
         <label className="ddl-config-field is-number">
-          <span>备份副本</span>
+          <span>{t("ddl.backupReplicas")}</span>
           <InputNumber
-            aria-label="Ignite 备份副本"
+            aria-label={t("ddl.backupReplicas")}
             min={0}
             max={10}
             precision={0}
@@ -790,70 +957,92 @@ export function DdlExportModal({
           />
         </label>
         <label className="ddl-config-field">
-          <span>原子性模式</span>
+          <span>{t("ddl.atomicityMode")}</span>
           <ValueSelect
-            ariaLabel="Ignite 原子性模式"
+            ariaLabel={t("ddl.atomicityMode")}
             value={config.ignite_atomicity}
             options={options.ignite_atomicity_modes}
-            onChange={(value) => updateConfig("ignite_atomicity", value as DdlConfig["ignite_atomicity"])}
+            onChange={(value) =>
+              updateConfig(
+                "ignite_atomicity",
+                value as DdlConfig["ignite_atomicity"],
+              )
+            }
           />
         </label>
         <label className="ddl-config-field">
-          <span>写同步模式</span>
+          <span>{t("ddl.writeSyncMode")}</span>
           <ValueSelect
-            ariaLabel="Ignite 写同步模式"
+            ariaLabel={t("ddl.writeSyncMode")}
             value={config.ignite_write_sync}
             options={options.ignite_write_sync_modes}
-            onChange={(value) => updateConfig("ignite_write_sync", value as DdlConfig["ignite_write_sync"])}
+            onChange={(value) =>
+              updateConfig(
+                "ignite_write_sync",
+                value as DdlConfig["ignite_write_sync"],
+              )
+            }
           />
         </label>
         <label className="ddl-config-field">
-          <span>缓存组（可选）</span>
+          <span>{t("ddl.cacheGroup")}</span>
           <Input
-            aria-label="Ignite 缓存组"
+            aria-label={t("ddl.cacheGroup")}
             value={config.ignite_cache_group}
-            placeholder="例如 INVESTMENT"
-            onChange={(event) => updateConfig("ignite_cache_group", event.target.value)}
+            placeholder={t("ddl.cacheGroupPlaceholder")}
+            onChange={(event) =>
+              updateConfig("ignite_cache_group", event.target.value)
+            }
           />
         </label>
       </>
     );
   };
 
-  const footerStatus = generating
-    ? "正在生成脚本…"
-    : result
-      ? stale
-        ? "配置或选表已变化，请重新生成"
-        : edited
-          ? "脚本已生成并经过手动编辑"
-          : `生成完成 · ${result.table_count} 张表，${result.warning_count} 项提醒`
-      : selectedIds.size
-        ? `等待生成 · 已选 ${selectedIds.size} 张表`
-        : "请选择要导出的数据表";
+  let footerStatus: string;
+  if (generating) footerStatus = t("ddl.generating");
+  else if (!result)
+    footerStatus = selectedIds.size
+      ? t("ddl.waiting", { count: selectedIds.size })
+      : t("ddl.selectTables");
+  else if (stale) footerStatus = t("ddl.stale");
+  else if (edited) footerStatus = t("ddl.edited");
+  else
+    footerStatus = t("ddl.completed", {
+      tables: result.table_count,
+      warnings: result.warning_count,
+    });
 
   return (
-    <Modal
+    <DraggableModal
       open={open}
       title={
         <div className="ddl-modal-title">
-          <span className="ddl-title-icon"><CodeOutlined /></span>
+          <span className="ddl-title-icon">
+            <CodeOutlined />
+          </span>
           <span className="ddl-title-copy">
-            <span><b>导出建表脚本</b><Tag color="blue">V1 · 基础可用</Tag></span>
-            <small>把 PDM 中的表结构转换为目标数据库可执行的 DDL</small>
+            <span>
+              <b>{t("ddl.exportTitle")}</b>
+            </span>
+            <small>{t("ddl.exportSubtitle")}</small>
           </span>
           <span className="ddl-title-flow">
-            <span><FileTextOutlined /> PDM · {selectedIds.size} 张表</span>
+            <span>
+              <FileTextOutlined />{" "}
+              {t("ddl.pdmTables", { count: selectedIds.size })}
+            </span>
             <i>→</i>
             <span className="is-target">
               <DatabaseLogo database={config.database} />
-              {currentDatabase?.label || "目标数据库"} {config.version} · .sql
+              {databaseLabel(config.database, currentDatabase?.label, language)}{" "}
+              {config.version} · .sql
             </span>
           </span>
         </div>
       }
       className="ddl-export-modal"
-      width="min(1680px, calc(100vw - 40px))"
+      width="min(1360px, calc(100vw - 40px))"
       centered
       destroyOnHidden
       mask={{ closable: false }}
@@ -861,17 +1050,29 @@ export function DdlExportModal({
       onCancel={closeModal}
       footer={
         <div className="ddl-modal-footer">
-          <span className={`ddl-footer-status${result && !stale ? " is-ready" : ""}${stale ? " is-stale" : ""}`}>
+          <span
+            className={`ddl-footer-status${result && !stale ? " is-ready" : ""}${stale ? " is-stale" : ""}`}
+          >
             <i />
             <b>{footerStatus}</b>
-            {hasUnsavedChanges ? <small>当前字段页有未保存修改，本次生成使用已保存内容</small> : null}
+            {hasUnsavedChanges ? (
+              <small>{t("ddl.unsavedWarning")}</small>
+            ) : null}
           </span>
           <span className="ddl-footer-actions">
-            <Button icon={<CopyOutlined />} disabled={!result || generating} onClick={() => void copyScript()}>
-              复制 SQL
+            <Button
+              icon={<CopyOutlined />}
+              disabled={!result || generating}
+              onClick={() => void copyScript()}
+            >
+              {t("ddl.copySql")}
             </Button>
-            <Button icon={<DownloadOutlined />} disabled={!result || generating} onClick={downloadScript}>
-              下载 .sql
+            <Button
+              icon={<DownloadOutlined />}
+              disabled={!result || generating}
+              onClick={downloadScript}
+            >
+              {t("ddl.downloadSql")}
             </Button>
             <Button
               type="primary"
@@ -880,29 +1081,42 @@ export function DdlExportModal({
               disabled={!selectedIds.size || loading || Boolean(loadError)}
               onClick={() => void generateScript()}
             >
-              {result ? "重新生成" : "生成脚本"}
+              {result ? t("ddl.regenerate") : t("ddl.generateScript")}
             </Button>
           </span>
         </div>
       }
     >
       {loading ? (
-        <div className="ddl-modal-loading"><Spin size="large" /><span>正在读取项目中的 PDM 和数据表…</span></div>
+        <div className="ddl-modal-loading">
+          <Spin size="large" />
+          <span>{t("ddl.readingCatalog")}</span>
+        </div>
       ) : loadError ? (
         <div className="ddl-modal-error">
-          <Alert type="error" showIcon message="无法打开导出功能" description={loadError} />
-          <Button icon={<ReloadOutlined />} onClick={() => setReloadRevision((value) => value + 1)}>重新加载</Button>
+          <Alert
+            type="error"
+            showIcon
+            message={t("ddl.openFailed")}
+            description={loadError}
+          />
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => setReloadRevision((value) => value + 1)}
+          >
+            {t("ddl.reload")}
+          </Button>
         </div>
       ) : options && catalog ? (
         <div className="ddl-modal-body">
           <aside className="ddl-table-picker">
             <div className="ddl-section-heading">
               <span>
-                <b>选择数据表</b>
+                <b>{t("ddl.tableSelection")}</b>
                 <small>
                   {!selectedNode || selectedNode.type === "project"
-                    ? "项目入口默认不选表，请按 PDM 勾选；展开时按需加载"
-                    : "已按当前节点预选，可继续按 PDM 展开、收起或调整"}
+                    ? t("ddl.projectSelectionHint")
+                    : t("ddl.nodeSelectionHint")}
                 </small>
               </span>
               <span className="ddl-picker-actions">
@@ -913,7 +1127,7 @@ export function DdlExportModal({
                   disabled={searching}
                   onClick={() => void setAllVisible(true)}
                 >
-                  全选
+                  {t("backup.selectAll")}
                 </Button>
                 <i />
                 <Button
@@ -922,28 +1136,28 @@ export function DdlExportModal({
                   disabled={allSelecting || searching}
                   onClick={() => void setAllVisible(false)}
                 >
-                  清空
+                  {t("backup.clear")}
                 </Button>
               </span>
             </div>
             <Input
               className="ddl-table-search"
-              aria-label="搜索 PDM 或数据表"
-              prefix={(
+              aria-label={t("ddl.tableSelection")}
+              prefix={
                 <button
                   type="button"
                   className="input-search-trigger"
-                  aria-label="搜索 PDM 或数据表"
-                  title="搜索"
+                  aria-label={t("common.search")}
+                  title={t("common.search")}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={submitTableSearch}
                 >
                   <SearchOutlined />
                 </button>
-              )}
+              }
               allowClear
               value={draftQuery}
-              placeholder="搜索 PDM、表名、表英文名或描述"
+              placeholder={t("ddl.searchPlaceholder")}
               onChange={(event) => setDraftQuery(event.target.value)}
               onPressEnter={() => void submitTableSearch()}
               onClear={clearTableSearch}
@@ -959,17 +1173,32 @@ export function DdlExportModal({
               queryActive={Boolean(query)}
               viewRevision={query}
               onToggleExpanded={toggleExpanded}
-              onToggleGroup={(group, checked) => void toggleGroup(group, checked)}
+              onToggleGroup={(group, checked) =>
+                void toggleGroup(group, checked)
+              }
               onToggleTable={toggleTable}
               onRetryGroup={(group) => void ensureGroupTables(group.id, true)}
             />
             <div className="ddl-selection-summary">
-              <span className="ddl-summary-check"><CheckCircleOutlined /></span>
-              <span>
-                <b>已选择 {compactNumber(selectedIds.size)} 张表</b>
-                <small>来自 {selectedPdmCount} 个 PDM，共 {compactNumber(selectedFieldCount)} 个字段</small>
+              <span className="ddl-summary-check">
+                <CheckCircleOutlined />
               </span>
-              <strong>≈ {Math.max(1, Math.ceil(selectedFieldCount * 0.18))} KB</strong>
+              <span>
+                <b>
+                  {t("ddl.selectedTables", {
+                    count: compactNumber(selectedIds.size, language),
+                  })}
+                </b>
+                <small>
+                  {t("ddl.fromPdms", {
+                    count: selectedPdmCount,
+                    fields: compactNumber(selectedFieldCount, language),
+                  })}
+                </small>
+              </span>
+              <strong>
+                ≈ {Math.max(1, Math.ceil(selectedFieldCount * 0.18))} KB
+              </strong>
             </div>
           </aside>
 
@@ -977,53 +1206,96 @@ export function DdlExportModal({
             <div className="ddl-config-panel">
               <div className="ddl-section-heading">
                 <span>
-                  <b>生成配置</b>
-                  <small>选择目标数据库并设置基础参数；变更配置不会自动覆盖已编辑脚本</small>
+                  <b>{t("ddl.configuration")}</b>
+                  <small>{t("ddl.configurationHint")}</small>
                 </span>
-                <strong>已支持 {options.databases.length} 种数据库</strong>
+                <strong>
+                  {t("ddl.supportedDatabases", {
+                    count: options.databases.length,
+                  })}
+                </strong>
               </div>
               <div className="ddl-config-primary">
                 <label className="ddl-config-field is-database">
-                  <span>目标数据库</span>
-                  <DatabaseSelect value={config.database} options={options.databases} onChange={changeDatabase} />
+                  <span>{t("ddl.targetDatabase")}</span>
+                  <DatabaseSelect
+                    value={config.database}
+                    options={options.databases}
+                    onChange={changeDatabase}
+                  />
                 </label>
                 <label className="ddl-config-field">
-                  <span>目标版本</span>
+                  <span>{t("ddl.targetVersion")}</span>
                   <ValueSelect
-                    ariaLabel="目标版本"
+                    ariaLabel={t("ddl.targetVersion")}
                     value={config.version}
-                    options={(currentDatabase?.versions || []).map((version) => ({ value: version }))}
+                    options={(currentDatabase?.versions || []).map(
+                      (version) => ({ value: version }),
+                    )}
                     onChange={(value) => updateConfig("version", value)}
                   />
                 </label>
                 <label className="ddl-config-field">
-                  <span>{config.database === "mysql" || config.database === "tdsql" ? "数据库" : "Schema / 模式"}</span>
+                  <span>
+                    {config.database === "mysql" || config.database === "tdsql"
+                      ? t("ddl.database")
+                      : t("ddl.schemaMode")}
+                  </span>
                   <Input
-                    aria-label="数据库或 Schema"
+                    aria-label={t("ddl.schemaMode")}
                     value={config.schema}
-                    placeholder={config.database === "ignite" ? "PUBLIC" : "留空则不限定"}
-                    onChange={(event) => updateConfig("schema", event.target.value)}
+                    placeholder={
+                      config.database === "ignite"
+                        ? "PUBLIC"
+                        : t("ddl.schemaPlaceholder")
+                    }
+                    onChange={(event) =>
+                      updateConfig("schema", event.target.value)
+                    }
                   />
                 </label>
               </div>
               <div className={`ddl-config-secondary is-${config.database}`}>
                 <div className="ddl-generation-options">
-                  <span>生成内容</span>
+                  <span>{t("ddl.generatedContent")}</span>
                   <div>
-                    <Checkbox checked={config.include_comments} onChange={(event) => updateConfig("include_comments", event.target.checked)}>
-                      表与字段注释
+                    <Checkbox
+                      checked={config.include_comments}
+                      onChange={(event) =>
+                        updateConfig("include_comments", event.target.checked)
+                      }
+                    >
+                      {t("ddl.tableAndFieldComments")}
                     </Checkbox>
-                    <Checkbox checked={config.drop_table} onChange={(event) => updateConfig("drop_table", event.target.checked)}>
+                    <Checkbox
+                      checked={config.drop_table}
+                      onChange={(event) =>
+                        updateConfig("drop_table", event.target.checked)
+                      }
+                    >
                       DROP TABLE
                     </Checkbox>
                     {["mysql", "tdsql", "ignite"].includes(config.database) ? (
-                      <Checkbox checked={config.if_not_exists} onChange={(event) => updateConfig("if_not_exists", event.target.checked)}>
+                      <Checkbox
+                        checked={config.if_not_exists}
+                        onChange={(event) =>
+                          updateConfig("if_not_exists", event.target.checked)
+                        }
+                      >
                         IF NOT EXISTS
                       </Checkbox>
                     ) : null}
                     {config.database === "ignite" ? (
-                      <Checkbox checked={config.ignite_affinity_key} onChange={(event) => updateConfig("ignite_affinity_key", event.target.checked)}>
-                        首主键作亲和键
+                      <Checkbox
+                        checked={config.ignite_affinity_key}
+                        onChange={(event) =>
+                          updateConfig(
+                            "ignite_affinity_key",
+                            event.target.checked,
+                          )
+                        }
+                      >
+                        {t("ddl.firstPrimaryKey")}
                       </Checkbox>
                     ) : null}
                   </div>
@@ -1035,70 +1307,147 @@ export function DdlExportModal({
             <div className="ddl-preview-panel">
               <div className="ddl-preview-tabs">
                 <span>
-                  <button type="button" className={activeTab === "script" ? "is-active" : ""} onClick={() => activatePreviewTab("script")}>脚本预览</button>
-                  <button type="button" className={activeTab === "problems" ? "is-active" : ""} onClick={() => activatePreviewTab("problems")}>问题检查 {result ? result.warning_count : "—"}</button>
+                  <button
+                    type="button"
+                    className={activeTab === "script" ? "is-active" : ""}
+                    onClick={() => activatePreviewTab("script")}
+                  >
+                    {t("ddl.scriptPreview")}
+                  </button>
+                  <button
+                    type="button"
+                    className={activeTab === "problems" ? "is-active" : ""}
+                    onClick={() => activatePreviewTab("problems")}
+                  >
+                    {t("ddl.problemCheck", {
+                      count: result ? result.warning_count : "—",
+                    })}
+                  </button>
                 </span>
                 <small>
-                  {result ? `${result.table_count} TABLES · ${result.column_count} COLUMNS · UTF-8` : "尚未生成"}
+                  {result
+                    ? `${result.table_count} TABLES · ${result.column_count} COLUMNS · UTF-8`
+                    : t("ddl.notGenerated")}
                 </small>
               </div>
               {activeTab === "script" ? (
                 <div className="ddl-script-view">
                   {result?.warning_count ? (
-                    <button type="button" className="ddl-warning-banner" onClick={() => activatePreviewTab("problems")}>
+                    <button
+                      type="button"
+                      className="ddl-warning-banner"
+                      onClick={() => activatePreviewTab("problems")}
+                    >
                       <WarningOutlined />
-                      <b>{result.warning_count} 项转换提醒</b>
+                      <b>
+                        {t("ddl.conversionWarnings", {
+                          count: result.warning_count,
+                        })}
+                      </b>
                       <span>{result.warnings[0]?.message}</span>
-                      <em>查看详情</em>
+                      <em>{t("ddl.viewDetails")}</em>
                     </button>
                   ) : result ? (
-                    <div className="ddl-success-banner"><CheckCircleOutlined /> 未发现需要人工确认的转换问题</div>
+                    <div className="ddl-success-banner">
+                      <CheckCircleOutlined /> {t("ddl.noConversionIssues")}
+                    </div>
                   ) : null}
                   <div className="ddl-editor-toolbar">
-                    <span>SQL 脚本</span>
-                    {result ? <Tag color="green" icon={<EditOutlined />}>可直接编辑</Tag> : null}
-                    {edited ? <Tag color="blue">已修改</Tag> : null}
-                    {stale ? <Tag color="orange">配置已变化</Tag> : null}
-                    <small>{result ? `${editorStats.lineCount} 行 · ${editorStats.charCount} 字符` : "0 行 · 0 字符"}</small>
+                    <span>{t("ddl.sqlScript")}</span>
+                    {result ? (
+                      <Tag color="green" icon={<EditOutlined />}>
+                        {t("ddl.editable")}
+                      </Tag>
+                    ) : null}
+                    {edited ? <Tag color="blue">{t("ddl.changed")}</Tag> : null}
+                    {stale ? (
+                      <Tag color="orange">{t("ddl.configurationChanged")}</Tag>
+                    ) : null}
+                    <small>
+                      {result
+                        ? t("ddl.editorStats", {
+                            lines: editorStats.lineCount,
+                            chars: editorStats.charCount,
+                          })
+                        : t("ddl.editorStats", { lines: 0, chars: 0 })}
+                    </small>
                   </div>
                   {result ? (
-                    <Suspense fallback={<div className="ddl-editor-loading"><Spin size="small" /> 正在打开大文档编辑器…</div>}>
+                    <Suspense
+                      fallback={
+                        <div className="ddl-editor-loading">
+                          <Spin size="small" /> {t("ddl.openingEditor")}
+                        </div>
+                      }
+                    >
                       <DdlScriptEditor
                         key={editorRevision}
                         value={scriptValueRef.current}
                         onDirty={markScriptDirty}
-                        onStats={(lineCount, charCount) => setEditorStats({ lineCount, charCount })}
+                        onStats={(lineCount, charCount) =>
+                          setEditorStats({ lineCount, charCount })
+                        }
                         editorViewRef={scriptEditorViewRef}
                       />
                     </Suspense>
                   ) : (
                     <div className="ddl-script-empty">
-                      <span><FileTextOutlined /></span>
-                      <b>尚未生成脚本</b>
-                      <p>确认左侧表范围和上方数据库配置后，点击底部“生成脚本”。生成结果会出现在这里，并可继续编辑。</p>
-                      <Tag>当前目标 · {currentDatabase?.label} {config.version}</Tag>
+                      <span>
+                        <FileTextOutlined />
+                      </span>
+                      <b>{t("ddl.scriptNotGenerated")}</b>
+                      <p>{t("ddl.scriptNotGeneratedHint")}</p>
+                      <Tag>
+                        {t("ddl.currentTarget", {
+                          database: databaseLabel(
+                            config.database,
+                            currentDatabase?.label,
+                            language,
+                          ),
+                          version: config.version,
+                        })}
+                      </Tag>
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="ddl-problem-list">
-                  {result?.warnings.length ? result.warnings.map((warning, index) => (
-                    <div className={`ddl-problem-item is-${warning.severity}`} key={`${warning.code}-${warning.table_id}-${warning.field_code}-${index}`}>
-                      <span>{warningIcon(warning)}</span>
-                      <span>
-                        <b>{warning.message}</b>
-                        <small>
-                          {[warning.table_code && `表 ${warning.table_code}`, warning.field_code && `字段 ${warning.field_code}`, warning.code]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </small>
-                      </span>
-                    </div>
-                  )) : (
+                  {result?.warnings.length ? (
+                    result.warnings.map((warning, index) => (
+                      <div
+                        className={`ddl-problem-item is-${warning.severity}`}
+                        key={`${warning.code}-${warning.table_id}-${warning.field_code}-${index}`}
+                      >
+                        <span>{warningIcon(warning)}</span>
+                        <span>
+                          <b>{warning.message}</b>
+                          <small>
+                            {[
+                              warning.table_code &&
+                                `${t("table.name")} ${warning.table_code}`,
+                              warning.field_code &&
+                                `${t("common.field")} ${warning.field_code}`,
+                              warning.code,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </small>
+                        </span>
+                      </div>
+                    ))
+                  ) : (
                     <div className="ddl-problem-empty">
-                      {result ? <CheckCircleOutlined /> : <InfoCircleOutlined />}
-                      <b>{result ? "未发现转换问题" : "尚未执行问题检查"}</b>
-                      <span>{result ? "当前生成结果可以继续编辑或下载。" : "生成脚本后，这里会列出类型映射、分表键和兼容性提醒。"}</span>
+                      {result ? (
+                        <CheckCircleOutlined />
+                      ) : (
+                        <InfoCircleOutlined />
+                      )}
+                      <b>{result ? t("ddl.noIssues") : t("ddl.checkNotRun")}</b>
+                      <span>
+                        {result
+                          ? t("ddl.resultEditable")
+                          : t("ddl.warningHint")}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -1107,6 +1456,6 @@ export function DdlExportModal({
           </section>
         </div>
       ) : null}
-    </Modal>
+    </DraggableModal>
   );
 }

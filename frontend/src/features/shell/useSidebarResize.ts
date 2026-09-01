@@ -10,13 +10,18 @@ export const SIDEBAR_MAX_WIDTH = 440;
 const SIDEBAR_STORAGE_KEY = "maxiong.sidebarWidth";
 
 function clampSidebarWidth(width: number): number {
-  return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, Math.round(width)));
+  return Math.max(
+    SIDEBAR_MIN_WIDTH,
+    Math.min(SIDEBAR_MAX_WIDTH, Math.round(width)),
+  );
 }
 
 function readStoredSidebarWidth(): number | null {
   try {
     const width = Number(window.localStorage.getItem(SIDEBAR_STORAGE_KEY));
-    return Number.isFinite(width) && width >= SIDEBAR_MIN_WIDTH && width <= SIDEBAR_MAX_WIDTH
+    return Number.isFinite(width) &&
+      width >= SIDEBAR_MIN_WIDTH &&
+      width <= SIDEBAR_MAX_WIDTH
       ? width
       : null;
   } catch {
@@ -25,7 +30,9 @@ function readStoredSidebarWidth(): number | null {
 }
 
 export function useSidebarResize() {
-  const [sidebarWidth, setSidebarWidth] = useState<number | null>(readStoredSidebarWidth);
+  const [sidebarWidth, setSidebarWidth] = useState<number | null>(
+    readStoredSidebarWidth,
+  );
   const [sidebarResizing, setSidebarResizing] = useState(false);
   const appRootRef = useRef<HTMLDivElement>(null);
   const sidebarResizerRef = useRef<HTMLDivElement>(null);
@@ -33,6 +40,7 @@ export function useSidebarResize() {
   const sidebarResizeLeftRef = useRef(0);
   const pendingSidebarWidthRef = useRef<number | null>(null);
   const sidebarResizeFrameRef = useRef<number | null>(null);
+  const sidebarResizeActiveRef = useRef(false);
 
   const updateLiveWidth = (width: number) => {
     const nextWidth = clampSidebarWidth(width);
@@ -42,7 +50,8 @@ export function useSidebarResize() {
     return nextWidth;
   };
 
-  const commitWidth = (width: number) => setSidebarWidth(updateLiveWidth(width));
+  const commitWidth = (width: number) =>
+    setSidebarWidth(updateLiveWidth(width));
 
   const persistWidth = () => {
     const width = liveSidebarWidthRef.current;
@@ -54,30 +63,51 @@ export function useSidebarResize() {
     }
   };
 
+  const applyResizeFrame = () => {
+    sidebarResizeFrameRef.current = null;
+    const width = pendingSidebarWidthRef.current;
+    if (width !== null) updateLiveWidth(width);
+  };
+
   const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
+    const navigatorRect = appRootRef.current
+      ?.querySelector<HTMLElement>(".project-navigator")
+      ?.getBoundingClientRect();
     sidebarResizeLeftRef.current =
-      appRootRef.current?.querySelector<HTMLElement>(".project-navigator")?.getBoundingClientRect().left
-      || appRootRef.current?.getBoundingClientRect().left
-      || 0;
-    pendingSidebarWidthRef.current = liveSidebarWidthRef.current;
+      navigatorRect?.left ||
+      appRootRef.current?.getBoundingClientRect().left ||
+      0;
+    const currentWidth = clampSidebarWidth(
+      liveSidebarWidthRef.current ??
+        navigatorRect?.width ??
+        (window.innerWidth <= 1360 ? 292 : 326),
+    );
+    liveSidebarWidthRef.current = currentWidth;
+    pendingSidebarWidthRef.current = currentWidth;
+    sidebarResizeActiveRef.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     setSidebarResizing(true);
   };
 
   const moveResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    pendingSidebarWidthRef.current = event.clientX - sidebarResizeLeftRef.current;
+    if (
+      !sidebarResizeActiveRef.current ||
+      !event.currentTarget.hasPointerCapture(event.pointerId)
+    )
+      return;
+    pendingSidebarWidthRef.current = clampSidebarWidth(
+      event.clientX - sidebarResizeLeftRef.current,
+    );
     if (sidebarResizeFrameRef.current !== null) return;
-    sidebarResizeFrameRef.current = window.requestAnimationFrame(() => {
-      sidebarResizeFrameRef.current = null;
-      const width = pendingSidebarWidthRef.current;
-      if (width !== null) updateLiveWidth(width);
-    });
+    sidebarResizeFrameRef.current =
+      window.requestAnimationFrame(applyResizeFrame);
   };
 
   const commitResize = () => {
+    if (!sidebarResizeActiveRef.current) return;
+    sidebarResizeActiveRef.current = false;
     if (sidebarResizeFrameRef.current !== null) {
       window.cancelAnimationFrame(sidebarResizeFrameRef.current);
       sidebarResizeFrameRef.current = null;
@@ -90,18 +120,23 @@ export function useSidebarResize() {
   };
 
   const finishResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    pendingSidebarWidthRef.current = event.clientX - sidebarResizeLeftRef.current;
+    if (!sidebarResizeActiveRef.current) return;
+    pendingSidebarWidthRef.current = clampSidebarWidth(
+      event.clientX - sidebarResizeLeftRef.current,
+    );
+    commitResize();
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    commitResize();
   };
 
   const resizeWithKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const currentWidth =
-      liveSidebarWidthRef.current
-      || appRootRef.current?.querySelector<HTMLElement>(".project-navigator")?.getBoundingClientRect().width
-      || 326;
+      liveSidebarWidthRef.current ||
+      appRootRef.current
+        ?.querySelector<HTMLElement>(".project-navigator")
+        ?.getBoundingClientRect().width ||
+      326;
     const nextWidth =
       event.key === "ArrowLeft"
         ? currentWidth - 10
@@ -118,9 +153,10 @@ export function useSidebarResize() {
     window.setTimeout(persistWidth, 0);
   };
 
-  const rootStyle = sidebarWidth === null
-    ? undefined
-    : ({ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties);
+  const rootStyle =
+    sidebarWidth === null
+      ? undefined
+      : ({ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties);
 
   return {
     appRootRef,

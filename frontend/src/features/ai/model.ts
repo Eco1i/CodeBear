@@ -11,6 +11,9 @@ import type {
   AiScopeType,
 } from "./types";
 import type { TableDetail } from "../tables/types";
+import { readLanguagePreference } from "../preferences/model";
+import { translateError } from "../preferences/messages";
+import type { AppLanguage } from "../preferences/types";
 import type { Project, WorkspaceNode } from "../workspace/types";
 
 export const MODEL_ID = "deepseek-v4-flash";
@@ -40,7 +43,12 @@ export type ConversationDateGroup = "今天" | "昨天" | "更早";
 export function readStoredScopeType(): AiScopeType {
   try {
     const stored = localStorage.getItem(AI_SCOPE_STORAGE_KEY);
-    if (stored === "table" || stored === "pdm" || stored === "project" || stored === "all") {
+    if (
+      stored === "table" ||
+      stored === "pdm" ||
+      stored === "project" ||
+      stored === "all"
+    ) {
       return stored;
     }
   } catch {
@@ -59,7 +67,8 @@ export function readStoredConversationId(): string {
 
 export function storeActiveConversationId(conversationId: string | null): void {
   try {
-    if (conversationId) localStorage.setItem(AI_ACTIVE_CONVERSATION_STORAGE_KEY, conversationId);
+    if (conversationId)
+      localStorage.setItem(AI_ACTIVE_CONVERSATION_STORAGE_KEY, conversationId);
     else localStorage.removeItem(AI_ACTIVE_CONVERSATION_STORAGE_KEY);
   } catch {
     // The conversation itself remains safe in SQLite when browser storage is unavailable.
@@ -72,7 +81,9 @@ export function messageId(): string {
     : `${Date.now()}-${Math.random()}`;
 }
 
-export function storedConversationMessage(item: StoredConversationMessage): ConversationMessage {
+export function storedConversationMessage(
+  item: StoredConversationMessage,
+): ConversationMessage {
   return {
     id: item.id,
     role: item.role,
@@ -101,11 +112,13 @@ export function conversationMessageInput(
       ...(item.confidence ? { confidence: item.confidence } : {}),
       ...(item.clarification ? { clarification: item.clarification } : {}),
       ...(item.error ? { error: true } : {}),
-      ...(scopeOption ? {
-        scope: scopeOption.scope,
-        scope_kind: scopeOption.kind,
-        scope_value: scopeOption.value,
-      } : {}),
+      ...(scopeOption
+        ? {
+            scope: scopeOption.scope,
+            scope_kind: scopeOption.kind,
+            scope_value: scopeOption.value,
+          }
+        : {}),
     },
   };
 }
@@ -117,29 +130,44 @@ export function conversationDateGroup(value: string): ConversationDateGroup {
   today.setHours(0, 0, 0, 0);
   const target = new Date(date);
   target.setHours(0, 0, 0, 0);
-  const difference = Math.round((today.getTime() - target.getTime()) / 86_400_000);
+  const difference = Math.round(
+    (today.getTime() - target.getTime()) / 86_400_000,
+  );
   if (difference <= 0) return "今天";
   if (difference === 1) return "昨天";
   return "更早";
 }
 
-export function conversationTime(value: string): string {
+export function conversationTime(
+  value: string,
+  language: AppLanguage = readLanguagePreference(),
+): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   if (conversationDateGroup(value) !== "更早") {
-    return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return date.toLocaleTimeString(language, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
   }
-  return date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
+  return date.toLocaleDateString(language, {
+    month: "numeric",
+    day: "numeric",
+  });
 }
 
-export function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : "AI 请求失败，请稍后重试";
+export function errorText(
+  error: unknown,
+  language: AppLanguage = readLanguagePreference(),
+): string {
+  return translateError(language, error);
 }
 
 export function isAbortError(error: unknown): boolean {
   return (
-    (error instanceof DOMException && error.name === "AbortError")
-    || (error instanceof Error && error.name === "AbortError")
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
   );
 }
 
@@ -157,9 +185,11 @@ export function buildScopeOptions(
       scope: { type: "table", table_id: selectedTable.id },
     });
   }
-  const pdmProjectId = selectedTable?.project_id || selectedNode?.project_id || activeProject?.id;
+  const pdmProjectId =
+    selectedTable?.project_id || selectedNode?.project_id || activeProject?.id;
   const pdmPath =
-    selectedTable?.relative_path || (selectedNode?.type === "pdm" ? selectedNode.relative_path : "");
+    selectedTable?.relative_path ||
+    (selectedNode?.type === "pdm" ? selectedNode.relative_path : "");
   if (pdmProjectId && pdmPath) {
     options.push({
       key: `pdm:${pdmProjectId}:${pdmPath}`,
@@ -176,16 +206,21 @@ export function buildScopeOptions(
       scope: { type: "project", project_id: activeProject.id },
     });
   }
-  options.push({ key: "all", kind: "全局", value: "所有项目", scope: { type: "all" } });
+  options.push({
+    key: "all",
+    kind: "全局",
+    value: "所有项目",
+    scope: { type: "all" },
+  });
   return options;
 }
 
 export function scopesMatch(left: AiScope, right: AiScope): boolean {
   return (
-    left.type === right.type
-    && (left.project_id || "") === (right.project_id || "")
-    && (left.scope_path || "") === (right.scope_path || "")
-    && (left.table_id || "") === (right.table_id || "")
+    left.type === right.type &&
+    (left.project_id || "") === (right.project_id || "") &&
+    (left.scope_path || "") === (right.scope_path || "") &&
+    (left.table_id || "") === (right.table_id || "")
   );
 }
 
@@ -197,15 +232,23 @@ export function restoredScopeFromConversation(
     .reverse()
     .find((message) => message.role === "user" && message.scope);
   if (!stored?.scope) return null;
-  const current = currentOptions.find((option) => scopesMatch(option.scope, stored.scope as AiScope));
+  const current = currentOptions.find((option) =>
+    scopesMatch(option.scope, stored.scope as AiScope),
+  );
   if (current) return current;
   const defaults: Record<AiScopeType, { kind: string; value: string }> = {
-    table: { kind: "原查询表", value: stored.scope.table_id || "已保存的数据表" },
+    table: {
+      kind: "原查询表",
+      value: stored.scope.table_id || "已保存的数据表",
+    },
     pdm: {
       kind: "原 PDM",
       value: stored.scope.scope_path?.split("/").at(-1) || "已保存的 PDM",
     },
-    project: { kind: "原项目", value: stored.scope.project_id || "已保存的项目" },
+    project: {
+      kind: "原项目",
+      value: stored.scope.project_id || "已保存的项目",
+    },
     all: { kind: "全局", value: "所有项目" },
   };
   const fallback = defaults[stored.scope.type];

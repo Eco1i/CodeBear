@@ -1,8 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Input, Modal } from "antd";
 import { MinusOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
-import { buildEdges, layoutGraph, otherTableCode, relationDisplayName } from "../model";
-import type { GraphEdge, GraphItem, GraphNode, Relation, RelationOptionTable } from "../types";
+import { useI18n } from "../../preferences/PreferencesProvider";
+import {
+  buildEdges,
+  layoutGraph,
+  otherTableCode,
+  relationDisplayName,
+} from "../model";
+import type {
+  GraphEdge,
+  GraphItem,
+  GraphNode,
+  Relation,
+  RelationOptionTable,
+} from "../types";
 
 interface RelationGraphModalProps {
   open: boolean;
@@ -43,18 +55,29 @@ interface HoverTip {
   nodeHover: boolean;
 }
 
-type Focus = { kind: "node"; id: string } | { kind: "edge"; index: number } | null;
+type Focus =
+  | { kind: "node"; id: string }
+  | { kind: "edge"; index: number }
+  | null;
 
 const MIN_SCALE = 0.4;
 const MAX_SCALE = 2.5;
 const ZOOM_STEP = 1.25;
-const DIR_OPTIONS: Array<{ key: "all" | "in" | "out"; label: string }> = [
-  { key: "all", label: "全部" },
-  { key: "in", label: "入向" },
-  { key: "out", label: "出向" },
+const DIR_OPTIONS: Array<{ key: "all" | "in" | "out"; labelKey: string }> = [
+  { key: "all", labelKey: "relation.all" },
+  { key: "in", labelKey: "relation.incoming" },
+  { key: "out", labelKey: "relation.outgoing" },
 ];
 
-export function RelationGraphModal({ open, centerTableId, relations, tables, onClose, onJump }: RelationGraphModalProps) {
+export function RelationGraphModal({
+  open,
+  centerTableId,
+  relations,
+  tables,
+  onClose,
+  onJump,
+}: RelationGraphModalProps) {
+  const { t } = useI18n();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [centerId, setCenterId] = useState(centerTableId);
   const [nodes, setNodes] = useState<Record<string, GraphNode>>({});
@@ -81,11 +104,17 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
   const visibleRelations = useMemo(() => {
     const q = search.trim().toLowerCase();
     return relations.filter((relation) => {
-      if (dirFilter === "in" && relation.target_table.id !== centerId) return false;
-      if (dirFilter === "out" && relation.source_table.id !== centerId) return false;
+      if (dirFilter === "in" && relation.target_table.id !== centerId)
+        return false;
+      if (dirFilter === "out" && relation.source_table.id !== centerId)
+        return false;
       if (!q) return true;
       const other = otherTableCode(relation, centerId);
-      const table = tableById(relation.source_table.id === centerId ? relation.target_table.id : relation.source_table.id);
+      const table = tableById(
+        relation.source_table.id === centerId
+          ? relation.target_table.id
+          : relation.source_table.id,
+      );
       return `${other} ${table?.name || ""}`.toLowerCase().includes(q);
     });
   }, [relations, dirFilter, search, centerId, tables]);
@@ -100,7 +129,10 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
   const measure = useCallback(() => {
     const rect = wrapRef.current?.getBoundingClientRect();
     if (rect && rect.width > 0 && rect.height > 0) {
-      setSize({ width: Math.round(rect.width), height: Math.round(rect.height) });
+      setSize({
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      });
     }
   }, []);
 
@@ -114,7 +146,13 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
 
   useEffect(() => {
     if (!open || size.width <= 0 || size.height <= 0) return;
-    const layout = layoutGraph(centerId, centerCode, visibleRelations, size.width, size.height);
+    const layout = layoutGraph(
+      centerId,
+      centerCode,
+      visibleRelations,
+      size.width,
+      size.height,
+    );
     setNodes(layout.nodes);
     setItems(layout.items);
     setEdges(layout.edges);
@@ -133,14 +171,18 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
     const handleWheel = (event: WheelEvent) => {
       const wrap = wrapRef.current;
       if (!wrap) return;
-      if (!(event.target instanceof Node) || !wrap.contains(event.target)) return;
+      if (!(event.target instanceof Node) || !wrap.contains(event.target))
+        return;
       event.preventDefault();
       const rect = wrap.getBoundingClientRect();
       const px = event.clientX - rect.left;
       const py = event.clientY - rect.top;
       setView((current) => {
         const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-        const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, current.scale * factor));
+        const scale = Math.min(
+          MAX_SCALE,
+          Math.max(MIN_SCALE, current.scale * factor),
+        );
         const worldX = (px - current.tx) / current.scale;
         const worldY = (py - current.ty) / current.scale;
         return {
@@ -156,7 +198,10 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
 
   const zoomAroundCenter = (factor: number) => {
     setView((current) => {
-      const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, current.scale * factor));
+      const scale = Math.min(
+        MAX_SCALE,
+        Math.max(MIN_SCALE, current.scale * factor),
+      );
       const cx = size.width / 2;
       const cy = size.height / 2;
       const worldX = (cx - current.tx) / current.scale;
@@ -189,12 +234,26 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
 
   const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
     event.preventDefault();
-    const target = (event.target as Element).closest(".graph-node") as SVGGElement | null;
+    const target = (event.target as Element).closest(
+      ".graph-node",
+    ) as SVGGElement | null;
     if (target?.dataset.id && nodes[target.dataset.id]) {
       const id = target.dataset.id;
-      dragRef.current = { id, startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY };
+      dragRef.current = {
+        id,
+        startX: event.clientX,
+        startY: event.clientY,
+        lastX: event.clientX,
+        lastY: event.clientY,
+      };
     } else {
-      panRef.current = { startX: event.clientX, startY: event.clientY, startTx: view.tx, startTy: view.ty, moved: 0 };
+      panRef.current = {
+        startX: event.clientX,
+        startY: event.clientY,
+        startTx: view.tx,
+        startTy: view.ty,
+        moved: 0,
+      };
     }
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -209,7 +268,10 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
       setNodes((current) => {
         const node = current[drag.id];
         if (!node) return current;
-        const next = { ...current, [drag.id]: { ...node, x: node.x + deltaX, y: node.y + deltaY } };
+        const next = {
+          ...current,
+          [drag.id]: { ...node, x: node.x + deltaX, y: node.y + deltaY },
+        };
         setEdges(buildEdges(next, items, centerId));
         return next;
       });
@@ -231,7 +293,10 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
   const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
     const drag = dragRef.current;
     if (drag) {
-      const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+      const moved = Math.hypot(
+        event.clientX - drag.startX,
+        event.clientY - drag.startY,
+      );
       const clickedId = drag.id;
       dragRef.current = null;
       if (moved < 5) {
@@ -246,7 +311,9 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
         lastClickRef.current = { id: clickedId, time: now };
         // 单击相关表：聚焦该表，其余变暗淡；再点取消
         setFocus((current) =>
-          current?.kind === "node" && current.id === clickedId ? null : { kind: "node", id: clickedId },
+          current?.kind === "node" && current.id === clickedId
+            ? null
+            : { kind: "node", id: clickedId },
         );
       }
     } else if (panRef.current) {
@@ -261,7 +328,12 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
     onJump(tableId);
   };
 
-  const moveTip = (event: React.MouseEvent, relation: Relation, side: -1 | 1, nodeHover: boolean) => {
+  const moveTip = (
+    event: React.MouseEvent,
+    relation: Relation,
+    side: -1 | 1,
+    nodeHover: boolean,
+  ) => {
     const rect = wrapRef.current?.getBoundingClientRect();
     const x = rect ? event.clientX - rect.left + 14 : event.clientX + 14;
     const y = rect ? event.clientY - rect.top + 14 : event.clientY + 14;
@@ -285,7 +357,14 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
       width={1060}
       centered
       className="relation-graph-modal"
-      title={<span className="relation-graph-title">表关系图 · <span style={{ fontFamily: "'JetBrains Mono', inherit" }}>{centerCode}</span></span>}
+      title={
+        <span className="relation-graph-title">
+          {t("relation.graphTitle")} ·{" "}
+          <span style={{ fontFamily: "'JetBrains Mono', inherit" }}>
+            {centerCode}
+          </span>
+        </span>
+      }
       footer={null}
       afterOpenChange={(nextOpen) => {
         if (nextOpen) measure();
@@ -293,10 +372,22 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
     >
       <div className="relation-graph-wrap" ref={wrapRef}>
         <div className="relation-graph-legend">
-          <span><i className="dot center" />当前表</span>
-          <span><i className="dot normal" />相关表</span>
-          <span><i />自动解析关系</span>
-          <span><i className="manual" />手工维护关系</span>
+          <span>
+            <i className="dot center" />
+            {t("relation.currentTable")}
+          </span>
+          <span>
+            <i className="dot normal" />
+            {t("relation.relatedTable")}
+          </span>
+          <span>
+            <i />
+            {t("relation.auto")} {t("relation.title")}
+          </span>
+          <span>
+            <i className="manual" />
+            {t("relation.manual")} {t("relation.title")}
+          </span>
         </div>
         <div className="relation-graph-toolbar">
           <Input
@@ -306,8 +397,8 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
               <button
                 type="button"
                 className="input-search-trigger"
-                aria-label="过滤相关表"
-                title="搜索"
+                aria-label={t("relation.filterRelated")}
+                title={t("common.search")}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => setSearch(searchDraft.trim())}
               >
@@ -315,7 +406,7 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
               </button>
             }
             value={searchDraft}
-            placeholder="过滤表，如 TBND"
+            placeholder={t("relation.filterPlaceholder")}
             onChange={(event) => setSearchDraft(event.target.value)}
             onPressEnter={() => setSearch(searchDraft.trim())}
           />
@@ -323,17 +414,37 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
             <Button
               key={option.key}
               size="small"
+              className={`relation-filter-button${
+                dirFilter === option.key ? " is-selected" : ""
+              }`}
+              aria-pressed={dirFilter === option.key}
               type={dirFilter === option.key ? "primary" : "default"}
               onClick={() => setDirFilter(option.key)}
             >
-              {option.label}
+              {t(option.labelKey)}
             </Button>
           ))}
-          <Button size="small" icon={<MinusOutlined />} aria-label="缩小" onClick={() => zoomAroundCenter(1 / ZOOM_STEP)} />
-          <Button size="small" aria-label="复位缩放" onClick={() => setView({ scale: 1, tx: 0, ty: 0 })}>
+          <Button
+            size="small"
+            className="relation-graph-zoom-button"
+            icon={<MinusOutlined />}
+            aria-label={t("relation.zoomOut")}
+            onClick={() => zoomAroundCenter(1 / ZOOM_STEP)}
+          />
+          <Button
+            size="small"
+            aria-label={t("relation.resetZoom")}
+            onClick={() => setView({ scale: 1, tx: 0, ty: 0 })}
+          >
             1:1
           </Button>
-          <Button size="small" icon={<PlusOutlined />} aria-label="放大" onClick={() => zoomAroundCenter(ZOOM_STEP)} />
+          <Button
+            size="small"
+            className="relation-graph-zoom-button"
+            icon={<PlusOutlined />}
+            aria-label={t("relation.zoomIn")}
+            onClick={() => zoomAroundCenter(ZOOM_STEP)}
+          />
         </div>
         <svg
           width={size.width}
@@ -343,20 +454,48 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
           onPointerUp={handlePointerUp}
         >
           <defs>
-            <marker id="rel-arr-auto" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <marker
+              id="rel-arr-auto"
+              viewBox="0 0 10 10"
+              refX="8.5"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
               <path d="M 0 1 L 9 5 L 0 9 z" className="graph-arrow" />
             </marker>
-            <marker id="rel-arr-manual" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <marker
+              id="rel-arr-manual"
+              viewBox="0 0 10 10"
+              refX="8.5"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
               <path d="M 0 1 L 9 5 L 0 9 z" className="graph-arrow manual" />
             </marker>
-            <marker id="rel-arr-hl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-              <path d="M 0 1 L 9 5 L 0 9 z" className="graph-arrow" style={{ fill: "#347ee8" }} />
+            <marker
+              id="rel-arr-hl"
+              viewBox="0 0 10 10"
+              refX="8.5"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 1 L 9 5 L 0 9 z" className="graph-arrow hl" />
             </marker>
           </defs>
-          <g transform={`translate(${view.tx}, ${view.ty}) scale(${view.scale})`}>
+          <g
+            transform={`translate(${view.tx}, ${view.ty}) scale(${view.scale})`}
+          >
             {edges.map((edge, index) => {
               const manual = edge.relation.source_type === "manual";
-              const dimmed = focusSets ? !focusSets.relatedEdges.has(index) : false;
+              const dimmed = focusSets
+                ? !focusSets.relatedEdges.has(index)
+                : false;
               const focused = focus?.kind === "edge" && focus.index === index;
               const highlighted =
                 hoveredEdge === index ||
@@ -369,19 +508,29 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
                 focused ? "focus" : "",
                 highlighted ? "hl" : "",
                 entering ? "graph-edge-enter" : "",
-              ].filter(Boolean).join(" ");
+              ]
+                .filter(Boolean)
+                .join(" ");
               return (
                 <path
                   key={edge.relation.id}
                   className={classes}
                   d={`M ${edge.x1} ${edge.y1} C ${(edge.x1 + edge.x2) / 2} ${edge.y1}, ${(edge.x1 + edge.x2) / 2} ${edge.y2}, ${edge.x2} ${edge.y2}`}
                   markerEnd={edgeMarker(edge.relation, focused || highlighted)}
-                  style={entering ? { animationDelay: `${(nodeOrder.get(edge.nodeId) || 1) * 18}ms` } : undefined}
+                  style={
+                    entering
+                      ? {
+                          animationDelay: `${(nodeOrder.get(edge.nodeId) || 1) * 18}ms`,
+                        }
+                      : undefined
+                  }
                   onMouseEnter={(event) => {
                     setHoveredEdge(index);
                     moveTip(event, edge.relation, edge.side, false);
                   }}
-                  onMouseMove={(event) => moveTip(event, edge.relation, edge.side, false)}
+                  onMouseMove={(event) =>
+                    moveTip(event, edge.relation, edge.side, false)
+                  }
                   onMouseLeave={() => {
                     setHoveredEdge(null);
                     setHoverTip(null);
@@ -389,7 +538,9 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
                   onClick={(event) => {
                     event.stopPropagation();
                     setFocus((current) =>
-                      current?.kind === "edge" && current.index === index ? null : { kind: "edge", index },
+                      current?.kind === "edge" && current.index === index
+                        ? null
+                        : { kind: "edge", index },
                     );
                   }}
                 />
@@ -398,7 +549,9 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
             {Object.values(nodes).map((node) => {
               const table = tableById(node.id);
               if (!table) return null;
-              const dimmed = focusSets ? !focusSets.relatedNodes.has(node.id) : false;
+              const dimmed = focusSets
+                ? !focusSets.relatedNodes.has(node.id)
+                : false;
               const focused = focus?.kind === "node" && focus.id === node.id;
               const isCenter = node.id === centerId;
               const classes = [
@@ -407,16 +560,24 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
                 dimmed ? "dim" : "",
                 focused ? "focus" : "",
                 entering ? "graph-node-enter" : "",
-              ].filter(Boolean).join(" ");
+              ]
+                .filter(Boolean)
+                .join(" ");
               const order = nodeOrder.get(node.id) || 0;
-              const relationOfNode = items.find((item) => item.nodeId === node.id)?.relation;
-              const nodeSide = items.find((item) => item.nodeId === node.id)?.side;
+              const relationOfNode = items.find(
+                (item) => item.nodeId === node.id,
+              )?.relation;
+              const nodeSide = items.find(
+                (item) => item.nodeId === node.id,
+              )?.side;
               return (
                 <g
                   key={node.id}
                   className={classes}
                   data-id={node.id}
-                  style={entering ? { animationDelay: `${order * 18}ms` } : undefined}
+                  style={
+                    entering ? { animationDelay: `${order * 18}ms` } : undefined
+                  }
                   onMouseEnter={(event) => {
                     setHoveredNodeId(node.id);
                     if (!isCenter && relationOfNode && nodeSide) {
@@ -435,16 +596,37 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
                 >
                   {node.mode === "bubble" ? (
                     <>
-                      <ellipse className="bubble-shape" cx={node.x} cy={node.y} rx={node.width / 2} ry={13} />
-                      <text className="graph-node-label" x={node.x} y={node.y + 3.5} textAnchor="middle">
+                      <ellipse
+                        className="bubble-shape"
+                        cx={node.x}
+                        cy={node.y}
+                        rx={node.width / 2}
+                        ry={13}
+                      />
+                      <text
+                        className="graph-node-label"
+                        x={node.x}
+                        y={node.y + 3.5}
+                        textAnchor="middle"
+                      >
                         {table.code}
                       </text>
                     </>
                   ) : (
                     <>
-                      <circle className="graph-node-dot" cx={node.x} cy={node.y} r={isCenter ? 11 : 5.5} />
+                      <circle
+                        className="graph-node-dot"
+                        cx={node.x}
+                        cy={node.y}
+                        r={isCenter ? 11 : 5.5}
+                      />
                       {isCenter ? (
-                        <text className="graph-node-label" x={node.x} y={node.y + 26} textAnchor="middle">
+                        <text
+                          className="graph-node-label"
+                          x={node.x}
+                          y={node.y + 26}
+                          textAnchor="middle"
+                        >
                           {table.code}
                         </text>
                       ) : null}
@@ -455,14 +637,19 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
             })}
           </g>
         </svg>
-        <div className="relation-graph-tip">
-          悬停看详情 · 双击相关表切换中心 · 滚轮缩放 · 拖拽圆调整布局
-        </div>
+        <div className="relation-graph-tip">{t("relation.graphTip")}</div>
         {hoverTip ? (
-          <div className="graph-hover-tip" style={{ left: hoverTip.x, top: hoverTip.y }}>
+          <div
+            className="graph-hover-tip"
+            style={{ left: hoverTip.x, top: hoverTip.y }}
+          >
             {(() => {
               const relation = hoverTip.relation;
-              const other = tableById(relation.source_table.id === centerId ? relation.target_table.id : relation.source_table.id);
+              const other = tableById(
+                relation.source_table.id === centerId
+                  ? relation.target_table.id
+                  : relation.source_table.id,
+              );
               const isIn = hoverTip.side < 0;
               const fields = isIn
                 ? `${otherTableCode(relation, centerId)}.${relation.source_field.code} → ${relation.target_field.code}`
@@ -478,9 +665,13 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
                       <b>{fields}</b>
                     </div>
                     <div className="tip-meta">
-                      <span className={`tip-badge card`}>{relation.cardinality || "—"}</span>
+                      <span className={`tip-badge card`}>
+                        {relation.cardinality || "—"}
+                      </span>
                       <span className={`tip-badge ${relation.source_type}`}>
-                        {relation.source_type === "auto" ? "自动解析" : "手工维护"}
+                        {relation.source_type === "auto"
+                          ? t("relation.auto")
+                          : t("relation.manual")}
                       </span>
                     </div>
                   </>
@@ -490,16 +681,23 @@ export function RelationGraphModal({ open, centerTableId, relations, tables, onC
                 <>
                   <div className="tip-title">
                     {other?.code || otherTableCode(relation, centerId)}
-                    {other?.name ? `（${other.name}）` : ""} {isIn ? "→ 本表" : "← 本表"}
+                    {other?.name ? `（${other.name}）` : ""}{" "}
+                    {isIn
+                      ? `→ ${t("relation.currentTable")}`
+                      : `← ${t("relation.currentTable")}`}
                   </div>
                   <div className="tip-fk">{relationDisplayName(relation)}</div>
                   <div className="tip-fields">
                     <b>{fields}</b>
                   </div>
                   <div className="tip-meta">
-                    <span className={`tip-badge card`}>{relation.cardinality || "—"}</span>
+                    <span className={`tip-badge card`}>
+                      {relation.cardinality || "—"}
+                    </span>
                     <span className={`tip-badge ${relation.source_type}`}>
-                      {relation.source_type === "auto" ? "自动解析" : "手工维护"}
+                      {relation.source_type === "auto"
+                        ? t("relation.auto")
+                        : t("relation.manual")}
                     </span>
                   </div>
                 </>

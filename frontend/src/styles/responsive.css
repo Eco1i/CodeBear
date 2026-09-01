@@ -8,6 +8,45 @@
   }
 }
 
+@media (max-width: 1180px) {
+  :root {
+    --sidebar-width: 252px;
+    --workspace-edge: 6px;
+  }
+
+  .header-context {
+    padding-inline: 12px;
+    gap: 6px;
+  }
+
+  .header-context strong {
+    max-width: 220px;
+  }
+
+  .header-actions {
+    gap: 5px;
+    padding-right: 8px;
+  }
+
+  .header-actions .ant-btn {
+    padding-inline: 8px;
+  }
+}
+
+@media (max-width: 900px) {
+  .header-context {
+    display: none;
+  }
+
+  .header-actions {
+    margin-left: auto;
+  }
+
+  .table-search-controls .ant-input-affix-wrapper {
+    width: 132px;
+  }
+}
+
 @media (max-width: 1480px) {
   .app-root.ai-assistant-open.ai-mode-sidebar {
     padding-right: 0;
@@ -20,7 +59,9 @@
     max-width: calc(100% - 45px);
   }
 
-  .ai-assistant.is-fullscreen .ai-message-row.is-assistant .ai-message-content.has-supporting-content {
+  .ai-assistant.is-fullscreen
+    .ai-message-row.is-assistant
+    .ai-message-content.has-supporting-content {
     width: min(calc(100% - 45px), 960px);
   }
 
@@ -45,8 +86,265 @@
 }
 
 @media (max-width: 520px) {
+  .workspace-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .scope-copy small,
+  .scope-stats > span:nth-child(3) {
+    display: none;
+  }
+
+  .scope-header {
+    padding-inline: 8px;
+  }
+
+  .scope-stats {
+    gap: 3px;
+  }
+
+  .scope-stats > span {
+    gap: 3px;
+    padding-inline: 6px;
+    font-size: 8px;
+  }
+
+  .scope-stats > span b {
+    font-size: 10px;
+  }
+
+  .table-panel-header,
+  .field-panel-header {
+    padding-inline: 8px;
+  }
+
+  .table-grid-columns {
+    grid-template-columns: 32px minmax(0, 1fr) 48px;
+  }
+
+  .data-grid-head .table-grid-core > span:nth-child(3),
+  .data-grid-head .table-grid-core > span:nth-child(4),
+  .data-grid-head .table-grid-core > span:nth-child(5),
+  .data-grid-row .table-grid-core > span:nth-child(3),
+  .data-grid-row .table-grid-core > span:nth-child(4),
+  .data-grid-row .table-grid-core > span:nth-child(5) {
+    display: none !important;
+  }
+
+  .table-grid-columns > span {
+    padding-inline: 5px;
+  }
+
+  .full-text-popover {
+    right: auto !important;
+    left: 8px !important;
+  }
+
+  .table-comment-trigger {
+    width: 18px;
+    flex: 0 0 18px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .table-comment-trigger > span:last-child {
+    display: none;
+  }
+
+  .table-panel-header:has(.table-bulk-controls) {
+    height: auto;
+    min-height: 76px;
+    flex-wrap: wrap;
+    align-content: center;
+    row-gap: 4px;
+  }
+
+  .table-panel-header:has(.table-bulk-controls) .section-title {
+    flex: 1 1 100%;
+  }
+
+  .table-bulk-controls {
+    min-width: 0;
+    flex: 0 0 100%;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  .table-bulk-controls > span {
+    white-space: nowrap;
+  }
+
+  .table-bulk-controls .ant-btn {
+    height: 26px;
+    padding-inline: 6px;
+    font-size: 9px;
+  }
+
+  .table-bulk-controls .ant-btn:last-child {
+    width: 30px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .table-bulk-controls .ant-btn:last-child > span:last-child {
+    display: none;
+  }
+
+  .table-bulk-controls .ant-btn:last-child .anticon {
+    margin-inline-end: 0;
+  }
+
+  .table-search-controls {
+    gap: 4px;
+  }
+
+  .table-search-controls .ant-segmented-item-label {
+    padding-inline: 6px;
+    font-size: 9px;
+  }
+
+  .table-search-controls .ant-input-affix-wrapper {
+    width: 30px;
+    flex: 0 0 30px;
+    padding-inline: 5px;
+  }
+
+  .table-search-controls .ant-input-affix-wrapper > input.ant-input {
+    width: 0;
+    padding: 0;
+    opacity: 0;
+  }
+
+  .table-search-controls .ant-input-prefix {
+    margin-inline-end: 0;
+  }
+
+  .table-search-controls .ant-checkbox-wrapper,
+  .table-search-settings-trigger {
+    display: none;
+  }
+
+  .field-actions {
+    min-width: 0;
+    flex: 0 0 auto;
+    gap: 4px;
+  }
+
+  .field-actions:has(.field-search-box) {
+    flex: 1 1 auto;
+  }
+
+  .field-panel-header:has(.table-meta-editor) {
+    height: auto;
+    min-height: 76px;
+    flex-wrap: wrap;
+    align-content: center;
+    row-gap: 4px;
+  }
+
+  .field-panel-header:has(.table-meta-editor) .field-title {
+    flex: 1 1 100%;
+  }
+
+  .field-panel-header:has(.table-meta-editor) .field-actions {
+    flex: 0 0 100%;
+    justify-content: flex-end;
+  }
+
+  .table-meta-editor {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .table-meta-editor .ant-input {
+    min-width: 0;
+    padding-inline: 4px;
+  }
+
+  .table-meta-label {
+    display: none;
+  }
+
+  .field-search-box {
+    min-width: 0;
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .field-search-box .ant-input-affix-wrapper {
+    min-width: 0;
+    width: auto;
+    flex: 1 1 auto;
+  }
+
+  .field-search-box > .ant-btn {
+    flex: 0 0 30px;
+  }
+
+  .field-actions > .ant-btn {
+    width: 30px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .field-actions > .ant-btn > span:last-child {
+    display: none;
+  }
+
+  .field-actions > .ant-btn .anticon {
+    margin-inline-end: 0;
+  }
+
   :root {
     --ai-assistant-width: 100vw;
+    --sidebar-width: 190px;
+    --workspace-edge: 4px;
+  }
+
+  .brand-block {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+
+  .navigator-toolbar {
+    padding-right: 3px;
+    padding-left: 8px;
+  }
+
+  .navigator-title {
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  .navigator-actions > .ant-btn:first-child {
+    display: none;
+  }
+
+  .header-actions {
+    gap: 3px;
+    padding-right: 4px;
+  }
+
+  .header-actions > .ant-btn:not(.preferences-trigger) {
+    width: 34px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .header-actions > .ant-btn:not(.preferences-trigger) > span:last-child {
+    display: none;
+  }
+
+  .header-actions > .ant-btn:not(.preferences-trigger) .anticon {
+    margin-inline-end: 0;
+  }
+
+  .header-actions .update-chip {
+    width: 44px;
+    padding-inline: 0;
+    font-size: 9px;
+    justify-content: center;
   }
 
   .ai-launcher-hint {
@@ -65,7 +363,7 @@
   }
 
   .ai-history-heading small,
-  .ai-history-new > span {
+  .ai-history-new > span:last-child {
     display: none;
   }
 

@@ -1,6 +1,6 @@
 /* 0.8.4 · 导出建表脚本 */
 .ddl-export-modal {
-  max-width: 1680px;
+  max-width: 1360px;
   padding-bottom: 0;
 }
 
@@ -71,8 +71,8 @@
   place-items: center;
   border: 1px solid #cfe2fb;
   border-radius: 9px;
-  color: #347ee8;
-  background: #edf5ff;
+  color: var(--blue);
+  background: var(--blue-soft);
   font-size: 18px;
 }
 
@@ -212,7 +212,7 @@
 .ddl-picker-actions .ant-btn {
   height: 26px;
   padding-inline: 9px;
-  color: #347ee8;
+  color: var(--blue);
   font-size: 10px;
 }
 
@@ -338,7 +338,7 @@
   height: 26px;
   margin-left: auto;
   padding-inline: 7px;
-  color: #347ee8;
+  color: var(--blue);
   font-size: 9px;
 }
 
@@ -368,7 +368,7 @@
   align-items: center;
   gap: 7px;
   border-bottom: 1px solid transparent;
-  background: #f8fbff;
+  background: transparent;
 }
 
 .ddl-tree-group[aria-expanded="true"] .ddl-pdm-node {
@@ -391,8 +391,8 @@
 
 .ddl-tree-toggle:hover,
 .ddl-tree-toggle:focus-visible {
-  color: #347ee8;
-  background: #eaf3ff;
+  color: var(--blue);
+  background: var(--blue-soft);
 }
 
 .ddl-tree-toggle .prototype-glyph {
@@ -504,11 +504,13 @@
 }
 
 .ddl-table-node:hover {
-  background: #f5f9fe;
+  background: transparent;
 }
 
-.ddl-table-node.is-selected {
-  background: #f4f8fd;
+.ddl-table-node.is-selected,
+.ddl-table-node.is-selected:hover {
+  background: transparent;
+  box-shadow: none;
 }
 
 .ddl-table-copy {
@@ -535,8 +537,8 @@
   display: grid;
   place-items: center;
   border-radius: 8px;
-  color: #347ee8;
-  background: #eaf3ff;
+  color: var(--blue);
+  background: var(--blue-soft);
   font-size: 16px;
 }
 
@@ -711,7 +713,7 @@
   display: grid;
   place-items: center;
   border-radius: 6px;
-  background: #fff;
+  background: transparent;
 }
 
 .ddl-title-flow .ddl-database-logo {
@@ -781,7 +783,9 @@
   border: 1px solid #d6e1ee;
   border-radius: 8px;
   background: #fff;
-  box-shadow: 0 14px 36px rgba(29, 50, 78, 0.17), 0 3px 8px rgba(29, 50, 78, 0.07);
+  box-shadow:
+    0 14px 36px rgba(29, 50, 78, 0.17),
+    0 3px 8px rgba(29, 50, 78, 0.07);
 }
 
 .ddl-system-select-popup .ant-select-item {
@@ -811,11 +815,13 @@
   padding-block: 5px;
 }
 
-.ddl-system-select-popup .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+.ddl-system-select-popup
+  .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
   background: #f0f6ff;
 }
 
-.ddl-system-select-popup .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+.ddl-system-select-popup
+  .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
   color: #296ecf;
   background: #e8f2ff;
 }
@@ -892,21 +898,19 @@
 .ddl-generation-options .ant-checkbox-wrapper {
   height: 30px;
   margin-inline-start: 0;
-  padding: 0 8px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
-  border: 1px solid #d6e2ef;
-  border-radius: 7px;
+  border: 0;
+  border-radius: 0;
   color: #536a88;
-  background: #fff;
+  background: transparent;
   font-size: 9px;
   white-space: nowrap;
 }
 
 .ddl-generation-options .ant-checkbox-wrapper:has(.ant-checkbox-checked) {
-  border-color: #abd0ff;
-  color: #347ee8;
-  background: #edf5ff;
+  color: var(--blue);
 }
 
 .ddl-preview-panel {
@@ -949,7 +953,7 @@
 }
 
 .ddl-preview-tabs button.is-active {
-  color: #347ee8;
+  color: var(--blue);
 }
 
 .ddl-preview-tabs button.is-active::after {
@@ -959,7 +963,7 @@
   left: 0;
   height: 2px;
   border-radius: 2px 2px 0 0;
-  background: #347ee8;
+  background: var(--blue);
   content: "";
 }
 
@@ -1285,6 +1289,86 @@
   width: min(560px, calc(100% - 40px));
 }
 
+@media (max-width: 900px) {
+  .ddl-generation-options > div {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+}
+
+@media (max-width: 900px) and (max-height: 700px) {
+  .ddl-config-panel {
+    --ddl-control-height: 26px;
+  }
+
+  .ddl-config-panel > .ddl-section-heading {
+    min-height: 32px;
+    padding: 4px 12px 2px;
+  }
+
+  .ddl-config-primary,
+  .ddl-config-secondary {
+    padding-right: 12px;
+    padding-left: 12px;
+    gap: 6px;
+  }
+
+  .ddl-config-primary {
+    padding-bottom: 4px;
+  }
+
+  .ddl-config-secondary {
+    padding-top: 3px;
+    padding-bottom: 4px;
+  }
+
+  .ddl-config-field {
+    gap: 2px;
+  }
+
+  .ddl-generation-options {
+    gap: 2px;
+  }
+
+  .ddl-generation-options > span {
+    height: 10px;
+  }
+
+  .ddl-generation-options > div {
+    min-height: 26px;
+  }
+
+  .ddl-generation-options .ant-checkbox-wrapper {
+    height: 26px;
+  }
+
+  .ddl-script-empty {
+    padding: 4px 8px;
+  }
+
+  .ddl-script-empty > span:not(.ant-tag) {
+    width: 28px;
+    height: 28px;
+    margin-bottom: 4px;
+    font-size: 18px;
+  }
+
+  .ddl-script-empty b {
+    font-size: 11px;
+  }
+
+  .ddl-script-empty p {
+    margin: 4px 0 6px;
+    font-size: 8px;
+    line-height: 1.45;
+  }
+
+  .ddl-script-empty .ant-tag {
+    font-size: 7px;
+    line-height: 18px;
+  }
+}
+
 @media (max-width: 1320px) {
   .ddl-modal-body {
     grid-template-columns: minmax(360px, 39%) minmax(0, 1fr);
@@ -1299,5 +1383,66 @@
   .ddl-config-secondary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
+  }
+}
+
+@media (max-width: 520px) {
+  .ddl-modal-body {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+
+  .ddl-config-panel > .ddl-section-heading {
+    min-height: 32px;
+    padding: 4px 12px 2px;
+  }
+
+  .ddl-config-panel > .ddl-section-heading > strong,
+  .ddl-config-panel > .ddl-section-heading small {
+    display: none;
+  }
+
+  .ddl-config-primary {
+    grid-template-columns: 1.2fr 1fr 1fr;
+  }
+
+  .ddl-config-field > span,
+  .ddl-generation-options > span {
+    overflow: hidden;
+    font-size: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ddl-section-heading {
+    min-height: 70px;
+    padding: 8px 10px 6px;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .ddl-section-heading > span:first-child {
+    flex: 1 1 100%;
+  }
+
+  .ddl-picker-actions {
+    height: 26px;
+    margin-left: auto;
+  }
+
+  .ddl-picker-actions .ant-btn {
+    height: 22px;
+    padding-inline: 6px;
+    font-size: 9px;
+  }
+
+  .ddl-table-search {
+    width: calc(100% - 16px);
+    margin-right: 8px;
+    margin-left: 8px;
+  }
+
+  .ddl-table-tree {
+    padding-right: 6px;
+    padding-left: 6px;
   }
 }

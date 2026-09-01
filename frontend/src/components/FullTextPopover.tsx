@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { ReactElement } from "react";
 import { CopyOutlined } from "@ant-design/icons";
 import { App as AntApp, Button, Popover } from "antd";
+import { useI18n } from "../features/preferences/PreferencesProvider";
 
 interface FullTextPopoverProps {
   title: string;
@@ -26,8 +27,13 @@ async function copyText(text: string): Promise<void> {
   if (!copied) throw new Error("copy failed");
 }
 
-export function FullTextPopover({ title, text, children }: FullTextPopoverProps) {
+export function FullTextPopover({
+  title,
+  text,
+  children,
+}: FullTextPopoverProps) {
   const { message } = AntApp.useApp();
+  const { t } = useI18n();
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -40,9 +46,9 @@ export function FullTextPopover({ title, text, children }: FullTextPopoverProps)
   const handleCopy = async () => {
     try {
       await copyText(text);
-      if (mountedRef.current) message.success("已复制完整内容");
+      if (mountedRef.current) message.success(t("common.copied"));
     } catch {
-      if (mountedRef.current) message.error("复制失败，请手动选择文本");
+      if (mountedRef.current) message.error(t("common.copyFailed"));
     }
   };
 
@@ -50,8 +56,13 @@ export function FullTextPopover({ title, text, children }: FullTextPopoverProps)
     <div className="full-text-content">
       <div className="full-text-header">
         <strong>{title}</strong>
-        <Button type="text" size="small" icon={<CopyOutlined />} onClick={handleCopy}>
-          复制
+        <Button
+          type="text"
+          size="small"
+          icon={<CopyOutlined />}
+          onClick={handleCopy}
+        >
+          {t("common.copy")}
         </Button>
       </div>
       <div className="full-text-body">{text}</div>

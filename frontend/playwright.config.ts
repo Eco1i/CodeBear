@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { defineConfig, devices } from "@playwright/test";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -5,11 +7,18 @@ import { fileURLToPath } from "node:url";
 
 const frontendRoot = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(frontendRoot, "..");
-const bundledPython = process.platform === "win32"
-  ? path.join(repositoryRoot, ".venv", "Scripts", "python.exe")
-  : path.join(repositoryRoot, ".venv", "bin", "python");
+const bundledPython =
+  process.platform === "win32"
+    ? path.join(repositoryRoot, ".venv", "Scripts", "python.exe")
+    : path.join(repositoryRoot, ".venv", "bin", "python");
 const python = existsSync(bundledPython) ? bundledPython : "python";
-const appData = path.join(repositoryRoot, "output", "playwright", `app-data-${process.pid}`);
+const appData = path.join(
+  repositoryRoot,
+  "output",
+  "playwright",
+  `app-data-${process.pid}`,
+);
+const forcedDeviceScaleFactor = process.env.CODEBEAR_E2E_DEVICE_SCALE_FACTOR;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -28,7 +37,14 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: forcedDeviceScaleFactor
+          ? {
+              args: [`--force-device-scale-factor=${forcedDeviceScaleFactor}`],
+            }
+          : undefined,
+      },
     },
     {
       name: "webkit",

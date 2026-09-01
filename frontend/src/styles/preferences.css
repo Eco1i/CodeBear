@@ -1,0 +1,2495 @@
+:root,
+:root[data-theme="light"] {
+  --cb-page-bg: #f4f7fb;
+  --cb-surface: #ffffff;
+  --cb-surface-raised: #fbfdff;
+  --cb-surface-muted: #f3f6fa;
+  --cb-text: #20314d;
+  --cb-text-secondary: #6d7f9d;
+  --cb-text-muted: #8795aa;
+  --cb-border: #dbe5f1;
+  --cb-border-soft: #e8edf4;
+  --cb-hover: #f6f9fd;
+  --cb-selected: #eaf3ff;
+  --cb-selected-text: #315d99;
+  --cb-shadow: rgba(28, 49, 78, 0.08);
+  --cb-scroll-track: #f4f7fb;
+  --cb-scroll-thumb: #bdcadb;
+}
+
+:root[data-theme="dark"] {
+  /* Codex-inspired dark palette: graphite surfaces with quiet gray focus states. */
+  --blue: #c1c7ce;
+  --blue-soft: #24292f;
+  --blue-hover: #5b646d;
+  --blue-ink: #d8dde2;
+  --blue-border: #49525b;
+  --green: #4fd1a7;
+  --cb-page-bg: #0b0d0f;
+  --cb-surface: #14171b;
+  --cb-surface-raised: #191d22;
+  --cb-surface-muted: #20252b;
+  --cb-text: #f1f3f5;
+  --cb-text-secondary: #b8c0ca;
+  --cb-text-muted: #858f9b;
+  --cb-border: #2c333b;
+  --cb-border-soft: #242a31;
+  --cb-hover: #252c34;
+  --cb-accent: #c1c7ce;
+  --cb-accent-strong: #e0e4e7;
+  --cb-accent-soft: #24292f;
+  --cb-accent-border: #59636d;
+  --cb-icon: #8fb9b3;
+  --cb-icon-strong: #b5d0cb;
+  --cb-icon-bg: #1b302f;
+  --cb-icon-border: #3d615d;
+  --cb-warm: #c6aa78;
+  --cb-selected: #22282e;
+  --cb-selected-text: #f1f3f5;
+  --cb-shadow: rgba(0, 0, 0, 0.52);
+  --cb-scroll-track: #0b0d0f;
+  --cb-scroll-thumb: #3b4652;
+}
+
+/* The custom workbench uses these variables while Ant Design supplies its own tokens. */
+html[data-theme="dark"] {
+  background: var(--cb-page-bg) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] #root,
+[data-theme="dark"] .ant-app,
+[data-theme="dark"] .app-root,
+[data-theme="dark"] .app-body {
+  background: var(--cb-page-bg) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .app-header,
+[data-theme="dark"] .brand-block,
+[data-theme="dark"] .project-navigator,
+[data-theme="dark"] .panel-shell,
+[data-theme="dark"] .scope-header,
+[data-theme="dark"] .table-tabs,
+[data-theme="dark"] .field-panel-header,
+[data-theme="dark"] .table-panel-header {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .app-header {
+  box-shadow: 0 2px 12px var(--cb-shadow);
+}
+
+[data-theme="dark"] .app-root .ant-input,
+[data-theme="dark"] .app-root .ant-input-affix-wrapper,
+[data-theme="dark"] .app-root .ant-input-number,
+[data-theme="dark"] .app-root .ant-input-number-input,
+[data-theme="dark"] .app-root .ant-select-selector,
+[data-theme="dark"] .app-root textarea,
+[data-theme="dark"] .app-root select {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .app-root input::placeholder,
+[data-theme="dark"] .app-root textarea::placeholder,
+[data-theme="dark"] .app-root .ant-input::placeholder {
+  color: var(--cb-text-muted) !important;
+}
+
+[data-theme="dark"] .app-root .ant-btn-text {
+  color: var(--cb-text-secondary);
+}
+
+[data-theme="dark"] .app-root .ant-btn-text:not(:disabled):hover,
+[data-theme="dark"] .app-root .ant-btn-text:not(:disabled):focus-visible {
+  background: var(--cb-hover) !important;
+  color: var(--cb-accent) !important;
+}
+
+[data-theme="dark"] .app-root .data-grid,
+[data-theme="dark"] .app-root .table-grid-body,
+[data-theme="dark"] .app-root .field-grid-body,
+[data-theme="dark"] .app-root .field-grid,
+[data-theme="dark"] .app-root .table-row-open,
+[data-theme="dark"] .app-root .field-row,
+[data-theme="dark"] .app-root .table-tab-main {
+  color: var(--cb-text-secondary) !important;
+  background: var(--cb-surface) !important;
+}
+
+[data-theme="dark"] .app-root .data-grid-head,
+[data-theme="dark"] .app-root .field-grid-head,
+[data-theme="dark"] .app-root .table-search-settings,
+[data-theme="dark"] .app-root .table-search-settings-title,
+[data-theme="dark"] .app-root .grid-loading {
+  background: var(--cb-surface-muted) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+[data-theme="dark"] .app-root .grid-empty {
+  background: transparent !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+[data-theme="dark"] .app-root .field-placeholder {
+  background: transparent !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+[data-theme="dark"] .app-root .data-grid-head > span,
+[data-theme="dark"] .app-root .data-grid-row > span,
+[data-theme="dark"] .app-root .data-grid-head .table-grid-core > span,
+[data-theme="dark"] .app-root .data-grid-row .table-grid-core > span {
+  border-color: var(--cb-border-soft) !important;
+}
+
+[data-theme="dark"] .app-root .table-search-controls .ant-checkbox-wrapper,
+[data-theme="dark"] .app-root .data-grid-head .table-selection-cell,
+[data-theme="dark"] .app-root .data-grid-head .table-action-cell {
+  color: var(--cb-text-secondary) !important;
+}
+
+[data-theme="dark"] .app-root .data-grid-row:hover,
+[data-theme="dark"] .app-root .table-row-open:hover,
+[data-theme="dark"] .app-root .field-row:hover,
+[data-theme="dark"]
+  .app-root
+  .navigator-tree
+  .ant-tree-treenode:not(.navigator-tree-node-selected):hover
+  > .ant-tree-switcher,
+[data-theme="dark"]
+  .app-root
+  .navigator-tree
+  .ant-tree-treenode:not(.navigator-tree-node-selected):hover
+  > .ant-tree-node-content-wrapper {
+  background: var(--cb-hover) !important;
+}
+
+[data-theme="dark"] .app-root .data-grid-row.is-selected,
+[data-theme="dark"]
+  .app-root
+  .navigator-tree
+  .navigator-tree-node-selected
+  > .ant-tree-switcher,
+[data-theme="dark"]
+  .app-root
+  .navigator-tree
+  .navigator-tree-node-selected
+  > .ant-tree-node-content-wrapper,
+[data-theme="dark"]
+  .app-root
+  .navigator-tree
+  .navigator-tree-node-selected
+  > .ant-tree-node-content-wrapper:hover,
+[data-theme="dark"] .app-root .table-tab.is-active {
+  background: var(--cb-selected) !important;
+  border-color: var(--cb-accent-border) !important;
+  color: var(--cb-selected-text) !important;
+}
+
+/* The selected table row uses its fill as the selection indicator; do not add a bright bottom rule. */
+[data-theme="dark"] .app-root .table-grid-body .data-grid-row.is-selected {
+  border-bottom-color: transparent !important;
+}
+
+[data-theme="dark"] .app-root .navigator-tree .ant-tree,
+[data-theme="dark"] .app-root .tree-name,
+[data-theme="dark"] .app-root .navigator-title,
+[data-theme="dark"] .app-root .header-context strong,
+[data-theme="dark"] .app-root .brand-copy strong,
+[data-theme="dark"] .app-root .section-title strong,
+[data-theme="dark"] .app-root .scope-copy strong,
+[data-theme="dark"] .app-root .field-title,
+[data-theme="dark"] .app-root .table-name-text {
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .app-root .header-context,
+[data-theme="dark"] .app-root .header-context i,
+[data-theme="dark"] .app-root .brand-copy small,
+[data-theme="dark"] .app-root .scope-copy small,
+[data-theme="dark"] .app-root .scope-stats,
+[data-theme="dark"] .app-root .grid-index,
+[data-theme="dark"] .app-root .path-cell,
+[data-theme="dark"] .app-root .number-cell {
+  color: var(--cb-text-muted) !important;
+}
+
+[data-theme="dark"] .app-root .ant-modal-content,
+[data-theme="dark"] .app-root .ant-modal-header,
+[data-theme="dark"] .app-root .ant-modal-footer,
+[data-theme="dark"] .app-root .ant-drawer-content,
+[data-theme="dark"] .app-root .ant-drawer-header,
+[data-theme="dark"] .app-root .ant-drawer-body,
+[data-theme="dark"] .app-root .ant-popover-inner,
+[data-theme="dark"] .app-root .ant-popover-container,
+[data-theme="dark"] .app-root .ant-dropdown-menu,
+[data-theme="dark"] .app-root .ant-select-dropdown {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .app-root .ant-modal-title,
+[data-theme="dark"] .app-root .ant-drawer-title,
+[data-theme="dark"] .app-root .ant-popover-title,
+[data-theme="dark"] .app-root .ant-dropdown-menu-title-content,
+[data-theme="dark"] .app-root .ant-select-item {
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .app-root .ant-dropdown-menu-item:hover,
+[data-theme="dark"] .app-root .ant-select-item-option-active,
+[data-theme="dark"] .app-root .ant-select-item-option-selected {
+  background: var(--cb-hover) !important;
+}
+
+[data-theme="dark"] .app-root .ant-empty-description,
+[data-theme="dark"] .app-root .ant-form-item-explain,
+[data-theme="dark"] .app-root .ant-typography-secondary {
+  color: var(--cb-text-muted) !important;
+}
+
+[data-theme="dark"] .app-root .ant-divider,
+[data-theme="dark"] .app-root .ant-table-thead > tr > th,
+[data-theme="dark"] .app-root .ant-table-tbody > tr > td {
+  border-color: var(--cb-border) !important;
+}
+
+[data-theme="dark"] .app-root .ant-table,
+[data-theme="dark"] .app-root .ant-table-container,
+[data-theme="dark"] .app-root .ant-table-thead > tr > th,
+[data-theme="dark"] .app-root .ant-table-tbody > tr > td {
+  background: var(--cb-surface) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+[data-theme="dark"] .app-root .ant-table-tbody > tr:hover > td {
+  background: var(--cb-hover) !important;
+}
+
+[data-theme="dark"] .app-root .feature-loading {
+  background: rgba(11, 13, 15, 0.96) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .app-root .ant-switch {
+  background: #4b535b;
+}
+
+[data-theme="dark"] .app-root .ant-segmented {
+  background: var(--cb-accent-soft) !important;
+}
+
+[data-theme="dark"] .app-root .ant-segmented-item-selected {
+  background: var(--cb-accent-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .app-root .ant-alert {
+  background: var(--cb-surface-muted) !important;
+  border-color: var(--cb-border) !important;
+}
+
+[data-theme="dark"] .app-root .prototype-glyph {
+  color: inherit;
+}
+
+html[data-theme="dark"],
+html[data-theme="dark"] * {
+  scrollbar-color: var(--cb-scroll-thumb) var(--cb-scroll-track) !important;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: var(--cb-scroll-track);
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: var(--cb-scroll-track) !important;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  border: 2px solid var(--cb-scroll-track) !important;
+  border-color: var(--cb-scroll-track) !important;
+  border-radius: 8px;
+  background: var(--cb-scroll-thumb) !important;
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #59636d !important;
+}
+
+.preferences-trigger {
+  width: 28px;
+  height: 28px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  color: var(--cb-text-secondary);
+}
+
+.preferences-trigger .anticon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(0);
+}
+
+.preferences-trigger:hover,
+.preferences-trigger:focus-visible {
+  background: var(--cb-selected) !important;
+  color: var(--blue) !important;
+}
+
+.preferences-popover .ant-popover-container {
+  width: 252px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--cb-border);
+  border-radius: 9px;
+  background: var(--cb-surface);
+  box-shadow: 0 10px 24px var(--cb-shadow);
+}
+
+.preferences-popover .ant-popover-content {
+  background: transparent;
+}
+
+.preferences-popover-content {
+  padding: 10px 11px;
+  color: var(--cb-text);
+  background: var(--cb-surface);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.preferences-popover-title {
+  padding-bottom: 7px;
+  color: var(--cb-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.preferences-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.preferences-setting-label {
+  flex: 0 0 76px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--cb-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.preferences-setting .ant-segmented {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.preferences-setting .ant-segmented-group {
+  width: 100%;
+}
+
+.preferences-setting .ant-segmented-item {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.preferences-setting-label .anticon {
+  color: var(--blue);
+}
+
+.preferences-popover .ant-divider {
+  margin: 8px 0;
+  border-color: var(--cb-border-soft);
+}
+
+.preferences-popover .ant-segmented,
+.preferences-popover .ant-segmented-item,
+.preferences-popover .ant-segmented-item-label {
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+/* Modals, drawers, popovers, and select menus are rendered in a body portal. */
+[data-theme="dark"] .ant-modal-content,
+[data-theme="dark"] .ant-modal-header,
+[data-theme="dark"] .ant-modal-footer,
+[data-theme="dark"] .ant-drawer-content,
+[data-theme="dark"] .ant-drawer-header,
+[data-theme="dark"] .ant-drawer-body,
+[data-theme="dark"] .ant-popover-inner,
+[data-theme="dark"] .ant-popover-container,
+[data-theme="dark"] .ant-dropdown-menu,
+[data-theme="dark"] .ant-select-dropdown {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .dictionary-modal-title b,
+[data-theme="dark"] .dictionary-submodal-title {
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .ant-modal-title,
+[data-theme="dark"] .ant-drawer-title,
+[data-theme="dark"] .ant-popover-title,
+[data-theme="dark"] .ant-dropdown-menu-title-content,
+[data-theme="dark"] .ant-select-item,
+[data-theme="dark"] .ant-modal-body,
+[data-theme="dark"] .ant-drawer-body {
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .ant-dropdown-menu-item:hover,
+[data-theme="dark"] .ant-select-item-option-active,
+[data-theme="dark"] .ant-select-item-option-selected {
+  background: var(--cb-hover) !important;
+}
+
+[data-theme="dark"] .ant-popover-arrow-content {
+  background: var(--cb-surface) !important;
+}
+
+[data-theme="dark"] .ant-modal-close:hover {
+  background: var(--cb-hover) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .table-search-settings-popover .ant-popover-inner,
+[data-theme="dark"] .table-search-settings-popover .ant-popover-inner-content,
+[data-theme="dark"] .table-search-settings-popover .table-search-settings,
+[data-theme="dark"]
+  .table-search-settings-popover
+  .table-search-settings-title {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"]
+  .table-search-settings-popover
+  .table-search-setting-row
+  strong {
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"]
+  .table-search-settings-popover
+  .table-search-setting-block
+  > small {
+  color: var(--cb-text-muted) !important;
+}
+
+[data-theme="dark"] .table-search-settings-popover .table-search-clear-button {
+  border-color: var(--cb-border) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+[data-theme="dark"]
+  .table-search-settings-popover
+  .table-search-clear-button:not(:disabled):hover,
+[data-theme="dark"]
+  .table-search-settings-popover
+  .table-search-clear-button:not(:disabled):focus-visible {
+  border-color: var(--cb-accent-border) !important;
+  background: var(--cb-hover) !important;
+  color: var(--cb-accent) !important;
+}
+
+[data-theme="dark"]
+  .table-search-settings-popover
+  .table-search-clear-button:not(:disabled):active {
+  border-color: var(--cb-accent-border) !important;
+  background: var(--cb-selected) !important;
+  color: var(--cb-accent-strong) !important;
+}
+
+[data-theme="dark"]
+  .table-search-settings-popover
+  .table-search-clear-button:disabled {
+  border-color: var(--cb-border) !important;
+  background: transparent !important;
+  color: var(--cb-text-muted) !important;
+}
+
+[data-theme="dark"] .full-text-popover .full-text-header {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .full-text-popover .full-text-header strong,
+[data-theme="dark"] .full-text-popover .full-text-header .ant-btn,
+[data-theme="dark"] .full-text-popover .full-text-body {
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .ant-input,
+[data-theme="dark"] .ant-input-affix-wrapper,
+[data-theme="dark"] .ant-input-number,
+[data-theme="dark"] .ant-select-selector,
+[data-theme="dark"] .ant-input-number-input,
+[data-theme="dark"] .ant-picker {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .ant-input::placeholder,
+[data-theme="dark"] .ant-input-affix-wrapper input::placeholder {
+  color: var(--cb-text-muted) !important;
+}
+
+[data-theme="dark"] .ant-divider,
+[data-theme="dark"] .ant-table-thead > tr > th,
+[data-theme="dark"] .ant-table-tbody > tr > td {
+  border-color: var(--cb-border) !important;
+}
+
+[data-theme="dark"] .ant-table,
+[data-theme="dark"] .ant-table-container,
+[data-theme="dark"] .ant-table-thead > tr > th,
+[data-theme="dark"] .ant-table-tbody > tr > td {
+  background: var(--cb-surface) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+[data-theme="dark"] .ant-table-tbody > tr:hover > td {
+  background: var(--cb-hover) !important;
+}
+
+[data-theme="dark"] .field-dictionary-drawer-table {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+}
+
+[data-theme="dark"] .ddl-export-modal .ant-modal-container,
+[data-theme="dark"] .ddl-modal-body,
+[data-theme="dark"] .ddl-table-picker,
+[data-theme="dark"] .ddl-generation-pane,
+[data-theme="dark"] .ddl-config-panel,
+[data-theme="dark"] .ddl-config-primary,
+[data-theme="dark"] .ddl-config-secondary,
+[data-theme="dark"] .ddl-preview-panel,
+[data-theme="dark"] .ddl-script-view,
+[data-theme="dark"] .ddl-problem-list,
+[data-theme="dark"] .ddl-section-heading,
+[data-theme="dark"] .ddl-tree-virtual-group,
+[data-theme="dark"] .ddl-tree-table-surface,
+[data-theme="dark"] .ddl-table-node,
+[data-theme="dark"] .ddl-script-empty,
+[data-theme="dark"] .ddl-editor-toolbar,
+[data-theme="dark"] .ddl-modal-footer {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .ddl-table-node:hover,
+[data-theme="dark"] .ddl-table-node.is-selected,
+[data-theme="dark"] .ddl-tree-group[aria-expanded="true"] .ddl-pdm-node,
+[data-theme="dark"] .ddl-preview-tabs button.is-active {
+  background: var(--cb-hover) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .ddl-tree-table-surface::before,
+[data-theme="dark"] .ddl-tree-status::before {
+  background: var(--cb-border) !important;
+}
+
+[data-theme="dark"] .backup-migration-modal .ant-modal-container,
+[data-theme="dark"] .backup-layout,
+[data-theme="dark"] .backup-tree-pane,
+[data-theme="dark"] .backup-summary-pane,
+[data-theme="dark"] .backup-pane-heading,
+[data-theme="dark"] .backup-tree-scroll,
+[data-theme="dark"] .backup-import-pane,
+[data-theme="dark"] .backup-source-empty,
+[data-theme="dark"] .backup-inspecting,
+[data-theme="dark"] .backup-receipt,
+[data-theme="dark"] .backup-dictionary-receipt,
+[data-theme="dark"] .backup-import-progress {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .dictionary-center-modal .ant-modal-container,
+[data-theme="dark"] .dictionary-center-layout,
+[data-theme="dark"] .dictionary-list-pane,
+[data-theme="dark"] .dictionary-detail-pane,
+[data-theme="dark"] .dictionary-binding-layout,
+[data-theme="dark"] .dictionary-scope-pane,
+[data-theme="dark"] .dictionary-candidate-pane,
+[data-theme="dark"] .dictionary-detail-header,
+[data-theme="dark"] .dictionary-metrics,
+[data-theme="dark"] .dictionary-detail-tabs,
+[data-theme="dark"] .dictionary-manage-modal .ant-modal-container,
+[data-theme="dark"] .dictionary-import-modal .ant-modal-container,
+[data-theme="dark"] .dictionary-manage-meta,
+[data-theme="dark"] .dictionary-manage-toolbar,
+[data-theme="dark"] .dictionary-import-body,
+[data-theme="dark"] .dictionary-excel-preview {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .dictionary-list-item:hover,
+[data-theme="dark"] .dictionary-list-item.is-selected,
+[data-theme="dark"] .dictionary-scope-tree .navigator-tree-node-selected,
+[data-theme="dark"] .dictionary-candidate-summary {
+  background: var(--cb-hover) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .relation-drawer,
+[data-theme="dark"] .relation-drawer .ant-drawer-content,
+[data-theme="dark"] .relation-graph-modal .ant-modal-container,
+[data-theme="dark"] .relation-graph-wrap,
+[data-theme="dark"] .relation-list,
+[data-theme="dark"] .relation-list-toolbar,
+[data-theme="dark"] .relation-graph-toolbar,
+[data-theme="dark"] .relation-graph-legend,
+[data-theme="dark"] .relation-form-modal .ant-modal-container,
+[data-theme="dark"] .relation-form,
+[data-theme="dark"] .relation-row-tip,
+[data-theme="dark"] .graph-hover-tip {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .relation-graph-toolbar,
+[data-theme="dark"] .relation-list-toolbar,
+[data-theme="dark"] .relation-drawer-footer,
+[data-theme="dark"] .relation-form-hint,
+[data-theme="dark"] .rel-entry:hover,
+[data-theme="dark"] .rel-group {
+  background: var(--cb-surface-muted) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+[data-theme="dark"] .ai-assistant,
+[data-theme="dark"] .ai-assistant-header,
+[data-theme="dark"] .ai-scope-strip,
+[data-theme="dark"] .ai-conversation,
+[data-theme="dark"] .ai-conversation-inner,
+[data-theme="dark"] .ai-composer-shell,
+[data-theme="dark"] .ai-composer-frame,
+[data-theme="dark"] .ai-settings-panel,
+[data-theme="dark"] .ai-history-view,
+[data-theme="dark"] .ai-history-drawer,
+[data-theme="dark"] .ai-table-peek,
+[data-theme="dark"] .ai-layout-menu,
+[data-theme="dark"] .ai-scope-menu {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+[data-theme="dark"] .ai-evidence-card,
+[data-theme="dark"] .ai-history-item,
+[data-theme="dark"] .ai-suggestion,
+[data-theme="dark"] .ai-retrieval-process,
+[data-theme="dark"] .ai-table-peek-grid,
+[data-theme="dark"] .ai-table-peek-footer,
+[data-theme="dark"] .ai-composer {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+[data-theme="dark"] .ai-layout-menu button:hover,
+[data-theme="dark"] .ai-scope-option:hover,
+[data-theme="dark"] .ai-history-item:hover,
+[data-theme="dark"] .ai-evidence-card:hover {
+  background: var(--cb-hover) !important;
+}
+
+[data-theme="dark"] .ai-layout-menu > button.is-selected,
+[data-theme="dark"] .ai-scope-option.is-selected,
+[data-theme="dark"] .ai-history-item.is-active {
+  background: var(--cb-selected) !important;
+  border-color: var(--cb-accent-border) !important;
+  color: var(--cb-selected-text) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-root,
+  .app-root * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Neutral, low-luminance surfaces keep the dark theme continuous across the shell. */
+html[data-theme="dark"] .workspace-main,
+html[data-theme="dark"] .workspace-stack,
+html[data-theme="dark"] .navigator-footer {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border);
+}
+
+html[data-theme="dark"] .workspace-stack {
+  background: var(--cb-page-bg) !important;
+}
+
+html[data-theme="dark"] .ant-modal-container {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .data-grid-row,
+html[data-theme="dark"] .field-grid-body .data-grid-row {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border-soft);
+  color: var(--cb-text-secondary);
+}
+
+html[data-theme="dark"] .scope-icon,
+html[data-theme="dark"] .scope-stats > span,
+html[data-theme="dark"] .update-chip,
+html[data-theme="dark"] .ai-launcher,
+html[data-theme="dark"] .ai-launcher-hint {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .scope-icon {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .scope-stats b,
+html[data-theme="dark"] .update-chip {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .navigator-footer {
+  border-top-color: var(--cb-border);
+}
+
+html[data-theme="dark"] .workspace-status strong {
+  color: var(--cb-text-secondary);
+}
+
+html[data-theme="dark"] .workspace-status small {
+  color: var(--cb-text-muted);
+}
+
+html[data-theme="dark"] .ai-launcher {
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="dark"] .ai-launcher-hint {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.48);
+}
+
+html[data-theme="dark"] .ai-launcher-hint kbd {
+  background: var(--cb-surface-muted);
+  color: var(--cb-text-muted);
+}
+
+html[data-theme="dark"] .ant-modal-close {
+  background: transparent !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ddl-selection-summary,
+html[data-theme="dark"] .ddl-preview-tabs,
+html[data-theme="dark"] .ddl-preview-panel,
+html[data-theme="dark"] .ddl-picker-actions,
+html[data-theme="dark"] .ddl-system-select-popup {
+  background: var(--cb-surface-muted) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ddl-generation-options .ant-checkbox-wrapper {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ddl-selection-summary b,
+html[data-theme="dark"] .ddl-preview-tabs button {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ddl-selection-summary small,
+html[data-theme="dark"] .ddl-preview-tabs > small {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .ddl-summary-check,
+html[data-theme="dark"] .ddl-title-icon,
+html[data-theme="dark"] .ddl-tree-icon {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .ddl-database-logo {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+html[data-theme="dark"]
+  .ddl-generation-options
+  .ant-checkbox-wrapper:has(.ant-checkbox-checked) {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--cb-selected-text) !important;
+}
+
+html[data-theme="dark"] .ddl-preview-tabs button.is-active {
+  background: var(--cb-selected) !important;
+  border-color: var(--cb-accent-border) !important;
+  color: var(--cb-selected-text) !important;
+}
+
+html[data-theme="dark"] .ddl-picker-actions i {
+  background: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .ddl-script-empty > span:not(.ant-tag),
+html[data-theme="dark"] .ddl-script-empty .ant-tag,
+html[data-theme="dark"] .ddl-title-flow > span {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"]
+  .ddl-system-select-popup
+  .ant-select-item-option-active:not(.ant-select-item-option-disabled),
+html[data-theme="dark"]
+  .ddl-system-select-popup
+  .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background: var(--cb-hover) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ddl-database-selection b,
+html[data-theme="dark"] .ddl-database-option b,
+html[data-theme="dark"] .ddl-select-option b {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ddl-selection-summary > strong {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .ddl-title-copy b,
+html[data-theme="dark"] .ddl-section-heading b,
+html[data-theme="dark"] .ddl-section-heading > strong,
+html[data-theme="dark"] .ddl-config-field > span,
+html[data-theme="dark"] .ddl-generation-options > span,
+html[data-theme="dark"] .ddl-pdm-copy b,
+html[data-theme="dark"] .ddl-table-copy b,
+html[data-theme="dark"] .ddl-preview-tabs button,
+html[data-theme="dark"] .ddl-script-empty b {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ddl-title-copy small,
+html[data-theme="dark"] .ddl-section-heading small,
+html[data-theme="dark"] .ddl-tree-status,
+html[data-theme="dark"] .ddl-pdm-copy small,
+html[data-theme="dark"] .ddl-table-copy small,
+html[data-theme="dark"] .ddl-node-count,
+html[data-theme="dark"] .ddl-script-empty p {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .ddl-tree-group,
+html[data-theme="dark"] .ddl-pdm-node,
+html[data-theme="dark"] .ddl-table-nodes,
+html[data-theme="dark"] .ddl-table-node {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .ddl-table-node:hover,
+html[data-theme="dark"] .ddl-table-node.is-selected,
+html[data-theme="dark"] .ddl-tree-group[aria-expanded="true"] .ddl-pdm-node {
+  background: var(--cb-hover) !important;
+}
+
+html[data-theme="dark"] .ddl-title-flow > span.is-target {
+  background: var(--cb-surface-muted) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ddl-script-empty .ant-tag {
+  background: var(--cb-surface-muted) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ddl-success-banner,
+html[data-theme="dark"] .ddl-warning-banner {
+  border-bottom-color: var(--cb-border) !important;
+  background: var(--cb-surface-muted) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ddl-success-banner {
+  background: #163d35 !important;
+  color: #9be5d1 !important;
+}
+
+html[data-theme="dark"] .ddl-warning-banner {
+  background: #3b2e1d !important;
+  color: #f0c77b !important;
+}
+
+html[data-theme="dark"] .ddl-editor-toolbar,
+html[data-theme="dark"] .ddl-script-editor,
+html[data-theme="dark"] .ddl-editor-loading {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ddl-editor-toolbar small {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .backup-migration-modal .ant-modal-body,
+html[data-theme="dark"] .backup-migration-modal .ant-tabs-nav,
+html[data-theme="dark"] .backup-dictionary-options,
+html[data-theme="dark"] .backup-receipt {
+  background: var(--cb-surface-muted) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .backup-import-progress {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  box-shadow: none !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .backup-modal-title,
+html[data-theme="dark"] .backup-pane-heading b,
+html[data-theme="dark"] .backup-summary-pane h3,
+html[data-theme="dark"] .backup-receipt b,
+html[data-theme="dark"] .backup-dictionary-receipt b,
+html[data-theme="dark"] .backup-dictionary-options .ant-checkbox-wrapper {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .backup-pane-heading small,
+html[data-theme="dark"] .backup-summary-pane > p,
+html[data-theme="dark"] .backup-receipt small,
+html[data-theme="dark"] .backup-note-list,
+html[data-theme="dark"] .backup-dictionary-receipt small,
+html[data-theme="dark"] .backup-source-empty span {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .backup-source-empty strong {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .backup-tree-scroll .ant-tree,
+html[data-theme="dark"] .backup-tree-scroll .ant-tree-title,
+html[data-theme="dark"] .backup-tree-scroll .backup-node-title {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .backup-summary-icon {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .backup-dictionary-options .ant-checkbox-wrapper {
+  background: transparent !important;
+}
+
+html[data-theme="dark"] .backup-migration-modal .ant-tabs-tab-btn {
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"]
+  .backup-migration-modal
+  .ant-tabs-tab-active
+  .ant-tabs-tab-btn {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .backup-policy label,
+html[data-theme="dark"] .backup-policy .ant-radio-button-wrapper,
+html[data-theme="dark"] .backup-policy .ant-radio-button-wrapper:hover,
+html[data-theme="dark"] .backup-policy .ant-radio-button-wrapper:focus,
+html[data-theme="dark"] .backup-policy .ant-radio-button-wrapper:active,
+html[data-theme="dark"] .backup-policy .ant-radio-button-wrapper-checked,
+html[data-theme="dark"] .backup-policy .ant-radio-button-wrapper-checked:hover,
+html[data-theme="dark"] .backup-policy .ant-radio-button-wrapper-checked:focus,
+html[data-theme="dark"]
+  .backup-policy
+  .ant-radio-button-wrapper-checked:active {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .relation-context,
+html[data-theme="dark"] .relation-drawer-footer,
+html[data-theme="dark"] .relation-graph-toolbar,
+html[data-theme="dark"] .relation-graph-legend,
+html[data-theme="dark"] .relation-form-hint {
+  background: var(--cb-surface-muted) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .relation-context-route,
+html[data-theme="dark"] .relation-drawer-footer > span:first-child,
+html[data-theme="dark"] .relation-form .ant-form-item-label > label,
+html[data-theme="dark"] .relation-context-route code,
+html[data-theme="dark"] .relation-drawer-title small {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .relation-drawer-title b,
+html[data-theme="dark"] .relation-form-title,
+html[data-theme="dark"] .relation-graph-title {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .relation-form-title-copy small {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .relation-list-toolbar,
+html[data-theme="dark"] .relation-list-search,
+html[data-theme="dark"] .relation-group,
+html[data-theme="dark"] .rel-entry {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .relation-list-search .ant-input-affix-wrapper,
+html[data-theme="dark"] .relation-list-search .ant-input,
+html[data-theme="dark"] .relation-list-search .input-search-trigger {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .relation-list-search .ant-input::placeholder,
+html[data-theme="dark"] .relation-list-search .anticon {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .relation-group-head {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .relation-group-count,
+html[data-theme="dark"] .relation-group-head .fold,
+html[data-theme="dark"] .rel-entry .rel-arrow,
+html[data-theme="dark"] .rel-entry .rel-joins {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .rel-entry:hover {
+  background: var(--cb-hover) !important;
+}
+
+html[data-theme="dark"] .rel-entry .rel-other,
+html[data-theme="dark"] .rel-entry .rel-joins b {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .rel-entry.in .rel-arrow,
+html[data-theme="dark"] .rel-entry.out .rel-arrow {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .rel-entry .rel-go {
+  background: var(--cb-selected) !important;
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .relation-form-modal .ant-modal-header,
+html[data-theme="dark"] .relation-form-modal .ant-modal-body,
+html[data-theme="dark"] .relation-form-modal .ant-modal-footer {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .relation-form .ant-input,
+html[data-theme="dark"] .relation-form .ant-select-selector {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .relation-form .ant-input::placeholder,
+html[data-theme="dark"] .relation-form .ant-select-placeholder,
+html[data-theme="dark"] .relation-form .ant-select-arrow {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"]
+  .relation-form
+  .ant-select-disabled
+  .ant-select-selector {
+  background: var(--cb-surface-muted) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .relation-status {
+  background: #163d35 !important;
+  color: #9be5d1 !important;
+}
+
+html[data-theme="dark"] .relation-title-icon,
+html[data-theme="dark"] .relation-graph-legend i.dot.center {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .relation-graph-wrap,
+html[data-theme="dark"] .relation-graph-wrap svg {
+  background: var(--cb-surface) !important;
+}
+
+html[data-theme="dark"] .relation-graph-toolbar,
+html[data-theme="dark"] .relation-graph-toolbar .ant-btn,
+html[data-theme="dark"] .relation-graph-search.ant-input-affix-wrapper {
+  background: transparent !important;
+  border-color: var(--cb-border) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .relation-graph-toolbar .ant-btn {
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .relation-graph-toolbar .ant-btn:hover,
+html[data-theme="dark"] .relation-graph-toolbar .ant-btn:focus-visible {
+  background: var(--cb-hover) !important;
+  border-color: var(--cb-accent-border) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"]
+  .relation-graph-search.ant-input-affix-wrapper
+  .ant-input,
+html[data-theme="dark"]
+  .relation-graph-search.ant-input-affix-wrapper
+  .input-search-trigger {
+  background: transparent !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"]
+  .relation-graph-search.ant-input-affix-wrapper
+  .ant-input::placeholder,
+html[data-theme="dark"]
+  .relation-graph-search.ant-input-affix-wrapper
+  .anticon {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .relation-graph-tip,
+html[data-theme="dark"] .relation-form-hint {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .graph-hover-tip {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28) !important;
+}
+
+html[data-theme="dark"] .graph-hover-tip,
+html[data-theme="dark"] .graph-hover-tip .tip-fields {
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .graph-hover-tip .tip-title,
+html[data-theme="dark"] .graph-hover-tip .tip-fields b {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .graph-hover-tip .tip-fk {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .relation-graph-legend .focus-hint {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"]
+  .relation-graph-toolbar
+  .relation-filter-button.is-selected,
+html[data-theme="dark"]
+  .relation-graph-toolbar
+  .relation-filter-button.is-selected:hover,
+html[data-theme="dark"]
+  .relation-graph-toolbar
+  .relation-filter-button.is-selected:focus-visible {
+  border-color: var(--cb-accent-border) !important;
+  background: var(--cb-selected) !important;
+  color: var(--cb-text) !important;
+  font-weight: 700;
+}
+
+html[data-theme="dark"] .relation-graph-toolbar .relation-graph-zoom-button,
+html[data-theme="dark"]
+  .relation-graph-toolbar
+  .relation-graph-zoom-button:hover,
+html[data-theme="dark"]
+  .relation-graph-toolbar
+  .relation-graph-zoom-button:active,
+html[data-theme="dark"]
+  .relation-graph-toolbar
+  .relation-graph-zoom-button:focus,
+html[data-theme="dark"]
+  .relation-graph-toolbar
+  .relation-graph-zoom-button:focus-visible {
+  border-color: var(--cb-border) !important;
+  background: transparent !important;
+  color: var(--cb-text-secondary) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .ai-header-avatar,
+html[data-theme="dark"] .ai-scope-control,
+html[data-theme="dark"] .ai-personalize-trigger,
+html[data-theme="dark"] .ai-suggestions button,
+html[data-theme="dark"] .ai-composer,
+html[data-theme="dark"] .ai-composer-shell {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ai-assistant .ai-assistant-identity strong,
+html[data-theme="dark"] .ai-assistant .ai-scope-selection span,
+html[data-theme="dark"] .ai-assistant .ai-model-signature strong {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ai-scope-control:hover,
+html[data-theme="dark"] .ai-suggestions button:hover,
+html[data-theme="dark"] .ai-personalize-trigger:hover {
+  background: var(--cb-hover) !important;
+  border-color: var(--cb-accent-border) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ai-readonly-pill {
+  background: var(--cb-selected) !important;
+  border-color: var(--cb-accent-border) !important;
+  color: var(--cb-selected-text) !important;
+}
+
+html[data-theme="dark"] .ai-empty-state h2,
+html[data-theme="dark"] .ai-empty-state > p,
+html[data-theme="dark"] .ai-suggestions button,
+html[data-theme="dark"] .ai-composer-meta,
+html[data-theme="dark"] .ai-composer-meta kbd {
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ai-composer .ant-input::placeholder,
+html[data-theme="dark"] .ai-composer-meta kbd {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .ai-composer-meta kbd {
+  background: var(--cb-surface-muted) !important;
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .ai-assistant .ai-composer-shell,
+html[data-theme="dark"] .ai-assistant .ai-composer-frame {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .ai-assistant .ai-send-button {
+  background: var(--cb-accent) !important;
+  color: var(--cb-page-bg) !important;
+  opacity: 1;
+}
+
+html[data-theme="dark"] .ai-assistant .ai-send-button:hover:not(:disabled) {
+  background: var(--cb-accent-strong) !important;
+  color: var(--cb-page-bg) !important;
+}
+
+html[data-theme="dark"] .ai-assistant .ai-send-button:disabled,
+html[data-theme="dark"] .ai-assistant .ai-send-button.is-stop {
+  background: var(--cb-surface-muted) !important;
+  color: var(--cb-text-muted) !important;
+  opacity: 1;
+}
+
+html[data-theme="dark"]
+  .ai-assistant
+  .ai-send-button.is-stop:hover:not(:disabled) {
+  background: var(--cb-hover) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ai-personalize-modal .ai-personalize-shell,
+html[data-theme="dark"] .ai-persona-accessories,
+html[data-theme="dark"] .ai-persona-accessory-grid > button,
+html[data-theme="dark"] .ai-persona-preview-row > button {
+  background: var(--cb-surface-muted) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ai-personalize-modal .ai-personalize-shell h2,
+html[data-theme="dark"] .ai-persona-section-title strong,
+html[data-theme="dark"] .ai-persona-section-title span,
+html[data-theme="dark"] .ai-persona-name-field .ant-input,
+html[data-theme="dark"] .ai-persona-accessory-grid > button {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ai-persona-preview-bear {
+  border-color: var(--cb-border) !important;
+  background: #0f1216 !important;
+  box-shadow:
+    0 18px 38px rgba(0, 0, 0, 0.45),
+    0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+html[data-theme="dark"] .ai-persona-accessory-grid > button:hover,
+html[data-theme="dark"] .ai-persona-accessory-grid > button.is-selected,
+html[data-theme="dark"] .ai-persona-preview-row > button:hover {
+  background: var(--cb-hover) !important;
+  border-color: var(--cb-accent-border) !important;
+  color: var(--cb-selected-text) !important;
+}
+
+html[data-theme="dark"] .ai-persona-name-field .ant-input {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .ai-assistant-actions > button.is-active,
+html[data-theme="dark"] .ai-layout-picker > button.is-active {
+  background: var(--cb-surface-muted) !important;
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .ai-settings-title strong,
+html[data-theme="dark"] .ai-settings-title span,
+html[data-theme="dark"] .ai-settings-field > span:first-child,
+html[data-theme="dark"] .ai-privacy-note,
+html[data-theme="dark"] .ai-history-heading strong,
+html[data-theme="dark"] .ai-history-heading small,
+html[data-theme="dark"] .ai-history-empty > strong,
+html[data-theme="dark"] .ai-history-empty > p {
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ai-privacy-note {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-accent-border) !important;
+}
+
+html[data-theme="dark"] .ai-history-toolbar,
+html[data-theme="dark"] .ai-history-new,
+html[data-theme="dark"] .ai-history-empty > button,
+html[data-theme="dark"] .ai-history-status > button,
+html[data-theme="dark"] .ai-history-empty > span {
+  background: var(--cb-surface-muted) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ai-history-new:hover,
+html[data-theme="dark"] .ai-history-empty > button:hover,
+html[data-theme="dark"] .ai-history-status > button:hover {
+  background: var(--cb-hover) !important;
+  border-color: var(--cb-accent-border) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .update-check-modal .ant-modal-body,
+html[data-theme="dark"] .update-versions,
+html[data-theme="dark"] .update-steps,
+html[data-theme="dark"] .update-notes,
+html[data-theme="dark"] .update-notes-heading,
+html[data-theme="dark"] .update-notes-content,
+html[data-theme="dark"] .update-sha-row,
+html[data-theme="dark"] .update-footer {
+  background: var(--cb-surface-muted) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .update-check-modal .ant-modal-body {
+  background: var(--cb-surface) !important;
+}
+
+html[data-theme="dark"] .update-modal-title,
+html[data-theme="dark"] .update-versions b,
+html[data-theme="dark"] .update-steps li,
+html[data-theme="dark"] .update-notes-content h1,
+html[data-theme="dark"] .update-notes-content h2,
+html[data-theme="dark"] .update-notes-content h3,
+html[data-theme="dark"] .update-empty b,
+html[data-theme="dark"] .update-centered {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .update-versions small,
+html[data-theme="dark"] .update-versions em,
+html[data-theme="dark"] .update-steps > small,
+html[data-theme="dark"] .update-notes-heading small,
+html[data-theme="dark"] .update-notes-content,
+html[data-theme="dark"] .update-empty small,
+html[data-theme="dark"] .update-sha-row code {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .update-notes-content code,
+html[data-theme="dark"] .update-notes-content pre {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .update-notes-content blockquote {
+  background: #3b2e1d !important;
+  border-color: #8a6a2f !important;
+  color: #f0c77b !important;
+}
+
+html[data-theme="dark"] .dictionary-import-modal .ant-upload-drag,
+html[data-theme="dark"] .dictionary-import-modal .ant-upload-list,
+html[data-theme="dark"] .dictionary-import-modal .ant-upload-list-item {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .dictionary-import-modal .ant-upload-text,
+html[data-theme="dark"] .dictionary-import-modal .ant-upload-hint,
+html[data-theme="dark"] .dictionary-import-modal .ant-upload-list-item-name {
+  color: var(--cb-text-secondary) !important;
+}
+
+/* Codex-style accents: neutral graphite surfaces, quiet gray interaction states. */
+html[data-theme="dark"] .ai-bear-data-line {
+  stroke: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .ai-accessory-blue {
+  fill: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .ai-layout-check,
+html[data-theme="dark"] .ai-suggestions button .anticon {
+  stroke: var(--cb-accent) !important;
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .ai-history-item::before {
+  background: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .ai-personalize-modal .ant-modal-close:hover,
+html[data-theme="dark"] .ai-persona-preview-row > button:hover {
+  background: var(--cb-hover) !important;
+  border-color: var(--cb-accent-border) !important;
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .ai-persona-name-field .ant-input:hover,
+html[data-theme="dark"] .ai-persona-name-field .ant-input:focus {
+  border-color: var(--cb-accent) !important;
+  box-shadow: 0 0 0 3px rgba(193, 199, 206, 0.16) !important;
+}
+
+html[data-theme="dark"] .ai-persona-accessory-grid > button.is-selected {
+  border-color: var(--cb-accent) !important;
+  box-shadow:
+    inset 0 0 0 1px var(--cb-accent),
+    0 7px 16px rgba(0, 0, 0, 0.28) !important;
+}
+
+html[data-theme="dark"] .ai-persona-option-check {
+  background: var(--cb-accent) !important;
+  color: #10201f !important;
+}
+
+html[data-theme="dark"] .ai-evidence-card.is-direct {
+  border-color: var(--cb-border) !important;
+  box-shadow: inset 2px 0 0 var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .backup-import-progress-track {
+  background: var(--cb-accent-soft) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.28) !important;
+}
+
+html[data-theme="dark"] .backup-import-progress-track > span {
+  background: linear-gradient(
+    90deg,
+    var(--cb-accent) 0%,
+    var(--cb-accent-strong) 64%,
+    #eef0f2 100%
+  ) !important;
+  box-shadow: 0 0 9px rgba(193, 199, 206, 0.18) !important;
+}
+
+html[data-theme="dark"] .relation-graph-legend i.dot.normal {
+  background: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .graph-node .bubble-shape {
+  fill: var(--cb-surface-raised) !important;
+  stroke: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .graph-node:hover .bubble-shape {
+  stroke: var(--cb-accent-strong) !important;
+}
+
+html[data-theme="dark"] .graph-node .graph-node-label {
+  fill: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .graph-node.center .bubble-shape {
+  fill: var(--cb-selected) !important;
+  stroke: var(--cb-accent-strong) !important;
+}
+
+html[data-theme="dark"] .graph-node.center .graph-node-label {
+  fill: var(--cb-selected-text) !important;
+}
+
+html[data-theme="dark"] .graph-node .graph-node-dot {
+  fill: var(--cb-border) !important;
+  stroke: var(--cb-surface) !important;
+}
+
+html[data-theme="dark"] .graph-node:hover .graph-node-dot {
+  fill: var(--cb-accent-strong) !important;
+}
+
+html[data-theme="dark"] .graph-node.center .graph-node-dot {
+  fill: var(--cb-accent-strong) !important;
+  stroke: var(--cb-surface) !important;
+}
+
+html[data-theme="dark"] .graph-edge {
+  stroke: #65717d !important;
+}
+
+html[data-theme="dark"] .graph-edge.hl,
+html[data-theme="dark"] .graph-edge.focus {
+  stroke: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .graph-arrow {
+  fill: #65717d !important;
+}
+
+html[data-theme="dark"] .graph-arrow.manual {
+  fill: #d9972d !important;
+}
+
+html[data-theme="dark"] .app-root .ant-tag-blue {
+  background: var(--cb-accent-soft) !important;
+  border-color: var(--cb-accent-border) !important;
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .app-root .data-grid-row code,
+html[data-theme="dark"] .app-root .field-grid-body code {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .app-root .table-tab.is-active .table-tab-name {
+  color: var(--cb-selected-text) !important;
+}
+
+html[data-theme="dark"] .ai-assistant,
+html[data-theme="dark"] .ai-assistant.is-floating {
+  border-color: var(--cb-border) !important;
+  background: var(--cb-surface) !important;
+  box-shadow: -12px 0 34px rgba(0, 0, 0, 0.42) !important;
+}
+
+html[data-theme="dark"] .ai-assistant.is-fullscreen {
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .ai-assistant-header {
+  border-bottom-color: var(--cb-border) !important;
+  background: var(--cb-surface) !important;
+}
+
+html[data-theme="dark"] .ai-assistant-actions > button:hover,
+html[data-theme="dark"] .ai-assistant-actions > button:focus-visible,
+html[data-theme="dark"] .ai-layout-picker > button:hover,
+html[data-theme="dark"] .ai-layout-picker > button:focus-visible {
+  background: var(--cb-hover) !important;
+  color: var(--cb-accent) !important;
+  outline: none;
+}
+
+html[data-theme="dark"] .ai-assistant-actions > button.ai-assistant-close,
+html[data-theme="dark"] .ai-assistant-actions > button.ai-assistant-close:hover,
+html[data-theme="dark"]
+  .ai-assistant-actions
+  > button.ai-assistant-close:active,
+html[data-theme="dark"] .ai-assistant-actions > button.ai-assistant-close:focus,
+html[data-theme="dark"]
+  .ai-assistant-actions
+  > button.ai-assistant-close:focus-visible {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ai-assistant-actions > button.ai-assistant-close:hover,
+html[data-theme="dark"]
+  .ai-assistant-actions
+  > button.ai-assistant-close:focus-visible {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"]
+  .ai-assistant-actions
+  > button.ai-assistant-close:focus-visible {
+  outline: 1px solid var(--cb-accent-border) !important;
+  outline-offset: -1px;
+}
+
+html[data-theme="dark"] .ai-personalize-modal .ant-modal-content,
+html[data-theme="dark"] .ai-personalize-modal .ai-personalize-shell {
+  border-color: var(--cb-border) !important;
+  background: var(--cb-surface) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .ai-persona-accessories {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .table-tabs-actions {
+  border-left-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .table-tab-action {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .table-tab-action:hover,
+html[data-theme="dark"] .table-tab-action:focus-visible {
+  background: var(--cb-hover) !important;
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .table-tab-close:focus-visible {
+  outline-color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .table-icon {
+  border-color: var(--cb-border) !important;
+  background: var(--cb-surface-raised) !important;
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .table-heading code {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .pk-badge {
+  border-color: #695a42 !important;
+  background: #302a21 !important;
+  color: var(--cb-warm) !important;
+}
+
+html[data-theme="dark"] .scope-icon,
+html[data-theme="dark"] .table-icon,
+html[data-theme="dark"] .dictionary-title-icon,
+html[data-theme="dark"] .dictionary-list-icon,
+html[data-theme="dark"] .ddl-title-icon,
+html[data-theme="dark"] .ddl-summary-check,
+html[data-theme="dark"] .ddl-tree-icon,
+html[data-theme="dark"] .relation-title-icon,
+html[data-theme="dark"] .backup-summary-icon {
+  border-color: var(--cb-icon-border) !important;
+  background: var(--cb-icon-bg) !important;
+  color: var(--cb-icon) !important;
+}
+
+html[data-theme="dark"] .preferences-setting-label .anticon {
+  color: var(--cb-icon) !important;
+}
+
+html[data-theme="dark"] .table-delete-modal-title {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .table-delete-modal-title-icon {
+  border-color: var(--cb-border) !important;
+  background: var(--cb-surface-muted) !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] .table-delete-modal .ant-modal-container,
+html[data-theme="dark"] .table-delete-modal .ant-modal-header,
+html[data-theme="dark"] .table-delete-modal .ant-modal-body,
+html[data-theme="dark"] .table-delete-modal .ant-modal-footer {
+  background: var(--cb-surface) !important;
+  border-color: var(--cb-border) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .table-delete-target,
+html[data-theme="dark"] .table-delete-impact {
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .table-delete-target > span,
+html[data-theme="dark"] .table-delete-target small,
+html[data-theme="dark"] .table-delete-impact small {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .table-delete-target code,
+html[data-theme="dark"] .table-delete-impact b {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .table-delete-impact > span {
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .table-delete-backup-note {
+  border-left-color: var(--cb-accent-border) !important;
+  background: var(--cb-surface-muted) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .table-delete-backup-note strong,
+html[data-theme="dark"] .table-delete-backup-note small {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .table-delete-modal .ant-modal-footer .ant-btn,
+html[data-theme="dark"] .table-delete-modal .ant-modal-footer .ant-btn:hover,
+html[data-theme="dark"] .table-delete-modal .ant-modal-footer .ant-btn:active,
+html[data-theme="dark"] .table-delete-modal .ant-modal-footer .ant-btn:focus,
+html[data-theme="dark"]
+  .table-delete-modal
+  .ant-modal-footer
+  .ant-btn:focus-visible {
+  border-color: var(--cb-border) !important;
+  background: var(--cb-surface-raised) !important;
+  color: var(--cb-text) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .table-delete-modal .ant-modal-footer .ant-btn:hover,
+html[data-theme="dark"]
+  .table-delete-modal
+  .ant-modal-footer
+  .ant-btn:focus-visible {
+  border-color: var(--cb-accent-border) !important;
+  background: var(--cb-hover) !important;
+}
+
+html[data-theme="dark"] .dialog-form label {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .dialog-form small {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .ai-launcher {
+  border-color: var(--cb-border) !important;
+  background: var(--cb-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ai-launcher:hover {
+  border-color: var(--cb-accent-border) !important;
+}
+
+/* Keep dark-mode hover and selection states graphite instead of leaking light-theme chrome. */
+html[data-theme="dark"] .navigator-toolbar {
+  border-bottom-color: var(--cb-border) !important;
+  background: var(--cb-surface) !important;
+}
+
+html[data-theme="dark"] .navigator-actions .ant-btn:hover,
+html[data-theme="dark"] .navigator-actions .ant-btn:focus-visible,
+html[data-theme="dark"] .table-tab-action:hover,
+html[data-theme="dark"] .table-tab-action:focus-visible {
+  border-color: transparent !important;
+  background: var(--cb-hover) !important;
+  box-shadow: none !important;
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .table-tab {
+  border-color: transparent !important;
+  background: var(--cb-surface) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .table-tab:hover:not(.is-active),
+html[data-theme="dark"] .table-tab:focus-within:not(.is-active) {
+  background: var(--cb-surface) !important;
+}
+
+html[data-theme="dark"] .table-tab.is-active {
+  border-color: var(--cb-border) !important;
+  background: var(--cb-selected) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .table-tabs .table-tab.is-active .table-tab-main,
+html[data-theme="dark"] .table-tabs .table-tab.is-active .table-tab-main:hover,
+html[data-theme="dark"] .table-tabs .table-tab.is-active .table-tab-main:active,
+html[data-theme="dark"] .table-tabs .table-tab.is-active .table-tab-main:focus,
+html[data-theme="dark"]
+  .table-tabs
+  .table-tab.is-active
+  .table-tab-main:focus-visible {
+  background: var(--cb-selected) !important;
+}
+
+html[data-theme="dark"] .table-tab.is-active::after {
+  background: var(--cb-accent-border) !important;
+}
+
+html[data-theme="dark"] .table-tab-main,
+html[data-theme="dark"] .table-tab-name {
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .table-tab.is-active .table-tab-main,
+html[data-theme="dark"] .table-tab.is-active .table-tab-name {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .app-root .code-cell,
+html[data-theme="dark"] .app-root .data-grid-row code,
+html[data-theme="dark"] .app-root .field-grid-body code {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .table-tabs .table-tab-close,
+html[data-theme="dark"] .table-tabs .table-tab-close:hover,
+html[data-theme="dark"] .table-tabs .table-tab-close:active,
+html[data-theme="dark"] .table-tabs .table-tab-close:focus-visible {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .app-root .table-tabs .table-tab-close,
+html[data-theme="dark"] .app-root .table-tabs .table-tab-close:hover,
+html[data-theme="dark"] .app-root .table-tabs .table-tab-close:active,
+html[data-theme="dark"] .app-root .table-tabs .table-tab-close:focus,
+html[data-theme="dark"] .app-root .table-tabs .table-tab-close:focus-visible {
+  border: 0 !important;
+  background: inherit !important;
+  box-shadow: none !important;
+  color: var(--cb-text) !important;
+  outline: none !important;
+  transition: none !important;
+}
+
+html[data-theme="dark"] .dictionary-pane-heading b,
+html[data-theme="dark"] .dictionary-manage-toolbar b,
+html[data-theme="dark"] .dictionary-manage-meta label,
+html[data-theme="dark"] .dictionary-detail-header > span b,
+html[data-theme="dark"] .dictionary-metrics b,
+html[data-theme="dark"] .dictionary-candidate-summary b,
+html[data-theme="dark"] .dictionary-current-scope b,
+html[data-theme="dark"] .dictionary-binding-target b,
+html[data-theme="dark"] .dictionary-submodal-title,
+html[data-theme="dark"] .dictionary-center-modal .ant-table-thead > tr > th,
+html[data-theme="dark"] .dictionary-manage-modal .ant-table-thead > tr > th {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .dictionary-pane-heading small,
+html[data-theme="dark"] .dictionary-manage-toolbar small,
+html[data-theme="dark"] .dictionary-detail-header > span small,
+html[data-theme="dark"] .dictionary-metrics small,
+html[data-theme="dark"] .dictionary-list-item strong,
+html[data-theme="dark"] .dictionary-current-scope small,
+html[data-theme="dark"] .dictionary-binding-target small,
+html[data-theme="dark"] .dictionary-candidate-summary small {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .dictionary-list-item {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .dictionary-list-item:hover {
+  border-color: var(--cb-border) !important;
+  background: var(--cb-hover) !important;
+}
+
+html[data-theme="dark"] .dictionary-list-item.is-selected,
+html[data-theme="dark"] .dictionary-list-item.is-selected:hover {
+  border-color: var(--cb-accent-border) !important;
+  background: var(--cb-selected) !important;
+  box-shadow: inset 3px 0 var(--cb-accent-border) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .dictionary-list-label b,
+html[data-theme="dark"]
+  .dictionary-list-item.is-selected
+  .dictionary-list-label
+  b {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .dictionary-list-icon,
+html[data-theme="dark"]
+  .dictionary-list-item.is-selected
+  .dictionary-list-icon {
+  border-color: var(--cb-icon-border) !important;
+  background: var(--cb-icon-bg) !important;
+  color: var(--cb-icon) !important;
+}
+
+html[data-theme="dark"] .dictionary-list-actions,
+html[data-theme="dark"] .dictionary-detail-header,
+html[data-theme="dark"] .dictionary-metrics,
+html[data-theme="dark"] .dictionary-detail-tabs,
+html[data-theme="dark"] .dictionary-current-scope,
+html[data-theme="dark"] .dictionary-candidate-search,
+html[data-theme="dark"] .dictionary-candidate-summary {
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .dictionary-metrics > span {
+  border-right-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .dictionary-center-modal .ant-table,
+html[data-theme="dark"] .dictionary-manage-modal .ant-table {
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .dictionary-center-modal .ant-table-thead > tr > th,
+html[data-theme="dark"] .dictionary-manage-modal .ant-table-thead > tr > th {
+  border-color: var(--cb-border) !important;
+  background: var(--cb-surface-muted) !important;
+}
+
+html[data-theme="dark"] .dictionary-center-modal .ant-table-tbody > tr > td,
+html[data-theme="dark"] .dictionary-manage-modal .ant-table-tbody > tr > td {
+  border-color: var(--cb-border-soft) !important;
+  background: var(--cb-surface) !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"]
+  .dictionary-center-modal
+  .ant-table-tbody
+  > tr:hover
+  > td,
+html[data-theme="dark"]
+  .dictionary-manage-modal
+  .ant-table-tbody
+  > tr:hover
+  > td {
+  background: var(--cb-hover) !important;
+}
+
+html[data-theme="dark"] .dictionary-center-modal .ant-table-cell code {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .dictionary-binding-target {
+  border-color: var(--cb-icon-border) !important;
+  background: var(--cb-icon-bg) !important;
+  color: var(--cb-icon-strong) !important;
+}
+
+html[data-theme="dark"] .ddl-preview-tabs {
+  border-bottom-color: var(--cb-border) !important;
+  background: var(--cb-surface-muted) !important;
+}
+
+html[data-theme="dark"] .ddl-preview-tabs button {
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ddl-preview-tabs button:hover:not(.is-active) {
+  background: var(--cb-hover) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ddl-preview-tabs button.is-active {
+  background: var(--cb-selected) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ddl-preview-tabs button.is-active::after {
+  background: var(--cb-accent-border) !important;
+}
+
+html[data-theme="dark"] .app-root .data-grid-row.is-selected,
+html[data-theme="dark"] .app-root .data-grid-row.is-selected:hover,
+html[data-theme="dark"] .app-root .data-grid-row.is-selected > span,
+html[data-theme="dark"] .app-root .data-grid-row.is-selected > .table-row-open {
+  background: var(--cb-selected) !important;
+  color: var(--cb-selected-text) !important;
+}
+
+html[data-theme="dark"] .app-root .data-grid-row.is-selected {
+  box-shadow: inset 3px 0 0 var(--cb-accent-border) !important;
+}
+
+html[data-theme="dark"] .app-root .data-grid-row:not(.is-selected):hover,
+html[data-theme="dark"] .app-root .data-grid-row:not(.is-selected):hover > span,
+html[data-theme="dark"]
+  .app-root
+  .data-grid-row:not(.is-selected):hover
+  > .table-row-open {
+  background: var(--cb-selected) !important;
+}
+
+html[data-theme="dark"] .app-root .data-grid-row.is-marked:not(.is-selected),
+html[data-theme="dark"]
+  .app-root
+  .data-grid-row.is-marked:not(.is-selected)
+  > span,
+html[data-theme="dark"]
+  .app-root
+  .data-grid-row.is-marked:not(.is-selected)
+  > .table-row-open {
+  background: var(--cb-selected) !important;
+}
+
+html[data-theme="dark"] .app-root .table-row-open:focus-visible {
+  outline: 2px solid var(--cb-accent-border) !important;
+  outline-offset: -2px;
+}
+
+html[data-theme="dark"] .app-root .table-action-cell .ant-btn:hover,
+html[data-theme="dark"] .app-root .table-action-cell .ant-btn:focus-visible {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"]
+  .app-root
+  .navigator-tree
+  .navigator-tree-node-selected
+  > .ant-tree-node-content-wrapper::after {
+  background: var(--cb-accent-border) !important;
+}
+
+html[data-theme="dark"] .ddl-table-nodes::before,
+html[data-theme="dark"] .ddl-table-node::before {
+  background: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .ddl-pdm-node,
+html[data-theme="dark"] .ddl-tree-group[aria-expanded="true"] .ddl-pdm-node,
+html[data-theme="dark"] .ddl-table-node,
+html[data-theme="dark"] .ddl-table-node:hover,
+html[data-theme="dark"] .ddl-table-node.is-selected,
+html[data-theme="dark"] .ddl-table-node.is-selected:hover {
+  background: transparent !important;
+}
+
+html[data-theme="dark"] .ddl-table-node.is-selected,
+html[data-theme="dark"] .ddl-table-node.is-selected:hover {
+  box-shadow: none !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .dictionary-scope-tree,
+html[data-theme="dark"] .dictionary-scope-tree .ant-tree,
+html[data-theme="dark"] .dictionary-scope-tree .ant-tree-list,
+html[data-theme="dark"] .dictionary-scope-tree .ant-tree-list-holder,
+html[data-theme="dark"] .dictionary-scope-tree .ant-tree-list-holder-inner {
+  background: var(--cb-surface-raised) !important;
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .dictionary-scope-tree .ant-tree-treenode {
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"]
+  .dictionary-scope-tree
+  .ant-tree-treenode
+  > .ant-tree-switcher,
+html[data-theme="dark"]
+  .dictionary-scope-tree
+  .ant-tree-treenode
+  > .ant-tree-node-content-wrapper {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"]
+  .dictionary-scope-tree
+  .ant-tree-treenode:not(.navigator-tree-node-selected):hover
+  > .ant-tree-switcher,
+html[data-theme="dark"]
+  .dictionary-scope-tree
+  .ant-tree-treenode:not(.navigator-tree-node-selected):hover
+  > .ant-tree-node-content-wrapper {
+  background: var(--cb-hover) !important;
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"]
+  .dictionary-scope-tree
+  .navigator-tree-node-selected
+  > .ant-tree-switcher,
+html[data-theme="dark"]
+  .dictionary-scope-tree
+  .navigator-tree-node-selected
+  > .ant-tree-node-content-wrapper,
+html[data-theme="dark"]
+  .dictionary-scope-tree
+  .navigator-tree-node-selected
+  > .ant-tree-node-content-wrapper:hover {
+  border-color: var(--cb-accent-border) !important;
+  background: var(--cb-selected) !important;
+  color: var(--cb-selected-text) !important;
+}
+
+html[data-theme="dark"]
+  .dictionary-scope-tree
+  .navigator-tree-node-selected
+  > .ant-tree-node-content-wrapper::after {
+  background: var(--cb-accent-border) !important;
+}
+
+html[data-theme="dark"] .dictionary-scope-tree .navigator-tree-node-selected {
+  background: var(--cb-selected) !important;
+  color: var(--cb-selected-text) !important;
+}
+
+html[data-theme="dark"] .dictionary-scope-tree .tree-name,
+html[data-theme="dark"] .dictionary-scope-tree .tree-count {
+  color: inherit !important;
+}
+
+html[data-theme="dark"] .dictionary-scope-tree .tree-node-icon {
+  color: var(--cb-icon) !important;
+}
+
+html[data-theme="dark"] .dictionary-detail-tabs .ant-tabs-nav::before {
+  border-color: var(--cb-border) !important;
+}
+
+html[data-theme="dark"] .dictionary-detail-tabs .ant-tabs-tab-btn {
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"]
+  .dictionary-detail-tabs
+  .ant-tabs-tab-active
+  .ant-tabs-tab-btn {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .dictionary-detail-tabs .ant-tabs-ink-bar {
+  background: var(--cb-accent-border) !important;
+}
+
+html[data-theme="dark"] .table-tabs .table-tab.is-active {
+  border-color: transparent !important;
+}
+
+html[data-theme="dark"] .table-tabs .table-tab.is-active::after {
+  background: transparent !important;
+}
+
+html[data-theme="dark"] .table-tabs .table-tab.is-active .table-tab-close,
+html[data-theme="dark"] .table-tabs .table-tab.is-active .table-tab-close:hover,
+html[data-theme="dark"]
+  .table-tabs
+  .table-tab.is-active
+  .table-tab-close:active,
+html[data-theme="dark"] .table-tabs .table-tab.is-active .table-tab-close:focus,
+html[data-theme="dark"]
+  .table-tabs
+  .table-tab.is-active
+  .table-tab-close:focus-visible {
+  border: 0 !important;
+  border-color: transparent !important;
+  background: var(--cb-selected) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .app-root .ant-modal-close,
+html[data-theme="dark"] .ant-modal-close,
+html[data-theme="dark"] .ant-modal-wrap .ant-modal-close:hover,
+html[data-theme="dark"] .ant-modal-wrap .ant-modal-close:active,
+html[data-theme="dark"] .ant-modal-wrap .ant-modal-close:focus,
+html[data-theme="dark"] .ant-modal-wrap .ant-modal-close:focus-visible {
+  border: 0 !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ant-modal-wrap .ant-modal-close:hover,
+html[data-theme="dark"] .ant-modal-wrap .ant-modal-close:focus-visible {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .app-root .ant-modal-close:focus-visible,
+html[data-theme="dark"] .ant-modal-wrap .ant-modal-close:focus-visible {
+  outline: 1px solid var(--cb-accent-border) !important;
+  outline-offset: -1px;
+}
+
+html[data-theme="dark"] .app-root .search-highlight {
+  color: var(--cb-text) !important;
+  background: #414951 !important;
+  box-shadow: inset 0 0 0 1px #68737d;
+}
+
+html[data-theme="dark"] .ant-btn-dangerous.ant-btn-icon-only,
+html[data-theme="dark"] .ant-btn-dangerous.ant-btn-icon-only:hover,
+html[data-theme="dark"] .ant-btn-dangerous.ant-btn-icon-only:active,
+html[data-theme="dark"] .ant-btn-dangerous.ant-btn-icon-only:focus,
+html[data-theme="dark"] .ant-btn-dangerous.ant-btn-icon-only:focus-visible {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ant-btn-dangerous.ant-btn-icon-only:hover,
+html[data-theme="dark"] .ant-btn-dangerous.ant-btn-icon-only:focus-visible {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .ant-btn-dangerous.ant-btn-icon-only:focus-visible {
+  outline: 1px solid var(--cb-accent-border) !important;
+  outline-offset: -1px;
+}
+
+/* Keep row hover fills out of the native scrollbar gutter. */
+html[data-theme="dark"] .app-root .table-grid-body,
+html[data-theme="dark"] .app-root .field-grid-body {
+  scrollbar-color: var(--cb-scroll-thumb) var(--cb-scroll-track) !important;
+}
+
+html[data-theme="dark"] .app-root .table-grid-body::-webkit-scrollbar-track,
+html[data-theme="dark"] .app-root .field-grid-body::-webkit-scrollbar-track {
+  background: var(--cb-scroll-track) !important;
+}
+
+html[data-theme="dark"] .app-root .table-grid-body::-webkit-scrollbar-thumb,
+html[data-theme="dark"] .app-root .field-grid-body::-webkit-scrollbar-thumb {
+  border-color: var(--cb-scroll-track) !important;
+}
+
+/* Final dark-mode text audit: neutralize blue-gray literals in nested and portal content. */
+html[data-theme="dark"] .tree-count,
+html[data-theme="dark"] .section-title small,
+html[data-theme="dark"] .table-comment-trigger,
+html[data-theme="dark"] .dictionary-import-placeholder,
+html[data-theme="dark"] .dictionary-modal-title small,
+html[data-theme="dark"] .relation-empty-hint,
+html[data-theme="dark"] .rel-empty-hint-row,
+html[data-theme="dark"] .backup-source-meta small,
+html[data-theme="dark"] .backup-source-meta b,
+html[data-theme="dark"] .backup-node-title small,
+html[data-theme="dark"] .backup-policy label,
+html[data-theme="dark"] .backup-policy small,
+html[data-theme="dark"] .ddl-tree-loading,
+html[data-theme="dark"] .ddl-tree-toggle,
+html[data-theme="dark"] .ddl-problem-item small,
+html[data-theme="dark"] .ddl-problem-empty span,
+html[data-theme="dark"] .ddl-modal-loading,
+html[data-theme="dark"] .ddl-modal-error,
+html[data-theme="dark"] .relation-centered,
+html[data-theme="dark"] .relation-group-count,
+html[data-theme="dark"] .relation-row-tip .tip-meta,
+html[data-theme="dark"] .relation-drawer-footer > span:first-child,
+html[data-theme="dark"] .trash-loading,
+html[data-theme="dark"] .trash-copy small,
+html[data-theme="dark"] .navigator-empty,
+html[data-theme="dark"] .refresh-progress-copy .refresh-progress-count {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .tree-project-icon,
+html[data-theme="dark"] .tree-folder-icon,
+html[data-theme="dark"] .backup-project-icon,
+html[data-theme="dark"] .backup-folder-icon,
+html[data-theme="dark"] .trash-icon {
+  color: var(--cb-icon) !important;
+}
+
+html[data-theme="dark"] .ddl-footer-status,
+html[data-theme="dark"] .ddl-footer-status b,
+html[data-theme="dark"] .ddl-problem-item b,
+html[data-theme="dark"] .ddl-problem-empty b,
+html[data-theme="dark"] .relation-group-head,
+html[data-theme="dark"] .relation-row-tip .tip-name,
+html[data-theme="dark"] .relation-row-tip .tip-fk,
+html[data-theme="dark"] .relation-row-tip .tip-badge.card,
+html[data-theme="dark"] .refresh-progress-copy {
+  color: var(--cb-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ant-tag-blue,
+html[data-theme="dark"] .ddl-export-modal .ant-tag-blue {
+  border-color: var(--cb-accent-border) !important;
+  background: var(--cb-accent-soft) !important;
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .ai-assistant .ai-layout-menu-title,
+html[data-theme="dark"] .ai-assistant .ai-scope-label,
+html[data-theme="dark"] .ai-assistant .ai-message-model,
+html[data-theme="dark"] .dictionary-centered,
+html[data-theme="dark"] .ai-assistant .ai-assistant-identity small,
+html[data-theme="dark"] .ai-assistant .ai-model-signature > span,
+html[data-theme="dark"] .ai-assistant .ai-model-signature small,
+html[data-theme="dark"] .ai-assistant .ai-model-signature em,
+html[data-theme="dark"] .ai-assistant .ai-history-group-label,
+html[data-theme="dark"] .ai-assistant .ai-history-item-title time,
+html[data-theme="dark"] .ai-assistant .ai-history-item-preview,
+html[data-theme="dark"] .ai-assistant .ai-history-item-main > small,
+html[data-theme="dark"] .ai-assistant .ai-retrieval-toggle,
+html[data-theme="dark"] .ai-assistant .ai-confidence,
+html[data-theme="dark"] .ai-assistant .ai-retrieval-row > b,
+html[data-theme="dark"] .ai-assistant .ai-retrieval-row > span,
+html[data-theme="dark"] .ai-assistant .ai-retrieval-row.is-understanding > span,
+html[data-theme="dark"] .ai-assistant .ai-retrieval-tags i,
+html[data-theme="dark"] .ai-assistant .ai-retrieval-filters i,
+html[data-theme="dark"] .ai-assistant .ai-retrieval-pipeline small,
+html[data-theme="dark"] .ai-assistant .ai-evidence-label,
+html[data-theme="dark"] .ai-assistant .ai-evidence-summary b,
+html[data-theme="dark"] .ai-assistant .ai-evidence-summary small,
+html[data-theme="dark"] .ai-assistant .ai-evidence-source,
+html[data-theme="dark"] .ai-assistant .ai-evidence-group-label,
+html[data-theme="dark"] .ai-assistant .ai-evidence-group-label b,
+html[data-theme="dark"] .ai-assistant .ai-evidence-heading code,
+html[data-theme="dark"] .ai-assistant .ai-evidence-heading em,
+html[data-theme="dark"] .ai-assistant .ai-evidence-reason,
+html[data-theme="dark"] .ai-assistant .ai-evidence-fields code,
+html[data-theme="dark"] .ai-assistant .ai-evidence-fields small,
+html[data-theme="dark"] .ai-assistant .ai-evidence-path,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-title small,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-title code,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-context p,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-context span,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-toolbar label,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-toolbar > span,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-state,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-empty,
+html[data-theme="dark"] .ai-assistant .ai-thinking em {
+  color: var(--cb-text-muted) !important;
+}
+
+html[data-theme="dark"] .ai-assistant .ai-message-content > p,
+html[data-theme="dark"] .ai-assistant .ai-history-item-title strong,
+html[data-theme="dark"] .ai-assistant .ai-evidence-heading strong,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-title strong,
+html[data-theme="dark"] .ai-assistant .ai-scope-selection b,
+html[data-theme="dark"] .ai-assistant .ai-retrieval-pipeline b {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .ai-assistant .ai-history-back,
+html[data-theme="dark"] .ai-assistant .ai-history-back:hover,
+html[data-theme="dark"] .ai-assistant .ai-history-item-actions > button,
+html[data-theme="dark"] .ai-assistant .ai-history-item-actions > button:hover,
+html[data-theme="dark"] .ai-assistant .ai-history-rename > button,
+html[data-theme="dark"] .ai-assistant .ai-clarification button,
+html[data-theme="dark"] .ai-assistant .ai-clarification button:hover,
+html[data-theme="dark"] .ai-assistant .ai-evidence-expand,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-back,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-back:hover,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-back:focus-visible {
+  color: var(--cb-accent) !important;
+}
+
+html[data-theme="dark"] .ai-assistant .ai-history-rename > input,
+html[data-theme="dark"] .ai-assistant .ai-table-peek-toolbar input {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .table-search-clear-popconfirm .ant-popconfirm-title,
+html[data-theme="dark"] .table-search-settings-trigger,
+html[data-theme="dark"] .field-dictionary-drawer-title strong,
+html[data-theme="dark"] .table-tab-close-summary strong,
+html[data-theme="dark"] .table-tab-close-summary code,
+html[data-theme="dark"] .full-text-content {
+  color: var(--cb-text) !important;
+}
+
+html[data-theme="dark"] .field-dictionary-drawer-title small,
+html[data-theme="dark"] .field-dictionary-drawer-table code,
+html[data-theme="dark"] .table-tab-close-summary,
+html[data-theme="dark"] .table-tab-close-summary span,
+html[data-theme="dark"] .table-meta-label,
+html[data-theme="dark"] .table-bulk-controls,
+html[data-theme="dark"] .field-actions kbd,
+html[data-theme="dark"] .input-search-trigger,
+html[data-theme="dark"] .hit-count {
+  color: var(--cb-text-muted) !important;
+}

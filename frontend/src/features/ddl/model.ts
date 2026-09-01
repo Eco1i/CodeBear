@@ -28,7 +28,13 @@ export const DEFAULT_CONFIG: DdlConfig = {
 };
 
 export function optionText(option: DdlValueOption): string {
-  return [option.value, option.label, option.description, option.default_collation, option.charset]
+  return [
+    option.value,
+    option.label,
+    option.description,
+    option.default_collation,
+    option.charset,
+  ]
     .filter(Boolean)
     .join(" ")
     .toLocaleLowerCase();
@@ -40,14 +46,21 @@ export function scopeIncludesGroup(
 ): boolean {
   if (!node || node.type === "project") return true;
   if (node.type === "pdm") {
-    return node.pdm_id === group.id || node.relative_path === group.relative_path;
+    return (
+      node.pdm_id === group.id || node.relative_path === group.relative_path
+    );
   }
   const prefix = node.relative_path.replace(/\/+$/, "");
   return !prefix || group.relative_path.startsWith(`${prefix}/`);
 }
 
-export function mergeCatalogGroups(base: DdlCatalog, hydrated: DdlCatalog): DdlCatalog {
-  const hydratedById = new Map(hydrated.groups.map((group) => [group.id, group]));
+export function mergeCatalogGroups(
+  base: DdlCatalog,
+  hydrated: DdlCatalog,
+): DdlCatalog {
+  const hydratedById = new Map(
+    hydrated.groups.map((group) => [group.id, group]),
+  );
   return {
     ...base,
     groups: base.groups.map((group) => hydratedById.get(group.id) || group),
@@ -58,16 +71,27 @@ export function cacheCatalogTables(
   target: Map<string, DdlCatalogTable>,
   groups: DdlCatalogGroup[],
 ): void {
-  groups.forEach((group) => group.tables.forEach((table) => target.set(table.id, table)));
+  groups.forEach((group) =>
+    group.tables.forEach((table) => target.set(table.id, table)),
+  );
 }
 
-export function compactNumber(value: number): string {
-  return new Intl.NumberFormat("zh-CN").format(value);
+export function compactNumber(
+  value: number,
+  language: "zh-CN" | "en-US" = "zh-CN",
+): string {
+  return new Intl.NumberFormat(language).format(value);
 }
 
-export function cleanFileName(value: string): string {
-  return value
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
-    .replace(/[. ]+$/g, "")
-    .slice(0, 120) || "码熊建表脚本";
+export function cleanFileName(
+  value: string,
+  language: "zh-CN" | "en-US" = "zh-CN",
+): string {
+  return (
+    value
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
+      .replace(/[. ]+$/g, "")
+      .slice(0, 120) ||
+    (language === "en-US" ? "CodeBear-DDL-script" : "码熊建表脚本")
+  );
 }

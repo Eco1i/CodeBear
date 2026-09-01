@@ -4,7 +4,7 @@ import { basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
-
+import { useI18n } from "../features/preferences/PreferencesProvider";
 
 interface DdlScriptEditorProps {
   value: string;
@@ -13,12 +13,11 @@ interface DdlScriptEditorProps {
   editorViewRef: MutableRefObject<EditorView | null>;
 }
 
-
 const ddlEditorTheme = EditorView.theme({
   "&": {
     height: "100%",
-    color: "#224268",
-    backgroundColor: "#fff",
+    color: "var(--cb-text)",
+    backgroundColor: "var(--cb-surface)",
     fontFamily: '"JetBrains Mono", "Noto Sans SC Variable", monospace',
     fontSize: "10.5px",
   },
@@ -26,34 +25,39 @@ const ddlEditorTheme = EditorView.theme({
     overflow: "auto",
     fontFamily: "inherit",
     lineHeight: "1.62",
-    scrollbarColor: "#aeb8c4 #f1f4f7",
+    scrollbarColor: "var(--cb-scroll-thumb) var(--cb-scroll-track)",
     scrollbarWidth: "thin",
   },
   ".cm-content": {
     minHeight: "100%",
     padding: "14px 16px 28px",
-    caretColor: "#347ee8",
+    caretColor: "var(--blue)",
   },
   ".cm-line": {
     padding: "0",
   },
   ".cm-cursor, .cm-dropCursor": {
-    borderLeftColor: "#347ee8",
+    borderLeftColor: "var(--blue)",
   },
   ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": {
-    backgroundColor: "#d9eaff",
+    backgroundColor: "var(--cb-selected)",
   },
   ".cm-gutters": {
     display: "none",
   },
   "&.cm-focused": {
     outline: "none",
-    boxShadow: "inset 0 0 0 2px rgba(52, 126, 232, 0.1)",
+    boxShadow: "inset 0 0 0 2px rgba(52, 126, 232, 0.16)",
   },
 });
 
-
-export function DdlScriptEditor({ value, onDirty, onStats, editorViewRef }: DdlScriptEditorProps) {
+export function DdlScriptEditor({
+  value,
+  onDirty,
+  onStats,
+  editorViewRef,
+}: DdlScriptEditorProps) {
+  const { t } = useI18n();
   const hostRef = useRef<HTMLDivElement>(null);
   const dirtyRef = useRef(false);
   const dirtyCallbackRef = useRef(onDirty);
@@ -75,7 +79,7 @@ export function DdlScriptEditor({ value, onDirty, onStats, editorViewRef }: DdlS
           keymap.of([indentWithTab]),
           EditorView.lineWrapping,
           EditorView.contentAttributes.of({
-            "aria-label": "SQL 脚本编辑器",
+            "aria-label": t("ddl.scriptEditor"),
             spellcheck: "false",
           }),
           ddlEditorTheme,
@@ -84,8 +88,15 @@ export function DdlScriptEditor({ value, onDirty, onStats, editorViewRef }: DdlS
               dirtyRef.current = true;
               dirtyCallbackRef.current();
             }
-            if (update.focusChanged && !update.view.hasFocus && dirtyRef.current) {
-              statsCallbackRef.current(update.state.doc.lines, update.state.doc.length);
+            if (
+              update.focusChanged &&
+              !update.view.hasFocus &&
+              dirtyRef.current
+            ) {
+              statsCallbackRef.current(
+                update.state.doc.lines,
+                update.state.doc.length,
+              );
             }
           }),
         ],

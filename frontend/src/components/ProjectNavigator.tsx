@@ -16,7 +16,13 @@ import {
 import { Button, Dropdown, Input, Tooltip, Tree } from "antd";
 import type { DataNode, TreeProps } from "antd/es/tree";
 import type RcTree from "@rc-component/tree";
-import { FolderGlyph, PdmGlyph, ProjectGlyph, TreeChevronGlyph } from "./PrototypeGlyphs";
+import {
+  FolderGlyph,
+  PdmGlyph,
+  ProjectGlyph,
+  TreeChevronGlyph,
+} from "./PrototypeGlyphs";
+import { useI18n } from "../features/preferences/PreferencesProvider";
 import type { Settings, WorkspaceNode } from "../types";
 
 interface NavigatorProps {
@@ -47,7 +53,10 @@ interface NavigatorDataNode extends DataNode {
 
 const NAVIGATOR_EXPANSION_STORAGE_KEY = "maxiong.navigatorExpandedKeys";
 
-function hasStoredExpandedAncestors(key: React.Key, keys: Set<React.Key>): boolean {
+function hasStoredExpandedAncestors(
+  key: React.Key,
+  keys: Set<React.Key>,
+): boolean {
   if (typeof key !== "string" || !key.startsWith("folder:")) return true;
 
   const folderKey = key.slice("folder:".length);
@@ -61,7 +70,9 @@ function hasStoredExpandedAncestors(key: React.Key, keys: Set<React.Key>): boole
   const pathParts = relativePath.split("/").filter(Boolean);
   let ancestorPath = "";
   for (let index = 0; index < pathParts.length - 1; index += 1) {
-    ancestorPath = ancestorPath ? `${ancestorPath}/${pathParts[index]}` : pathParts[index];
+    ancestorPath = ancestorPath
+      ? `${ancestorPath}/${pathParts[index]}`
+      : pathParts[index];
     if (!keys.has(`folder:${projectId}:${ancestorPath}`)) return false;
   }
   return true;
@@ -76,11 +87,15 @@ function readStoredExpandedKeys(): React.Key[] | null {
     if (!Array.isArray(parsed)) return null;
 
     const keys = parsed.filter(
-      (key): key is React.Key => typeof key === "string" || typeof key === "number",
+      (key): key is React.Key =>
+        typeof key === "string" || typeof key === "number",
     );
     const keySet = new Set(keys);
-    const normalizedKeys = keys.filter((key) => hasStoredExpandedAncestors(key, keySet));
-    if (normalizedKeys.length !== keys.length) storeExpandedKeys(normalizedKeys);
+    const normalizedKeys = keys.filter((key) =>
+      hasStoredExpandedAncestors(key, keySet),
+    );
+    if (normalizedKeys.length !== keys.length)
+      storeExpandedKeys(normalizedKeys);
     return normalizedKeys;
   } catch {
     return null;
@@ -103,7 +118,10 @@ function parentPath(path: string): string {
   return index === -1 ? "" : path.slice(0, index);
 }
 
-function copyWithProject(node: WorkspaceNode, projectId: string): WorkspaceNode {
+function copyWithProject(
+  node: WorkspaceNode,
+  projectId: string,
+): WorkspaceNode {
   return {
     ...node,
     project_id: node.project_id || projectId,
@@ -111,18 +129,25 @@ function copyWithProject(node: WorkspaceNode, projectId: string): WorkspaceNode 
   };
 }
 
-function toDataNode(node: WorkspaceNode, selectedId?: string): NavigatorDataNode {
+function toDataNode(
+  node: WorkspaceNode,
+  selectedId?: string,
+): NavigatorDataNode {
   return {
     key: node.id,
     title: node.name,
     raw: node,
-    className: node.id === selectedId ? "navigator-tree-node-selected" : undefined,
+    className:
+      node.id === selectedId ? "navigator-tree-node-selected" : undefined,
     isLeaf: node.type === "pdm",
     children: node.children?.map((child) => toDataNode(child, selectedId)),
   };
 }
 
-function filterDataNode(node: NavigatorDataNode, query: string): NavigatorDataNode | null {
+function filterDataNode(
+  node: NavigatorDataNode,
+  query: string,
+): NavigatorDataNode | null {
   if (!query) return node;
   const children = (node.children || [])
     .map((child) => filterDataNode(child, query))
@@ -133,7 +158,10 @@ function filterDataNode(node: NavigatorDataNode, query: string): NavigatorDataNo
   return null;
 }
 
-function collectNodes(nodes: NavigatorDataNode[], map: Map<React.Key, WorkspaceNode>): void {
+function collectNodes(
+  nodes: NavigatorDataNode[],
+  map: Map<React.Key, WorkspaceNode>,
+): void {
   nodes.forEach((node) => {
     map.set(node.key, node.raw);
     collectNodes(node.children || [], map);
@@ -165,6 +193,7 @@ export function ProjectNavigator({
   onOpenTrash,
   onOpenSettings,
 }: NavigatorProps) {
+  const { t } = useI18n();
   const treeRef = useRef<RcTree>(null);
   const handledLocateRevisionRef = useRef(0);
   const [draftQuery, setDraftQuery] = useState("");
@@ -175,7 +204,10 @@ export function ProjectNavigator({
   const allData = useMemo(
     () =>
       trees.map((tree) => {
-        const normalized = copyWithProject(tree, tree.project_id || tree.id.replace("project:", ""));
+        const normalized = copyWithProject(
+          tree,
+          tree.project_id || tree.id.replace("project:", ""),
+        );
         return toDataNode(normalized, selectedNode?.id);
       }),
     [selectedNode?.id, trees],
@@ -199,19 +231,23 @@ export function ProjectNavigator({
       !locateRevision ||
       !locateNode ||
       handledLocateRevisionRef.current === locateRevision
-    ) return;
+    )
+      return;
     const pdmNode = [...nodeMap.values()].find(
       (node) =>
         node.type === "pdm" &&
         node.project_id === locateNode.projectId &&
-        (node.pdm_id === locateNode.pdmId || node.relative_path === locateNode.relativePath),
+        (node.pdm_id === locateNode.pdmId ||
+          node.relative_path === locateNode.relativePath),
     );
     if (!pdmNode) return;
     handledLocateRevisionRef.current = locateRevision;
     setDraftQuery("");
     setQuery("");
     const ancestors: React.Key[] = [`project:${locateNode.projectId}`];
-    const folderParts = parentPath(pdmNode.relative_path).split("/").filter(Boolean);
+    const folderParts = parentPath(pdmNode.relative_path)
+      .split("/")
+      .filter(Boolean);
     let folderPath = "";
     folderParts.forEach((part) => {
       folderPath = folderPath ? `${folderPath}/${part}` : part;
@@ -225,9 +261,11 @@ export function ProjectNavigator({
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         treeRef.current?.scrollTo({ key: pdmNode.id, align: "auto" });
-        document.querySelector(".navigator-tree .navigator-tree-node-selected")?.scrollIntoView({
-          block: "nearest",
-        });
+        document
+          .querySelector(".navigator-tree .navigator-tree-node-selected")
+          ?.scrollIntoView({
+            block: "nearest",
+          });
       });
     });
   }, [locateNode, locateRevision, nodeMap]);
@@ -240,7 +278,7 @@ export function ProjectNavigator({
     {
       key: "force-refresh",
       icon: <ReloadOutlined />,
-      label: "强制全部重新解析",
+      label: t("nav.forceRefresh"),
       disabled: !trees.length || loading,
       onClick: () => onForceRefresh(selectedNode),
     },
@@ -249,29 +287,34 @@ export function ProjectNavigator({
   const titleRender = (data: DataNode) => {
     const node = (data as NavigatorDataNode).raw;
     const menuItems = [
-      ...(node.type !== "pdm"
-        ? [
+      ...(node.type === "pdm"
+        ? []
+        : [
             {
               key: "folder",
               icon: <FolderAddOutlined />,
-              label: "新建子文件夹",
+              label: t("nav.createSubfolder"),
               onClick: () => onCreateFolder(node),
             },
             {
               key: "import",
               icon: <UploadOutlined />,
-              label: "导入 PDM",
+              label: t("nav.importPdm"),
               onClick: () => onImport(node),
             },
-          ]
-        : []),
+          ]),
       { type: "divider" as const },
-      { key: "rename", icon: <EditOutlined />, label: "重命名", onClick: () => onRename(node) },
+      {
+        key: "rename",
+        icon: <EditOutlined />,
+        label: t("nav.rename"),
+        onClick: () => onRename(node),
+      },
       {
         key: "delete",
         icon: <DeleteOutlined />,
         danger: true,
-        label: "移入回收站",
+        label: t("nav.moveToTrash"),
         onClick: () => onTrash(node),
       },
     ];
@@ -289,16 +332,25 @@ export function ProjectNavigator({
       ) : node.type === "folder" ? (
         <FolderGlyph className="tree-node-icon tree-folder-icon" />
       ) : (
-        <PdmGlyph className={`tree-node-icon tree-pdm-icon${node.parse_error ? " is-error" : ""}`} />
+        <PdmGlyph
+          className={`tree-node-icon tree-pdm-icon${node.parse_error ? " is-error" : ""}`}
+        />
       );
     return (
       <Dropdown menu={{ items: menuItems }} trigger={["contextMenu"]}>
-        <div className={`tree-title tree-title-${node.type}`} title={node.parse_error || node.name}>
+        <div
+          className={`tree-title tree-title-${node.type}`}
+          title={node.parse_error || node.name}
+        >
           <span className="tree-label">
             {icon}
             <span className="tree-name">{node.name}</span>
           </span>
-          <span className={node.parse_error ? "tree-count is-error" : "tree-count"}>{count}</span>
+          <span
+            className={node.parse_error ? "tree-count is-error" : "tree-count"}
+          >
+            {count}
+          </span>
         </div>
       </Dropdown>
     );
@@ -307,7 +359,13 @@ export function ProjectNavigator({
   const handleDrop: TreeProps["onDrop"] = (info) => {
     const source = nodeMap.get(info.dragNode.key);
     const target = nodeMap.get(info.node.key);
-    if (!source || !target || source.type === "project" || source.project_id !== target.project_id) return;
+    if (
+      !source ||
+      !target ||
+      source.type === "project" ||
+      source.project_id !== target.project_id
+    )
+      return;
     let destination = target;
     if (target.type === "pdm" || info.dropToGap) {
       const desiredPath = parentPath(target.relative_path);
@@ -319,7 +377,9 @@ export function ProjectNavigator({
             candidate.type !== "pdm",
         ) ||
         [...nodeMap.values()].find(
-          (candidate) => candidate.project_id === target.project_id && candidate.type === "project",
+          (candidate) =>
+            candidate.project_id === target.project_id &&
+            candidate.type === "project",
         ) ||
         target;
     }
@@ -331,21 +391,21 @@ export function ProjectNavigator({
     <aside className="project-navigator">
       <div className="navigator-search">
         <Input
-          aria-label="搜索项目、文件夹或 PDM"
+          aria-label={t("nav.searchPlaceholder")}
           allowClear
-          prefix={(
+          prefix={
             <button
               type="button"
               className="input-search-trigger"
-              aria-label="搜索项目、文件夹或 PDM"
-              title="搜索"
+              aria-label={t("nav.search")}
+              title={t("nav.search")}
               onMouseDown={(event) => event.preventDefault()}
               onClick={submitSearch}
             >
               <SearchOutlined />
             </button>
-          )}
-          placeholder="搜索项目、文件夹或 PDM"
+          }
+          placeholder={t("nav.searchPlaceholder")}
           value={draftQuery}
           onChange={(event) => setDraftQuery(event.target.value)}
           onPressEnter={submitSearch}
@@ -353,44 +413,67 @@ export function ProjectNavigator({
         />
       </div>
       <div className="navigator-toolbar">
-        <span className="navigator-title"><i />项目目录</span>
+        <span className="navigator-title">
+          <i />
+          {t("nav.projectDirectory")}
+        </span>
         <div className="navigator-actions">
-          <Tooltip title={locateNode ? "定位当前数据表所属 PDM" : "请先选择数据表"}>
+          <Tooltip
+            title={
+              locateNode ? t("nav.locatePdm") : t("message.selectTableFirst")
+            }
+          >
             <Button
               type="text"
               size="small"
               icon={<AimOutlined />}
               disabled={!locateNode}
-              aria-label="定位当前数据表所属 PDM"
+              aria-label={t("nav.locatePdm")}
               onClick={onLocate}
             />
           </Tooltip>
-          <Tooltip title="新建项目">
-            <Button type="text" size="small" icon={<PlusOutlined />} aria-label="新建项目" onClick={onCreateProject} />
+          <Tooltip title={t("nav.newProject")}>
+            <Button
+              type="text"
+              size="small"
+              icon={<PlusOutlined />}
+              aria-label={t("nav.newProject")}
+              onClick={onCreateProject}
+            />
           </Tooltip>
-          <Tooltip title="新建文件夹">
+          <Tooltip title={t("nav.newFolder")}>
             <Button
               type="text"
               size="small"
               icon={<FolderOpenOutlined />}
-              aria-label="新建文件夹"
+              aria-label={t("nav.newFolder")}
               disabled={!selectedNode}
               onClick={() => selectedNode && onCreateFolder(selectedNode)}
             />
           </Tooltip>
-          <Tooltip title="刷新（仅解析有变化的 PDM）">
+          <Tooltip title={t("nav.refresh")}>
             <Button
               type="text"
               size="small"
               icon={<ReloadOutlined spin={loading} />}
-              aria-label="刷新项目"
+              aria-label={t("nav.refresh")}
               disabled={!trees.length}
               onClick={() => onRefresh(selectedNode)}
             />
           </Tooltip>
-          <Dropdown menu={{ items: moreMenuItems }} trigger={["click"]} placement="bottomRight">
-            <Tooltip title="更多操作">
-              <Button type="text" size="small" icon={<MoreOutlined />} aria-label="更多操作" disabled={!trees.length} />
+          <Dropdown
+            menu={{ items: moreMenuItems }}
+            trigger={["click"]}
+            placement="bottomRight"
+          >
+            <Tooltip title={t("nav.moreActions")}>
+              <Button
+                type="text"
+                size="small"
+                icon={<MoreOutlined />}
+                aria-label={t("nav.moreActions")}
+                disabled={!trees.length}
+              />
             </Tooltip>
           </Dropdown>
         </div>
@@ -403,7 +486,9 @@ export function ProjectNavigator({
             showLine={{ showLeafIcon: false }}
             motion={null}
             autoExpandParent={false}
-            switcherIcon={(props) => <TreeChevronGlyph expanded={Boolean(props.expanded)} />}
+            switcherIcon={(props) => (
+              <TreeChevronGlyph expanded={Boolean(props.expanded)} />
+            )}
             treeData={visibleData}
             titleRender={titleRender}
             selectedKeys={selectedNode ? [selectedNode.id] : []}
@@ -413,7 +498,10 @@ export function ProjectNavigator({
                 let nextKeys = [...keys];
                 if (!info.expanded) {
                   const collapsedKeys = new Set<React.Key>();
-                  collectSubtreeKeys((info.node as NavigatorDataNode).raw, collapsedKeys);
+                  collectSubtreeKeys(
+                    (info.node as NavigatorDataNode).raw,
+                    collapsedKeys,
+                  );
                   nextKeys = nextKeys.filter((key) => !collapsedKeys.has(key));
                 }
                 setExpandedKeys(nextKeys);
@@ -426,28 +514,46 @@ export function ProjectNavigator({
             }}
             draggable={{
               icon: false,
-              nodeDraggable: (node) => nodeMap.get(node.key)?.type !== "project",
+              nodeDraggable: (node) =>
+                nodeMap.get(node.key)?.type !== "project",
             }}
             onDrop={handleDrop}
           />
         ) : (
           <div className="navigator-empty">
             <ApartmentOutlined />
-            <span>{query ? "没有匹配的节点" : "还没有项目"}</span>
-            {!query && <Button type="link" onClick={onCreateProject}>新建第一个项目</Button>}
+            <span>
+              {query ? t("nav.noMatchingNodes") : t("nav.noProjects")}
+            </span>
+            {!query && (
+              <Button type="link" onClick={onCreateProject}>
+                {t("nav.createFirstProject")}
+              </Button>
+            )}
           </div>
         )}
       </div>
       <div className="navigator-footer">
-        <button className="workspace-status" type="button" onClick={onOpenSettings}>
+        <button
+          className="workspace-status"
+          type="button"
+          onClick={onOpenSettings}
+        >
           <span className="status-dot" />
           <span>
-            <strong>本机工作区已连接</strong>
-            <small title={settings?.workspace_root}>{settings?.workspace_root || "正在读取工作区…"}</small>
+            <strong>{t("nav.connected")}</strong>
+            <small title={settings?.workspace_root}>
+              {settings?.workspace_root || t("nav.readingWorkspace")}
+            </small>
           </span>
         </button>
-        <Tooltip title="打开回收站">
-          <Button type="text" icon={<InboxOutlined />} aria-label="打开回收站" onClick={onOpenTrash} />
+        <Tooltip title={t("nav.openTrash")}>
+          <Button
+            type="text"
+            icon={<InboxOutlined />}
+            aria-label={t("nav.openTrash")}
+            onClick={onOpenTrash}
+          />
         </Tooltip>
       </div>
     </aside>

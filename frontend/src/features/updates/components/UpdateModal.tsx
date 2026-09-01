@@ -1,6 +1,11 @@
 import { App as AntApp, Button, Modal } from "antd";
-import { CopyOutlined, DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
-import { formatPublishedAt, releaseNotesHtml, versionLabel } from "../model";
+import {
+  CopyOutlined,
+  DownloadOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
+import { useI18n } from "../../preferences/PreferencesProvider";
+import { formatPublishedAt, versionLabel } from "../model";
 import type { UpdateState } from "../types";
 
 interface UpdateModalProps {
@@ -12,20 +17,46 @@ interface UpdateModalProps {
   onIgnore: (version: string) => void;
 }
 
-export function UpdateModal({ open, state, checking, onClose, onRefresh, onIgnore }: UpdateModalProps) {
+function releaseNoteLines(markdown: string): string[] {
+  return markdown
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) =>
+      line
+        .replace(/^#{1,3}\s+/, "")
+        .replace(/^[-*]\s+/, "")
+        .replace(/^\d+[.、]\s*/, "")
+        .replace(/^>\s?/, "")
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .replace(/\[([^\]]+)\]\(https?:\/\/[^\s)]+\)/g, "$1"),
+    );
+}
+
+export function UpdateModal({
+  open,
+  state,
+  checking,
+  onClose,
+  onRefresh,
+  onIgnore,
+}: UpdateModalProps) {
   const { message } = AntApp.useApp();
+  const { t } = useI18n();
   const available = state?.status === "update_available" && state.latest;
   const latest = state?.latest || null;
-  const notesHtml = latest?.notes ? releaseNotesHtml(latest.notes) : "";
+  const notes = latest?.notes ? releaseNoteLines(latest.notes) : [];
   const isMac = state?.target.startsWith("mac-") ?? false;
 
   const copySha = async () => {
     if (!latest?.sha256) return;
     try {
       await navigator.clipboard.writeText(latest.sha256);
-      message.success("官方 SHA-256 已复制");
+      message.success(t("update.shaCopied"));
     } catch {
-      message.error("复制失败，请手动选择文本");
+      message.error(t("update.copyFailed"));
     }
   };
 
@@ -36,75 +67,144 @@ export function UpdateModal({ open, state, checking, onClose, onRefresh, onIgnor
       centered
       onCancel={onClose}
       className="update-check-modal"
-      title={<span className="update-modal-title">{available ? `发现新版本 ${versionLabel(latest!.version)}` : "检查更新"}</span>}
+      title={
+        <span className="update-modal-title">
+          {available
+            ? t("update.newVersion", { version: versionLabel(latest!.version) })
+            : t("header.update")}
+        </span>
+      }
       footer={null}
     >
-      {!state ? (
-        <div className="update-centered"><ReloadOutlined spin /> 正在检查更新…</div>
-      ) : available ? (
-        <div className="update-body">
-          <div className="update-versions">
-            <span><small>当前版本</small><b>{versionLabel(state.current_version)}</b></span>
-            <i aria-hidden="true">→</i>
-            <span className="is-latest"><small>最新版本</small><b>{versionLabel(latest!.version)}</b><em>发布于 {formatPublishedAt(latest!.published_at)}</em></span>
-          </div>
-
-          <div className="update-steps">
-            <small>升级步骤</small>
-            {isMac ? (
-              <ol>
-                <li><b>01</b>下载 DMG，并用官方 SHA-256 校验完整性</li>
-                <li><b>02</b>从菜单栏退出旧版码熊，将新版拖入“应用程序”并替换旧版</li>
-                <li><b>03</b>重新打开码熊；工作区数据继续保存在当前用户的 Application Support 中</li>
-              </ol>
-            ) : (
-              <ol>
-                <li><b>01</b>下载 ZIP，并用官方 SHA-256 校验完整性</li>
-                <li><b>02</b>先从托盘右键退出旧版码熊，将新版完整解压到新目录后启动</li>
-                <li><b>03</b>在新版右上角「备份迁移」读取旧版 data 目录完成迁移，旧目录不会被修改</li>
-              </ol>
-            )}
-          </div>
-
-          <div className="update-notes">
-            <div className="update-notes-heading"><small>更新内容</small></div>
-            {notesHtml ? (
-              <div className="update-notes-content" dangerouslySetInnerHTML={{ __html: notesHtml }} />
-            ) : (
-              <p>暂无发布说明。</p>
-            )}
-          </div>
-
-          {latest!.sha256 ? (
-            <div className="update-sha-row">
-              <code title={latest!.sha256}>{latest!.sha256}</code>
-              <Button size="small" icon={<CopyOutlined />} onClick={() => void copySha()}>复制 SHA-256</Button>
+      {state ? (
+        available ? (
+          <div className="update-body">
+            <div className="update-versions">
+              <span>
+                <small>{t("update.currentVersion")}</small>
+                <b>{versionLabel(state.current_version)}</b>
+              </span>
+              <i aria-hidden="true">→</i>
+              <span className="is-latest">
+                <small>{t("update.latestVersion")}</small>
+                <b>{versionLabel(latest!.version)}</b>
+                <em>
+                  {t("update.publishedAt", {
+                    date: formatPublishedAt(latest!.published_at),
+                  })}
+                </em>
+              </span>
             </div>
-          ) : null}
-        </div>
-      ) : state.status === "unknown" ? (
-        <div className="update-centered">
-          <span className="update-empty">
-            <b>暂未获取到更新信息</b>
-            <small>无法连接 GitHub 或尚未完成检查，可稍后重试。</small>
-          </span>
-          <Button icon={<ReloadOutlined />} loading={checking} onClick={onRefresh}>重新检查</Button>
-        </div>
+
+            <div className="update-steps">
+              <small>{t("update.steps")}</small>
+              {isMac ? (
+                <ol>
+                  <li>
+                    <b>01</b>
+                    {t("update.macStep1")}
+                  </li>
+                  <li>
+                    <b>02</b>
+                    {t("update.macStep2")}
+                  </li>
+                  <li>
+                    <b>03</b>
+                    {t("update.macStep3")}
+                  </li>
+                </ol>
+              ) : (
+                <ol>
+                  <li>
+                    <b>01</b>
+                    {t("update.winStep1")}
+                  </li>
+                  <li>
+                    <b>02</b>
+                    {t("update.winStep2")}
+                  </li>
+                  <li>
+                    <b>03</b>
+                    {t("update.winStep3")}
+                  </li>
+                </ol>
+              )}
+            </div>
+
+            <div className="update-notes">
+              <div className="update-notes-heading">
+                <small>{t("update.notes")}</small>
+              </div>
+              {notes.length ? (
+                <div className="update-notes-content">
+                  {notes.map((line, index) => (
+                    <p key={`${index}-${line}`}>{line}</p>
+                  ))}
+                </div>
+              ) : (
+                <p>{t("update.noNotes")}</p>
+              )}
+            </div>
+
+            {latest!.sha256 ? (
+              <div className="update-sha-row">
+                <code title={latest!.sha256}>{latest!.sha256}</code>
+                <Button
+                  size="small"
+                  icon={<CopyOutlined />}
+                  onClick={() => void copySha()}
+                >
+                  {t("update.copySha")}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : state.status === "unknown" ? (
+          <div className="update-centered">
+            <span className="update-empty">
+              <b>{t("update.infoUnavailable")}</b>
+              <small>{t("update.infoUnavailableDescription")}</small>
+            </span>
+            <Button
+              icon={<ReloadOutlined />}
+              loading={checking}
+              onClick={onRefresh}
+            >
+              {t("update.recheck")}
+            </Button>
+          </div>
+        ) : (
+          <div className="update-centered">
+            <span className="update-empty">
+              <b>{t("update.latestTitle")}</b>
+              <small>
+                {t("update.latestDescription", {
+                  version: versionLabel(state.current_version),
+                })}
+              </small>
+            </span>
+            <Button
+              icon={<ReloadOutlined />}
+              loading={checking}
+              onClick={onRefresh}
+            >
+              {t("update.recheck")}
+            </Button>
+          </div>
+        )
       ) : (
         <div className="update-centered">
-          <span className="update-empty">
-            <b>码熊已是最新版本</b>
-            <small>当前版本 {versionLabel(state.current_version)}</small>
-          </span>
-          <Button icon={<ReloadOutlined />} loading={checking} onClick={onRefresh}>重新检查</Button>
+          <ReloadOutlined spin /> {t("update.checking")}
         </div>
       )}
 
       {available ? (
         <div className="update-footer">
-          <Button onClick={() => onIgnore(latest!.version)} disabled={checking}>忽略此版本</Button>
+          <Button onClick={() => onIgnore(latest!.version)} disabled={checking}>
+            {t("update.ignore")}
+          </Button>
           <div>
-            <Button onClick={onClose}>关闭</Button>
+            <Button onClick={onClose}>{t("common.close")}</Button>
             <Button
               type="primary"
               icon={<DownloadOutlined />}
@@ -112,7 +212,7 @@ export function UpdateModal({ open, state, checking, onClose, onRefresh, onIgnor
               target="_blank"
               rel="noreferrer"
             >
-              下载安装包
+              {t("update.download")}
             </Button>
           </div>
         </div>

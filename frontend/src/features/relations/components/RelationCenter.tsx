@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { App as AntApp } from "antd";
+import { useI18n } from "../../preferences/PreferencesProvider";
 import { relationsApi } from "../api";
 import type { Relation, TableRelations } from "../types";
 import { RelationDrawer, RelationTableInfo } from "./RelationDrawer";
@@ -13,11 +14,19 @@ interface RelationCenterProps {
   onJump: (tableId: string) => void;
 }
 
-export function RelationCenter({ open, table, onClose, onJump }: RelationCenterProps) {
+export function RelationCenter({
+  open,
+  table,
+  onClose,
+  onJump,
+}: RelationCenterProps) {
   const { message } = AntApp.useApp();
+  const { errorText } = useI18n();
   const [data, setData] = useState<TableRelations | null>(null);
   const [loading, setLoading] = useState(false);
-  const [formState, setFormState] = useState<{ editing: Relation | null } | null>(null);
+  const [formState, setFormState] = useState<{
+    editing: Relation | null;
+  } | null>(null);
   const [graphOpen, setGraphOpen] = useState(false);
 
   const load = useCallback(() => {
@@ -27,10 +36,10 @@ export function RelationCenter({ open, table, onClose, onJump }: RelationCenterP
       .fetch(table.id)
       .then(setData)
       .catch((error) => {
-        message.error(error instanceof Error ? error.message : "加载表关系失败");
+        message.error(errorText(error, "relation.loadFailed"));
       })
       .finally(() => setLoading(false));
-  }, [table?.id, message]);
+  }, [table?.id, message, errorText]);
 
   useEffect(() => {
     if (!open || !table) return;

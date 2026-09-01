@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# pyright: reportMissingImports=false
 import argparse
 import ctypes
 import json
@@ -13,23 +14,36 @@ import traceback
 import webbrowser
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 try:
     import pystray
-except ModuleNotFoundError:  # pragma: no cover - only source environments without packaging extras
+except (
+    ModuleNotFoundError
+):  # pragma: no cover - only source environments without packaging extras
     pystray = None  # type: ignore[assignment]
 import uvicorn
 
 from backend.instance_lock import SingleInstance
 from backend.platform_support import default_data_dir, reveal_directory
 
+TrayPopupMenu: Any = None
+pystray_win32: Any = None
+pystray_win32_api: Any = None
 if sys.platform == "win32":
-    from backend.tray_menu import TrayPopupMenu, enable_high_dpi
+    from backend.tray_menu import TrayPopupMenu as WindowsTrayPopupMenu
+    from backend.tray_menu import enable_high_dpi
 
+    TrayPopupMenu = WindowsTrayPopupMenu
     if pystray is not None:
-        from pystray import _win32 as pystray_win32
-        from pystray._util import win32 as pystray_win32_api
+        from pystray import _win32 as pystray_win32_module
+        from pystray._util import win32 as pystray_win32_api_module
+
+        pystray_win32 = pystray_win32_module
+        pystray_win32_api = pystray_win32_api_module
 
 
 APP_HOST = "127.0.0.1"
@@ -37,13 +51,24 @@ APP_PORT = 8765
 SERVER_SHUTDOWN_TIMEOUT = 5
 _PROCESS_JOB_HANDLES: dict[int, int] = {}
 if sys.platform == "win32" and pystray is not None:
+
     class CodeBearTrayIcon(pystray_win32.Icon):
         """Use the normal tray icon but replace the shell context menu."""
 
-        def __init__(self, *args: Any, popup_actions: tuple[Any, Any, Any], **kwargs: Any):
+        def __init__(
+            self,
+            *args: Any,
+            popup_actions: tuple[
+                Callable[[], None],
+                Callable[[], None],
+                Callable[[], None],
+                Callable[[], None],
+            ],
+            **kwargs: Any,
+        ):
             super().__init__(*args, **kwargs)
             self._popup_actions = popup_actions
-            self._popup: TrayPopupMenu | None = None
+            self._popup: Any = None
 
         def _on_notify(self, wparam: int, lparam: int) -> None:
             if lparam == pystray_win32_api.WM_LBUTTONUP:
@@ -63,7 +88,11 @@ def executable_root() -> Path:
 
 def configure_portable_data_dir() -> Path:
     override = os.environ.get("MAXIONG_APP_DATA_DIR")
-    data_dir = Path(override).expanduser().resolve() if override else default_data_dir(executable_root())
+    data_dir = (
+        Path(override).expanduser().resolve()
+        if override
+        else default_data_dir(executable_root())
+    )
     os.environ["MAXIONG_APP_DATA_DIR"] = str(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
@@ -91,12 +120,16 @@ def write_launcher_error(data_dir: Path) -> None:
     try:
         log_dir = data_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
-        with (log_dir / "launcher.log").open("a", encoding="utf-8", newline="\n") as stream:
-            stream.write(f"[{datetime.now().astimezone().isoformat(timespec='seconds')}]\n")
+        with (log_dir / "launcher.log").open(
+            "a", encoding="utf-8", newline="\n"
+        ) as stream:
+            stream.write(
+                f"[{datetime.now().astimezone().isoformat(timespec='seconds')}]\n"
+            )
             stream.write(traceback.format_exc())
             stream.write("\n")
     except OSError:
-        pass
+        return
 
 
 def create_app_icon(size: int = 256) -> Image.Image:
@@ -133,15 +166,32 @@ def create_app_icon(size: int = 256) -> Image.Image:
     draw.ellipse(box((61, 50, 99, 88)), fill="white")
     draw.ellipse(box((157, 50, 195, 88)), fill="white")
     draw.rounded_rectangle(box((54, 64, 202, 214)), radius=round(70 * scale), fill=navy)
-    draw.rounded_rectangle(box((68, 76, 188, 198)), radius=round(58 * scale), fill="white")
+    draw.rounded_rectangle(
+        box((68, 76, 188, 198)), radius=round(58 * scale), fill="white"
+    )
     draw.ellipse(box((94, 119, 106, 131)), fill=navy)
     draw.ellipse(box((150, 119, 162, 131)), fill=navy)
     draw.ellipse(box((116, 139, 140, 157)), fill=navy)
     stroke = max(2, round(6 * scale))
-    draw.line((round(128 * scale), round(154 * scale), round(128 * scale), round(170 * scale)), fill=navy, width=stroke)
+    draw.line(
+        (
+            round(128 * scale),
+            round(154 * scale),
+            round(128 * scale),
+            round(170 * scale),
+        ),
+        fill=navy,
+        width=stroke,
+    )
     draw.arc(box((103, 158, 129, 180)), 5, 135, fill=navy, width=stroke)
     draw.arc(box((127, 158, 153, 180)), 45, 175, fill=navy, width=stroke)
-    draw.arc(box((91, 178, 165, 209)), 10, 170, fill="#61A8FF", width=max(2, round(5 * scale)))
+    draw.arc(
+        box((91, 178, 165, 209)),
+        10,
+        170,
+        fill="#61A8FF",
+        width=max(2, round(5 * scale)),
+    )
     return image
 
 
@@ -201,7 +251,8 @@ def run_server_only(port: int) -> int:
                 if not line or line.strip() == "shutdown":
                     break
         except (OSError, ValueError):
-            pass
+            server.should_exit = True
+            return
         server.should_exit = True
 
     def monitor_launcher() -> None:
@@ -211,8 +262,12 @@ def run_server_only(port: int) -> int:
                 server.should_exit = True
                 return
 
-    threading.Thread(target=wait_for_launcher, name="maxiong-shutdown", daemon=True).start()
-    threading.Thread(target=monitor_launcher, name="maxiong-launcher-monitor", daemon=True).start()
+    threading.Thread(
+        target=wait_for_launcher, name="maxiong-shutdown", daemon=True
+    ).start()
+    threading.Thread(
+        target=monitor_launcher, name="maxiong-launcher-monitor", daemon=True
+    ).start()
     server.run()
     return 0
 
@@ -234,7 +289,12 @@ def attach_process_job(process: subprocess.Popen[bytes]) -> None:
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
         kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p]
         kernel32.CreateJobObjectW.restype = ctypes.c_void_p
-        kernel32.SetInformationJobObject.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint]
+        kernel32.SetInformationJobObject.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.c_uint,
+        ]
         kernel32.SetInformationJobObject.restype = ctypes.c_bool
         kernel32.AssignProcessToJobObject.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
         kernel32.AssignProcessToJobObject.restype = ctypes.c_bool
@@ -271,14 +331,18 @@ def attach_process_job(process: subprocess.Popen[bytes]) -> None:
         if not job:
             return
         limits = ExtendedLimitInformation()
-        limits.basic_limit_information.limit_flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        limits.basic_limit_information.limit_flags = (
+            0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        )
         configured = kernel32.SetInformationJobObject(
             job,
             9,  # JobObjectExtendedLimitInformation
             ctypes.byref(limits),
             ctypes.sizeof(limits),
         )
-        assigned = configured and kernel32.AssignProcessToJobObject(job, ctypes.c_void_p(handle))
+        assigned = configured and kernel32.AssignProcessToJobObject(
+            job, ctypes.c_void_p(handle)
+        )
         if not assigned:
             kernel32.CloseHandle(job)
             return
@@ -294,7 +358,7 @@ def close_process_job(process: subprocess.Popen[bytes]) -> None:
     try:
         ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(job))
     except (AttributeError, OSError):
-        pass
+        return
 
 
 def start_server_process(port: int) -> subprocess.Popen[bytes]:
@@ -322,16 +386,16 @@ def stop_server_process(process: subprocess.Popen[bytes]) -> None:
             process.stdin.flush()
             process.stdin.close()
     except (BrokenPipeError, OSError, ValueError):
-        pass
+        # The worker may have already closed its pipe; continue with bounded waits.
+        process.stdin = None
 
     try:
         try:
             process.wait(timeout=SERVER_SHUTDOWN_TIMEOUT)
             return
         except subprocess.TimeoutExpired:
-            pass
+            process.terminate()
 
-        process.terminate()
         try:
             process.wait(timeout=2)
         except subprocess.TimeoutExpired:
@@ -341,7 +405,9 @@ def stop_server_process(process: subprocess.Popen[bytes]) -> None:
         close_process_job(process)
 
 
-def wait_for_server_process(process: subprocess.Popen[bytes], port: int, timeout: float = 15.0) -> bool:
+def wait_for_server_process(
+    process: subprocess.Popen[bytes], port: int, timeout: float = 15.0
+) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if process.poll() is not None:
@@ -363,23 +429,27 @@ def run_with_tray(
     if not wait_for_server_process(server_process, port):
         stop_server_process(server_process)
         log_path = data_dir / "logs" / "server.log"
-        show_message("码熊启动失败", f"本机服务未能在端口 {port} 启动，请查看 {log_path}。", error=True)
+        show_message(
+            "码熊启动失败",
+            f"本机服务未能在端口 {port} 启动，请查看 {log_path}。",
+            error=True,
+        )
         return 1
 
     if open_browser:
         webbrowser.open(url_for(port))
 
-    def open_app(_: pystray.Icon | None = None, __: Any = None) -> None:
+    def open_app(_: Any = None, __: Any = None) -> None:
         webbrowser.open(url_for(port))
 
-    def open_updates(_: pystray.Icon | None = None, __: Any = None) -> None:
+    def open_updates(_: Any = None, __: Any = None) -> None:
         webbrowser.open(f"{url_for(port)}?update=1")
 
-    def open_data(_: pystray.Icon | None = None, __: Any = None) -> None:
+    def open_data(_: Any = None, __: Any = None) -> None:
         data_dir.mkdir(parents=True, exist_ok=True)
         reveal_directory(data_dir)
 
-    def exit_app(icon: pystray.Icon, _: Any = None) -> None:
+    def exit_app(icon: Any, _: Any = None) -> None:
         icon.stop()
         stop_server_process(server_process)
 
@@ -388,12 +458,17 @@ def run_with_tray(
             raise RuntimeError("未安装托盘运行依赖")
         app_icon = create_app_icon(256)
         if sys.platform == "win32":
-            icon: pystray.Icon = CodeBearTrayIcon(
+            icon: Any = CodeBearTrayIcon(
                 "maxiong",
                 app_icon,
                 "码熊 · PDM 数据字典工作台",
                 menu=pystray.Menu(pystray.MenuItem("打开码熊", open_app, default=True)),
-                popup_actions=(lambda: open_app(), lambda: open_data(), lambda: open_updates(), lambda: exit_app(icon)),
+                popup_actions=(
+                    lambda: open_app(),
+                    lambda: open_data(),
+                    lambda: open_updates(),
+                    lambda: exit_app(icon),
+                ),
             )
         else:
             icon = pystray.Icon(
@@ -444,7 +519,12 @@ def main() -> int:
             if ready and not arguments.no_browser:
                 webbrowser.open(url_for(arguments.port))
             elif not ready:
-                show_message("码熊", "码熊正在启动，请稍后再试。")
+                show_message(
+                    "码熊已在运行",
+                    "码熊已有实例在运行，但本机服务暂未就绪。\n"
+                    "请稍后从通知区域双击码熊图标打开；如果超过 30 秒仍不可用，"
+                    "请先退出该实例后重新启动。",
+                )
             return 0
 
         if not port_is_available(arguments.port):
@@ -458,11 +538,15 @@ def main() -> int:
         if arguments.no_tray:
             server = build_server(arguments.port)
             if not arguments.no_browser:
-                threading.Thread(target=open_when_ready, args=(arguments.port,), daemon=True).start()
+                threading.Thread(
+                    target=open_when_ready, args=(arguments.port,), daemon=True
+                ).start()
             server.run()
             return 0
         server_process = start_server_process(arguments.port)
-        return run_with_tray(server_process, arguments.port, data_dir, not arguments.no_browser)
+        return run_with_tray(
+            server_process, arguments.port, data_dir, not arguments.no_browser
+        )
     except Exception as exc:  # pragma: no cover - final desktop error boundary
         write_launcher_error(data_dir)
         show_message("码熊启动失败", str(exc), error=True)

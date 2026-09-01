@@ -10,11 +10,14 @@ import type {
   WorkspaceNode,
 } from "../../types";
 import { AiLauncher } from "../../components/AiLauncher";
+import { useI18n } from "../preferences/PreferencesProvider";
 import type { UpdateState } from "../updates/types";
 import type { RelationTableInfo } from "../relations/components/RelationDrawer";
 
 const AiAssistant = lazy(() =>
-  import("../../components/AiAssistant").then((module) => ({ default: module.AiAssistant })),
+  import("../../components/AiAssistant").then((module) => ({
+    default: module.AiAssistant,
+  })),
 );
 const BackupMigrationModal = lazy(() =>
   import("../../components/BackupMigrationModal").then((module) => ({
@@ -22,16 +25,24 @@ const BackupMigrationModal = lazy(() =>
   })),
 );
 const DdlExportModal = lazy(() =>
-  import("../../components/DdlExportModal").then((module) => ({ default: module.DdlExportModal })),
+  import("../../components/DdlExportModal").then((module) => ({
+    default: module.DdlExportModal,
+  })),
 );
 const DictionaryCenterModal = lazy(() =>
-  import("../../components/DictionaryCenterModal").then((module) => ({ default: module.DictionaryCenterModal })),
+  import("../../components/DictionaryCenterModal").then((module) => ({
+    default: module.DictionaryCenterModal,
+  })),
 );
 const UpdateModal = lazy(() =>
-  import("../updates/components/UpdateModal").then((module) => ({ default: module.UpdateModal })),
+  import("../updates/components/UpdateModal").then((module) => ({
+    default: module.UpdateModal,
+  })),
 );
 const RelationCenter = lazy(() =>
-  import("../relations/components/RelationCenter").then((module) => ({ default: module.RelationCenter })),
+  import("../relations/components/RelationCenter").then((module) => ({
+    default: module.RelationCenter,
+  })),
 );
 
 interface LazyFeatureOverlaysProps {
@@ -72,14 +83,24 @@ interface LazyFeatureOverlaysProps {
   onOpenAi: () => void;
   onAiOpenChange: (open: boolean) => void;
   onAiModeChange: (mode: AiLayoutMode) => void;
-  onOpenAiTable: (evidence: AiEvidenceTable, options?: { exitFullscreen?: boolean }) => void;
+  onOpenAiTable: (
+    evidence: AiEvidenceTable,
+    options?: { exitFullscreen?: boolean },
+  ) => void;
 }
 
 export function LazyFeatureOverlays(props: LazyFeatureOverlaysProps) {
+  const { t } = useI18n();
   return (
     <>
       {props.backupLoaded ? (
-        <Suspense fallback={<div className="feature-loading" role="status"><Spin size="small" /> 正在打开备份迁移…</div>}>
+        <Suspense
+          fallback={
+            <div className="feature-loading" role="status">
+              <Spin size="small" /> {t("backup.opening")}
+            </div>
+          }
+        >
           <BackupMigrationModal
             open={props.backupOpen}
             trees={props.trees}
@@ -93,7 +114,13 @@ export function LazyFeatureOverlays(props: LazyFeatureOverlaysProps) {
       ) : null}
 
       {props.ddlLoaded ? (
-        <Suspense fallback={<div className="feature-loading" role="status"><Spin size="small" /> 正在打开 SQL 导出…</div>}>
+        <Suspense
+          fallback={
+            <div className="feature-loading" role="status">
+              <Spin size="small" /> {t("ddl.opening")}
+            </div>
+          }
+        >
           <DdlExportModal
             open={props.ddlOpen}
             project={props.activeProject || null}
@@ -105,7 +132,13 @@ export function LazyFeatureOverlays(props: LazyFeatureOverlaysProps) {
       ) : null}
 
       {props.dictionaryLoaded ? (
-        <Suspense fallback={<div className="feature-loading" role="status"><Spin size="small" /> 正在打开字典中心…</div>}>
+        <Suspense
+          fallback={
+            <div className="feature-loading" role="status">
+              <Spin size="small" /> {t("dictionary.opening")}
+            </div>
+          }
+        >
           <DictionaryCenterModal
             open={props.dictionaryOpen}
             trees={props.trees}
@@ -117,7 +150,13 @@ export function LazyFeatureOverlays(props: LazyFeatureOverlaysProps) {
       ) : null}
 
       {props.updateLoaded ? (
-        <Suspense fallback={<div className="feature-loading" role="status"><Spin size="small" /> 正在打开更新面板…</div>}>
+        <Suspense
+          fallback={
+            <div className="feature-loading" role="status">
+              <Spin size="small" /> {t("update.opening")}
+            </div>
+          }
+        >
           <UpdateModal
             open={props.updateOpen}
             state={props.updateState}
@@ -130,7 +169,13 @@ export function LazyFeatureOverlays(props: LazyFeatureOverlaysProps) {
       ) : null}
 
       {props.relationLoaded ? (
-        <Suspense fallback={<div className="feature-loading" role="status"><Spin size="small" /> 正在打开表关系…</div>}>
+        <Suspense
+          fallback={
+            <div className="feature-loading" role="status">
+              <Spin size="small" /> {t("relation.opening")}
+            </div>
+          }
+        >
           <RelationCenter
             open={props.relationOpen}
             table={props.relationTable}
@@ -141,7 +186,13 @@ export function LazyFeatureOverlays(props: LazyFeatureOverlaysProps) {
       ) : null}
 
       {props.aiLoaded ? (
-        <Suspense fallback={<div className="feature-loading is-ai" role="status"><Spin size="small" /> 正在唤醒小码…</div>}>
+        <Suspense
+          fallback={
+            <div className="feature-loading is-ai" role="status">
+              <Spin size="small" /> {t("ai.waking")}
+            </div>
+          }
+        >
           <AiAssistant
             open={props.aiOpen}
             mode={props.aiMode}

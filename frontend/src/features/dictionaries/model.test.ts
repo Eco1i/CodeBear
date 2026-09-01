@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { importSuccessMessage } from "./model";
 import type { DictionarySummary } from "./types";
 
-const summary = (overrides: Partial<DictionarySummary> = {}): DictionarySummary => ({
+const summary = (
+  overrides: Partial<DictionarySummary> = {},
+): DictionarySummary => ({
   id: "dict-1",
   name: "委托方向",
   description: "",
@@ -25,8 +27,28 @@ describe("dictionaries model", () => {
   });
 
   it("跳过完全相同重复行时说明数量", () => {
-    expect(importSuccessMessage(summary({ skipped_duplicate_count: 108 }))).toBe(
+    expect(
+      importSuccessMessage(summary({ skipped_duplicate_count: 108 })),
+    ).toBe(
       "已导入 82 条字典值，已自动跳过 108 条重复行（完全相同 108 条），同码保留首次出现",
+    );
+  });
+
+  it("English import messages retain duplicate details", () => {
+    expect(importSuccessMessage(summary(), "en-US")).toBe(
+      "82 dictionary values imported",
+    );
+    expect(
+      importSuccessMessage(
+        summary({
+          skipped_duplicate_count: 108,
+          skipped_conflict_count: 23,
+          conflicting_codes: ["0", "9"],
+        }),
+        "en-US",
+      ),
+    ).toBe(
+      "82 dictionary values imported; 131 duplicate rows skipped automatically (108 exact duplicates; 23 same-code/different-name rows: e.g. 0, 9); first occurrence retained for duplicate codes",
     );
   });
 

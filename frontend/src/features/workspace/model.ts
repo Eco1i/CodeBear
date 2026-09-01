@@ -1,3 +1,6 @@
+import { readLanguagePreference } from "../preferences/model";
+import { translateError } from "../preferences/messages";
+import type { AppLanguage } from "../preferences/types";
 import type { Project, WorkspaceNode } from "./types";
 
 export type DialogKind = "project" | "folder" | "rename" | "settings" | null;
@@ -25,11 +28,17 @@ export function pathParent(path: string): string {
 }
 
 export function getProjectId(node: WorkspaceNode | null): string | undefined {
-  return node?.project_id || (node?.type === "project" ? node.id.replace("project:", "") : undefined);
+  return (
+    node?.project_id ||
+    (node?.type === "project" ? node.id.replace("project:", "") : undefined)
+  );
 }
 
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "操作失败，请稍后重试";
+export function errorMessage(
+  error: unknown,
+  language: AppLanguage = readLanguagePreference(),
+): string {
+  return translateError(language, error);
 }
 
 export function projectForNode(

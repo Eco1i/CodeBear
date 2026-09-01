@@ -3,14 +3,13 @@ import { ReloadOutlined } from "@ant-design/icons";
 import { Button, Checkbox, Empty, Spin } from "antd";
 
 import type { DdlCatalogGroup, DdlCatalogTable } from "../types";
+import { useI18n } from "../features/preferences/PreferencesProvider";
 import { PdmGlyph, TableGlyph, TreeChevronGlyph } from "./PrototypeGlyphs";
-
 
 const GROUP_ROW_HEIGHT = 44;
 const TABLE_ROW_HEIGHT = 40;
 const GROUP_GAP = 7;
 const TREE_OVERSCAN = 240;
-
 
 interface DdlTableTreeProps {
   groups: DdlCatalogGroup[];
@@ -27,7 +26,6 @@ interface DdlTableTreeProps {
   onToggleTable: (table: DdlCatalogTable, checked: boolean) => void;
   onRetryGroup: (group: DdlCatalogGroup) => void;
 }
-
 
 interface PositionedRowBase {
   key: string;
@@ -62,7 +60,6 @@ interface StatusRow extends PositionedRowBase {
 
 type PositionedRow = GroupRow | TableRow | StatusRow;
 
-
 export function DdlTableTree({
   groups,
   selectedIds,
@@ -78,6 +75,7 @@ export function DdlTableTree({
   onToggleTable,
   onRetryGroup,
 }: DdlTableTreeProps) {
+  const { t } = useI18n();
   const viewportRef = useRef<HTMLDivElement>(null);
   const pendingScrollTopRef = useRef(0);
   const scrollFrameRef = useRef<number | null>(null);
@@ -87,7 +85,8 @@ export function DdlTableTree({
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
-    const updateHeight = () => setViewportHeight(Math.max(1, Math.round(viewport.clientHeight)));
+    const updateHeight = () =>
+      setViewportHeight(Math.max(1, Math.round(viewport.clientHeight)));
     updateHeight();
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(updateHeight);
@@ -97,7 +96,8 @@ export function DdlTableTree({
 
   useEffect(
     () => () => {
-      if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current);
+      if (scrollFrameRef.current !== null)
+        window.cancelAnimationFrame(scrollFrameRef.current);
     },
     [],
   );
@@ -115,12 +115,22 @@ export function DdlTableTree({
     groups.forEach((group, groupIndex) => {
       const expanded = expandedIds.has(group.id);
       const visibleSelectedCount = queryActive
-        ? group.tables.reduce((total, table) => total + (selectedIds.has(table.id) ? 1 : 0), 0)
-        : (selectedGroupCounts.get(group.id) || 0);
-      const selectionTotal = queryActive ? group.tables.length : group.table_count;
+        ? group.tables.reduce(
+            (total, table) => total + (selectedIds.has(table.id) ? 1 : 0),
+            0,
+          )
+        : selectedGroupCounts.get(group.id) || 0;
+      const selectionTotal = queryActive
+        ? group.tables.length
+        : group.table_count;
       const loading = loadingGroupIds.has(group.id);
       const error = groupErrors.get(group.id) || "";
-      const hasChildRow = expanded && (loading || Boolean(error) || !group.tables_loaded || group.tables.length > 0);
+      const hasChildRow =
+        expanded &&
+        (loading ||
+          Boolean(error) ||
+          !group.tables_loaded ||
+          group.tables.length > 0);
       rows.push({
         kind: "group",
         key: `group-${group.id}`,
@@ -157,7 +167,7 @@ export function DdlTableTree({
           height: TABLE_ROW_HEIGHT + GROUP_GAP,
           group,
           status: "loading",
-          message: "正在读取数据表…",
+          message: t("common.reading"),
           isLast: true,
         });
         top += TABLE_ROW_HEIGHT + GROUP_GAP;
@@ -171,7 +181,7 @@ export function DdlTableTree({
           height: TABLE_ROW_HEIGHT + GROUP_GAP,
           group,
           status: "empty",
-          message: "该 PDM 暂无数据表",
+          message: t("table.empty"),
           isLast: true,
         });
         top += TABLE_ROW_HEIGHT + GROUP_GAP;
@@ -194,7 +204,16 @@ export function DdlTableTree({
       });
     });
     return { rows, totalHeight: top };
-  }, [expandedIds, groupErrors, groups, loadingGroupIds, queryActive, selectedGroupCounts, selectedIds]);
+  }, [
+    expandedIds,
+    groupErrors,
+    groups,
+    loadingGroupIds,
+    queryActive,
+    selectedGroupCounts,
+    selectedIds,
+    t,
+  ]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -241,26 +260,40 @@ export function DdlTableTree({
       ref={viewportRef}
       className="ddl-table-tree"
       role="tree"
-      aria-label="PDM 数据表选择树"
+      aria-label={t("ddl.tableSelection")}
       aria-busy={searching}
       onScroll={(event) => handleScroll(event.currentTarget.scrollTop)}
     >
       {searching ? (
-        <div className="ddl-tree-loading"><Spin size="small" /><span>正在搜索 PDM 和数据表…</span></div>
+        <div className="ddl-tree-loading">
+          <Spin size="small" />
+          <span>{t("ddl.readingTables")}</span>
+        </div>
       ) : !groups.length ? (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的 PDM 或数据表" />
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={t("ddl.noMatchPdmTables")}
+        />
       ) : (
-        <div className="ddl-tree-virtual-space" style={{ height: layout.totalHeight }}>
+        <div
+          className="ddl-tree-virtual-space"
+          style={{ height: layout.totalHeight }}
+        >
           {visibleRows.map((row) => {
             if (row.kind === "group") {
-              const checked = Boolean(row.selectionTotal && row.selectedCount === row.selectionTotal);
+              const checked = Boolean(
+                row.selectionTotal && row.selectedCount === row.selectionTotal,
+              );
               const indeterminate = row.selectedCount > 0 && !checked;
               const loading = loadingGroupIds.has(row.group.id);
               return (
                 <div
                   className="ddl-tree-virtual-row is-group"
                   key={row.key}
-                  style={{ height: row.height, transform: `translateY(${row.top}px)` }}
+                  style={{
+                    height: row.height,
+                    transform: `translateY(${row.top}px)`,
+                  }}
                 >
                   <div
                     className="ddl-tree-group ddl-tree-virtual-group"
@@ -274,7 +307,11 @@ export function DdlTableTree({
                       <button
                         type="button"
                         className="ddl-tree-toggle"
-                        aria-label={row.expanded ? `收起 ${row.group.file_name}` : `展开 ${row.group.file_name}`}
+                        aria-label={
+                          row.expanded
+                            ? t("ddl.collapse", { name: row.group.file_name })
+                            : t("ddl.expand", { name: row.group.file_name })
+                        }
                         onClick={() => onToggleExpanded(row.group)}
                       >
                         <TreeChevronGlyph expanded={row.expanded} />
@@ -283,15 +320,31 @@ export function DdlTableTree({
                         checked={checked}
                         indeterminate={indeterminate}
                         disabled={loading}
-                        aria-label={`选择 ${row.group.file_name}`}
-                        onChange={(event) => onToggleGroup(row.group, event.target.checked)}
+                        aria-label={t("ddl.selectPdm", {
+                          name: row.group.file_name,
+                        })}
+                        onChange={(event) =>
+                          onToggleGroup(row.group, event.target.checked)
+                        }
                       />
-                      <span className="ddl-tree-icon is-pdm"><PdmGlyph /></span>
-                      <button type="button" className="ddl-pdm-copy" onClick={() => onToggleExpanded(row.group)}>
-                        <b title={row.group.relative_path}>{row.group.file_name}</b>
-                        <small>{row.group.model_name || "PowerDesigner 模型文件"}</small>
+                      <span className="ddl-tree-icon is-pdm">
+                        <PdmGlyph />
+                      </span>
+                      <button
+                        type="button"
+                        className="ddl-pdm-copy"
+                        onClick={() => onToggleExpanded(row.group)}
+                      >
+                        <b title={row.group.relative_path}>
+                          {row.group.file_name}
+                        </b>
+                        <small>
+                          {row.group.model_name || t("ddl.modelFile")}
+                        </small>
                       </button>
-                      <span className="ddl-node-count">{row.selectedCount} / {row.selectionTotal}</span>
+                      <span className="ddl-node-count">
+                        {row.selectedCount} / {row.selectionTotal}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -302,10 +355,16 @@ export function DdlTableTree({
                 <div
                   className="ddl-tree-virtual-row is-table"
                   key={row.key}
-                  style={{ height: row.height, transform: `translateY(${row.top}px)` }}
+                  style={{
+                    height: row.height,
+                    transform: `translateY(${row.top}px)`,
+                  }}
                 >
                   <div className="ddl-tree-table-surface is-last">
-                    <div className={`ddl-tree-status is-${row.status}`} role="status">
+                    <div
+                      className={`ddl-tree-status is-${row.status}`}
+                      role="status"
+                    >
                       {row.status === "loading" ? <Spin size="small" /> : null}
                       <span title={row.message}>{row.message}</span>
                       {row.status === "error" ? (
@@ -315,7 +374,7 @@ export function DdlTableTree({
                           icon={<ReloadOutlined />}
                           onClick={() => onRetryGroup(row.group)}
                         >
-                          重试
+                          {t("ddl.retry")}
                         </Button>
                       ) : null}
                     </div>
@@ -327,9 +386,14 @@ export function DdlTableTree({
               <div
                 className="ddl-tree-virtual-row is-table"
                 key={row.key}
-                style={{ height: row.height, transform: `translateY(${row.top}px)` }}
+                style={{
+                  height: row.height,
+                  transform: `translateY(${row.top}px)`,
+                }}
               >
-                <div className={`ddl-tree-table-surface${row.isLast ? " is-last" : ""}`}>
+                <div
+                  className={`ddl-tree-table-surface${row.isLast ? " is-last" : ""}`}
+                >
                   <label
                     className={`ddl-table-node${selectedIds.has(row.table.id) ? " is-selected" : ""}`}
                     role="treeitem"
@@ -339,15 +403,30 @@ export function DdlTableTree({
                   >
                     <Checkbox
                       checked={selectedIds.has(row.table.id)}
-                      aria-label={`选择 ${row.table.name || row.table.code}`}
-                      onChange={(event) => onToggleTable(row.table, event.target.checked)}
+                      aria-label={t("table.selectTable", {
+                        name:
+                          row.table.name ||
+                          row.table.code ||
+                          t("table.unnamed"),
+                      })}
+                      onChange={(event) =>
+                        onToggleTable(row.table, event.target.checked)
+                      }
                     />
-                    <span className="ddl-tree-icon is-table"><TableGlyph /></span>
-                    <span className="ddl-table-copy">
-                      <b title={row.table.name || row.table.code}>{row.table.name || row.table.code || "未命名数据表"}</b>
-                      <small title={row.table.code}>{row.table.code || "NO_TABLE_CODE"}</small>
+                    <span className="ddl-tree-icon is-table">
+                      <TableGlyph />
                     </span>
-                    <span className="ddl-node-count">{row.table.field_count} 字段</span>
+                    <span className="ddl-table-copy">
+                      <b title={row.table.name || row.table.code}>
+                        {row.table.name || row.table.code || t("table.unnamed")}
+                      </b>
+                      <small title={row.table.code}>
+                        {row.table.code || t("ddl.noTableCode")}
+                      </small>
+                    </span>
+                    <span className="ddl-node-count">
+                      {t("ddl.fieldCount", { count: row.table.field_count })}
+                    </span>
                   </label>
                 </div>
               </div>
