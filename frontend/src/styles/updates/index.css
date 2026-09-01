@@ -42,15 +42,33 @@
 }
 
 .update-check-modal .ant-modal-header {
+  box-sizing: border-box;
+  min-height: 48px;
   margin: 0;
   padding: 13px 18px;
+  display: flex;
+  align-items: center;
   border-bottom: 1px solid #e2eaf3;
 }
 
+.update-check-modal .ant-modal-title {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  line-height: 22px;
+}
+
+.update-check-modal .ant-modal-close {
+  top: 8px;
+}
+
 .update-modal-title {
+  display: inline-flex;
+  align-items: center;
   color: #243955;
   font-size: 14px;
   font-weight: 800;
+  line-height: 22px;
 }
 
 .update-check-modal .ant-modal-body {

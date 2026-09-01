@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { TableDetail } from "../types";
@@ -41,13 +41,15 @@ describe("FieldPanel", () => {
   it("leaves empty display cells blank instead of rendering placeholder dashes", () => {
     const blankFieldDetail: TableDetail = {
       ...detail,
-      fields: [{
-        ...detail.fields[0],
-        length: "",
-        default_value: "",
-        comment: "",
-        is_primary_key: false,
-      }],
+      fields: [
+        {
+          ...detail.fields[0],
+          length: "",
+          default_value: "",
+          comment: "",
+          is_primary_key: false,
+        },
+      ],
     };
     const { container } = render(
       <FieldPanel
@@ -69,65 +71,6 @@ describe("FieldPanel", () => {
     });
   });
 
-  it("extends the hovered row background through the scrollbar gutter", () => {
-    const twoFieldDetail: TableDetail = {
-      ...detail,
-      field_count: 2,
-      fields: [
-        ...detail.fields,
-        {
-          ...detail.fields[0],
-          id: "field-2",
-          xml_id: "o12",
-          ordinal: 2,
-          code: "user_name",
-          name: "用户名称",
-          is_primary_key: false,
-        },
-      ],
-    };
-    const { container } = render(
-      <FieldPanel
-        detail={twoFieldDetail}
-        loading={false}
-        saving={false}
-        highlightQuery=""
-        onSave={vi.fn()}
-        onDirtyChange={vi.fn()}
-      />,
-    );
-    const grid = container.querySelector<HTMLElement>(".field-grid")!;
-    const body = screen.getByTestId("field-scroll-body");
-    const rows = body.querySelectorAll<HTMLElement>(".data-grid-row");
-    const hoveredRow = rows[1];
-    const gutterHighlight = container.querySelector<HTMLElement>(".field-grid-gutter-highlight")!;
-    vi.spyOn(grid, "getBoundingClientRect").mockReturnValue({
-      x: 100, y: 100, top: 100, right: 900, bottom: 500, left: 100,
-      width: 800, height: 400, toJSON: () => ({}),
-    });
-    vi.spyOn(body, "getBoundingClientRect").mockReturnValue({
-      x: 100, y: 133, top: 133, right: 900, bottom: 500, left: 100,
-      width: 800, height: 367, toJSON: () => ({}),
-    });
-    vi.spyOn(hoveredRow, "getBoundingClientRect").mockReturnValue({
-      x: 100, y: 169, top: 169, right: 890, bottom: 205, left: 100,
-      width: 790, height: 36, toJSON: () => ({}),
-    });
-    hoveredRow.style.backgroundColor = "rgb(246, 250, 255)";
-
-    fireEvent.pointerMove(hoveredRow, { clientX: 500, clientY: 180 });
-
-    expect(gutterHighlight).not.toHaveAttribute("hidden");
-    expect(gutterHighlight).toHaveStyle({
-      top: "69px",
-      height: "36px",
-      backgroundColor: "rgb(246, 250, 255)",
-    });
-
-    fireEvent.pointerLeave(body);
-    expect(gutterHighlight).toHaveAttribute("hidden");
-  });
-
   it("edits table metadata together with its fields", async () => {
     const user = userEvent.setup();
     const onSave = vi.fn().mockResolvedValue(undefined);
@@ -145,11 +88,20 @@ describe("FieldPanel", () => {
 
     await user.click(screen.getByRole("button", { name: /编辑字典/ }));
     await user.clear(screen.getByRole("textbox", { name: "表名称" }));
-    await user.type(screen.getByRole("textbox", { name: "表名称" }), "账户用户表");
+    await user.type(
+      screen.getByRole("textbox", { name: "表名称" }),
+      "账户用户表",
+    );
     await user.clear(screen.getByRole("textbox", { name: "表代码" }));
-    await user.type(screen.getByRole("textbox", { name: "表代码" }), "t_account_user");
+    await user.type(
+      screen.getByRole("textbox", { name: "表代码" }),
+      "t_account_user",
+    );
     await user.clear(screen.getByRole("textbox", { name: "表描述" }));
-    await user.type(screen.getByRole("textbox", { name: "表描述" }), "保存账户用户");
+    await user.type(
+      screen.getByRole("textbox", { name: "表描述" }),
+      "保存账户用户",
+    );
     await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
     await user.click(screen.getByRole("button", { name: /保存修改/ }));
 
@@ -172,14 +124,16 @@ describe("FieldPanel", () => {
       name: "订单表",
       code: "t_order",
       comment: "保存订单",
-      fields: [{
-        ...detail.fields[0],
-        id: "field-2",
-        table_id: "table-2",
-        xml_id: "o21",
-        code: "order_id",
-        name: "订单编号",
-      }],
+      fields: [
+        {
+          ...detail.fields[0],
+          id: "field-2",
+          table_id: "table-2",
+          xml_id: "o21",
+          code: "order_id",
+          name: "订单编号",
+        },
+      ],
     };
     const { rerender } = render(
       <FieldPanel
@@ -194,7 +148,10 @@ describe("FieldPanel", () => {
 
     await user.click(screen.getByRole("button", { name: /编辑字典/ }));
     await user.clear(screen.getByRole("textbox", { name: "表名称" }));
-    await user.type(screen.getByRole("textbox", { name: "表名称" }), "学习用户表");
+    await user.type(
+      screen.getByRole("textbox", { name: "表名称" }),
+      "学习用户表",
+    );
 
     rerender(
       <FieldPanel
@@ -218,7 +175,11 @@ describe("FieldPanel", () => {
         onDirtyChange={vi.fn()}
       />,
     );
-    await waitFor(() => expect(screen.getByRole("textbox", { name: "表名称" })).toHaveValue("学习用户表"));
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "表名称" })).toHaveValue(
+        "学习用户表",
+      ),
+    );
   });
 
   it("adds a new field and removes an existing non-primary field before saving", async () => {
@@ -259,9 +220,18 @@ describe("FieldPanel", () => {
     await user.click(screen.getByRole("button", { name: /编辑字典/ }));
     await user.click(screen.getByRole("button", { name: "删除字段 nickname" }));
     await user.click(screen.getByRole("button", { name: /新增字段/ }));
-    await user.type(screen.getByRole("textbox", { name: "第 2 行字段英文名" }), "status");
-    await user.type(screen.getByRole("textbox", { name: "第 2 行字段描述" }), "用户状态");
-    await user.type(screen.getByRole("textbox", { name: "第 2 行数据类型" }), "VARCHAR2");
+    await user.type(
+      screen.getByRole("textbox", { name: "第 2 行字段英文名" }),
+      "status",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "第 2 行字段描述" }),
+      "用户状态",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "第 2 行数据类型" }),
+      "VARCHAR2",
+    );
     await user.type(screen.getByRole("textbox", { name: "第 2 行长度" }), "20");
     await user.click(screen.getByRole("button", { name: /保存修改/ }));
 

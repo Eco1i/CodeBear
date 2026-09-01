@@ -1,7 +1,13 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button, Drawer, Empty, Input, Spin } from "antd";
-import { ApartmentOutlined, EditOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+  ApartmentOutlined,
+  EditOutlined,
+  PlusOutlined,
+  SearchOutlined,
+} from "@ant-design/icons";
+import { useI18n } from "../../preferences/PreferencesProvider";
 import { cardinalityText } from "../model";
 import type { Relation, TableRelations } from "../types";
 
@@ -33,11 +39,25 @@ interface TipState {
   isIn: boolean;
 }
 
-export function RelationDrawer({ open, table, data, loading, onClose, onJump, onEdit, onCreate, onOpenGraph }: RelationDrawerProps) {
+export function RelationDrawer({
+  open,
+  table,
+  data,
+  loading,
+  onClose,
+  onJump,
+  onEdit,
+  onCreate,
+  onOpenGraph,
+}: RelationDrawerProps) {
+  const { t } = useI18n();
   const [tab, setTab] = useState<DirFilter>("all");
   const [search, setSearch] = useState("");
   const [searchDraft, setSearchDraft] = useState("");
-  const [collapsed, setCollapsed] = useState<{ in: boolean; out: boolean }>({ in: false, out: false });
+  const [collapsed, setCollapsed] = useState<{ in: boolean; out: boolean }>({
+    in: false,
+    out: false,
+  });
   const [tip, setTip] = useState<TipState | null>(null);
 
   const incoming = data?.incoming || [];
@@ -48,7 +68,10 @@ export function RelationDrawer({ open, table, data, loading, onClose, onJump, on
     const filterList = (list: Relation[]) =>
       list.filter((relation) => {
         if (!q) return true;
-        const other = relation.source_table.id === table?.id ? relation.target_table : relation.source_table;
+        const other =
+          relation.source_table.id === table?.id
+            ? relation.target_table
+            : relation.source_table;
         return `${other.code} ${other.name} ${relation.source_field.code} ${relation.target_field.code} ${relation.name}`
           .toLowerCase()
           .includes(q);
@@ -65,23 +88,45 @@ export function RelationDrawer({ open, table, data, loading, onClose, onJump, on
       <div
         className={`rel-entry ${isIn ? "in" : "out"}`}
         key={relation.id}
-        title={`切换到「${other.name}」`}
+        title={`${t("relation.switch")} ${other.name}`}
         onClick={() => onJump(other.id)}
-        onMouseEnter={(event) => setTip({ x: event.clientX + 14, y: event.clientY + 14, relation, isIn })}
-        onMouseMove={(event) => setTip((current) => (current ? { ...current, x: event.clientX + 14, y: event.clientY + 14 } : current))}
+        onMouseEnter={(event) =>
+          setTip({
+            x: event.clientX + 14,
+            y: event.clientY + 14,
+            relation,
+            isIn,
+          })
+        }
+        onMouseMove={(event) =>
+          setTip((current) =>
+            current
+              ? { ...current, x: event.clientX + 14, y: event.clientY + 14 }
+              : current,
+          )
+        }
         onMouseLeave={() => setTip(null)}
       >
         <span className="rel-arrow">{isIn ? "←" : "→"}</span>
         <span className="rel-other">{other.code}</span>
         <span className="rel-joins">
-          <b>{relation.source_field.code}</b> → <b>{relation.target_field.code}</b>
+          <b>{relation.source_field.code}</b> →{" "}
+          <b>{relation.target_field.code}</b>
         </span>
         <span className={`rel-src-dot ${relation.source_type}`} />
-        <span className="rel-go">切换 ↗</span>
+        <span className="rel-go">{t("relation.switch")}</span>
         {relation.source_type === "manual" ? (
-          <span className="rel-row-actions" onClick={(event) => event.stopPropagation()}>
-            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => onEdit(relation)}>
-              编辑
+          <span
+            className="rel-row-actions"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => onEdit(relation)}
+            >
+              {t("relation.edit")}
             </Button>
           </span>
         ) : null}
@@ -92,13 +137,22 @@ export function RelationDrawer({ open, table, data, loading, onClose, onJump, on
   const group = (head: string, dir: "in" | "out", relations: Relation[]) =>
     relations.length ? (
       <div className="rel-group">
-        <div className="relation-group-head" onClick={() => setCollapsed((current) => ({ ...current, [dir]: !current[dir] }))}>
+        <div
+          className="relation-group-head"
+          onClick={() =>
+            setCollapsed((current) => ({ ...current, [dir]: !current[dir] }))
+          }
+        >
           <span className={`rel-dir ${dir}`} />
           {head}
-          <span className="relation-group-count">· {relations.length} 条</span>
+          <span className="relation-group-count">
+            · {t("relation.count", { count: relations.length })}
+          </span>
           <span className={`fold${collapsed[dir] ? " collapsed" : ""}`}>▾</span>
         </div>
-        {collapsed[dir] ? null : relations.map((relation) => entry(relation, dir === "in"))}
+        {collapsed[dir]
+          ? null
+          : relations.map((relation) => entry(relation, dir === "in"))}
       </div>
     ) : null;
 
@@ -106,7 +160,9 @@ export function RelationDrawer({ open, table, data, loading, onClose, onJump, on
   const tipContent = tip ? (
     <div className="relation-row-tip" style={{ left: tip.x, top: tip.y }}>
       <div className="tip-name">
-        {tip.isIn ? tip.relation.source_table.name : tip.relation.target_table.name}
+        {tip.isIn
+          ? tip.relation.source_table.name
+          : tip.relation.target_table.name}
         {`（${tip.isIn ? tip.relation.source_table.code : tip.relation.target_table.code}）`}
       </div>
       <div className="tip-fk">{tip.relation.name || "FK"}</div>
@@ -114,9 +170,13 @@ export function RelationDrawer({ open, table, data, loading, onClose, onJump, on
         {tip.relation.source_field.code} → {tip.relation.target_field.code}
       </div>
       <div className="tip-meta">
-        <span className="tip-badge card">{cardinalityText(tip.relation.cardinality)}</span>
+        <span className="tip-badge card">
+          {cardinalityText(tip.relation.cardinality)}
+        </span>
         <span className={`tip-badge ${tip.relation.source_type}`}>
-          {tip.relation.source_type === "auto" ? "自动解析" : "手工维护"}
+          {tip.relation.source_type === "auto"
+            ? t("relation.auto")
+            : t("relation.manual")}
         </span>
       </div>
     </div>
@@ -135,8 +195,11 @@ export function RelationDrawer({ open, table, data, loading, onClose, onJump, on
               <ApartmentOutlined />
             </span>
             <span>
-              <b>表关系{table ? ` · ${table.name}` : ""}</b>
-              <small>自动解析 PDM 外键 + 手工维护关系</small>
+              <b>
+                {t("relation.title")}
+                {table ? ` · ${table.name}` : ""}
+              </b>
+              <small>{t("relation.subtitle")}</small>
             </span>
           </span>
         }
@@ -148,32 +211,53 @@ export function RelationDrawer({ open, table, data, loading, onClose, onJump, on
                 {table.name} <code>{table.code}</code>
                 {table.comment ? ` · ${table.comment}` : ""}
               </span>
-              <span className="relation-status">{incoming.length + outgoing.length} 条关系</span>
+              <span className="relation-status">
+                {t("relation.count", {
+                  count: incoming.length + outgoing.length,
+                })}
+              </span>
             </>
           ) : null}
         </div>
         {loading ? (
           <div className="relation-centered">
-            <Spin size="small" /> 正在加载表关系…
+            <Spin size="small" /> {t("relation.loading")}
           </div>
         ) : !data ? null : incoming.length + outgoing.length === 0 ? (
           <div className="relation-centered">
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该表暂无关系">
-              <span className="relation-empty-hint">PDM 未包含关系定义时，可点击下方「新增关系」手工维护</span>
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={t("relation.empty")}
+            >
+              <span className="relation-empty-hint">
+                {t("relation.emptyHint")}
+              </span>
             </Empty>
           </div>
         ) : (
           <>
             <div className="relation-list-toolbar">
               <div className="relation-list-tabs">
-                <Button size="small" type={tab === "all" ? "primary" : "text"} onClick={() => setTab("all")}>
-                  全部 {incoming.length + outgoing.length}
+                <Button
+                  size="small"
+                  type={tab === "all" ? "primary" : "text"}
+                  onClick={() => setTab("all")}
+                >
+                  {t("relation.all")} {incoming.length + outgoing.length}
                 </Button>
-                <Button size="small" type={tab === "in" ? "primary" : "text"} onClick={() => setTab("in")}>
-                  入向 {incoming.length}
+                <Button
+                  size="small"
+                  type={tab === "in" ? "primary" : "text"}
+                  onClick={() => setTab("in")}
+                >
+                  {t("relation.incoming")} {incoming.length}
                 </Button>
-                <Button size="small" type={tab === "out" ? "primary" : "text"} onClick={() => setTab("out")}>
-                  出向 {outgoing.length}
+                <Button
+                  size="small"
+                  type={tab === "out" ? "primary" : "text"}
+                  onClick={() => setTab("out")}
+                >
+                  {t("relation.outgoing")} {outgoing.length}
                 </Button>
               </div>
               <div className="relation-list-search">
@@ -183,8 +267,8 @@ export function RelationDrawer({ open, table, data, loading, onClose, onJump, on
                     <button
                       type="button"
                       className="input-search-trigger"
-                      aria-label="搜索关系"
-                      title="搜索"
+                      aria-label={t("relation.search")}
+                      title={t("common.search")}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => setSearch(searchDraft.trim())}
                     >
@@ -192,27 +276,53 @@ export function RelationDrawer({ open, table, data, loading, onClose, onJump, on
                     </button>
                   }
                   value={searchDraft}
-                  placeholder="搜索表代码 / 字段"
+                  placeholder={t("relation.searchPlaceholder")}
                   onChange={(event) => setSearchDraft(event.target.value)}
                   onPressEnter={() => setSearch(searchDraft.trim())}
                 />
               </div>
             </div>
             <div className="relation-list">
-              {group("引用本表的表（入向）", "in", filtered.in)}
-              {group("本表引用的表（出向）", "out", filtered.out)}
-              {total === 0 ? <div className="rel-empty-hint-row">没有匹配的关系</div> : null}
+              {group(
+                `${t("relation.relatedTable")}（${t("relation.incoming")}）`,
+                "in",
+                filtered.in,
+              )}
+              {group(
+                `${t("relation.currentTable")}（${t("relation.outgoing")}）`,
+                "out",
+                filtered.out,
+              )}
+              {total === 0 ? (
+                <div className="rel-empty-hint-row">
+                  {t("relation.noMatch")}
+                </div>
+              ) : null}
             </div>
           </>
         )}
         <div className="relation-drawer-footer">
-          <span>入向 {incoming.length} · 出向 {outgoing.length} · 悬停行看详情 · 点击行切换查看</span>
+          <span>
+            {t("relation.footer", {
+              incoming: incoming.length,
+              outgoing: outgoing.length,
+            })}
+          </span>
           <span className="relation-footer-actions">
-            <Button size="small" icon={<ApartmentOutlined />} onClick={onOpenGraph}>
-              关系图
+            <Button
+              size="small"
+              icon={<ApartmentOutlined />}
+              onClick={onOpenGraph}
+            >
+              {t("relation.graph")}
             </Button>
-            <Button type="primary" size="small" icon={<PlusOutlined />} onClick={onCreate}>
-              新增关系
+            <Button
+              type="primary"
+              size="small"
+              icon={<PlusOutlined />}
+              onClick={onCreate}
+            >
+              {t("relation.add")}
             </Button>
           </span>
         </div>

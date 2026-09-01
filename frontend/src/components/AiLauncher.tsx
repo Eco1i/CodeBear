@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
@@ -6,6 +13,7 @@ import type {
   PointerEvent as ReactPointerEvent,
 } from "react";
 import type { AiAccessory } from "../features/ai/types";
+import { useI18n } from "../features/preferences/PreferencesProvider";
 import { PolarBearMark } from "./AiMascot";
 
 interface AiLauncherProps {
@@ -39,7 +47,9 @@ const LAUNCHER_KEYBOARD_STEP = 16;
 
 function readStoredLauncherPosition(): LauncherPosition | null {
   try {
-    const stored = window.localStorage.getItem(AI_LAUNCHER_POSITION_STORAGE_KEY);
+    const stored = window.localStorage.getItem(
+      AI_LAUNCHER_POSITION_STORAGE_KEY,
+    );
     if (!stored) return null;
     const parsed = JSON.parse(stored) as Partial<LauncherPosition>;
     return Number.isFinite(parsed.x) && Number.isFinite(parsed.y)
@@ -97,6 +107,7 @@ export function AiLauncher({
   shortcutEnabled = true,
   visible = true,
 }: AiLauncherProps) {
+  const { t } = useI18n();
   const displayName = assistantName?.trim() || "小码";
   const descriptionId = useId();
   const launcherRef = useRef<HTMLButtonElement>(null);
@@ -111,12 +122,15 @@ export function AiLauncher({
   });
   const [dragging, setDragging] = useState(false);
 
-  const updatePosition = useCallback((nextPosition: LauncherPosition, persist = false) => {
-    const clamped = clampLauncherPosition(nextPosition, launcherRef.current);
-    positionRef.current = clamped;
-    setPosition(clamped);
-    if (persist) storeLauncherPosition(clamped);
-  }, []);
+  const updatePosition = useCallback(
+    (nextPosition: LauncherPosition, persist = false) => {
+      const clamped = clampLauncherPosition(nextPosition, launcherRef.current);
+      positionRef.current = clamped;
+      setPosition(clamped);
+      if (persist) storeLauncherPosition(clamped);
+    },
+    [],
+  );
 
   useLayoutEffect(() => {
     if (positionRef.current) updatePosition(positionRef.current, true);
@@ -127,12 +141,13 @@ export function AiLauncher({
     const handleShortcut = (event: KeyboardEvent) => {
       const hasSinglePrimaryModifier = event.ctrlKey !== event.metaKey;
       if (
-        event.repeat
-        || !hasSinglePrimaryModifier
-        || event.altKey
-        || event.shiftKey
-        || event.key.toLocaleLowerCase() !== "j"
-      ) return;
+        event.repeat ||
+        !hasSinglePrimaryModifier ||
+        event.altKey ||
+        event.shiftKey ||
+        event.key.toLocaleLowerCase() !== "j"
+      )
+        return;
       event.preventDefault();
       onOpen();
     };
@@ -149,11 +164,14 @@ export function AiLauncher({
     return () => window.removeEventListener("resize", keepInsideViewport);
   }, [updatePosition]);
 
-  useEffect(() => () => {
-    if (suppressClickTimerRef.current !== null) {
-      window.clearTimeout(suppressClickTimerRef.current);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (suppressClickTimerRef.current !== null) {
+        window.clearTimeout(suppressClickTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0 || event.isPrimary === false) return;
@@ -180,7 +198,11 @@ export function AiLauncher({
     if (!dragState || dragState.pointerId !== event.pointerId) return;
     const deltaX = event.clientX - dragState.startX;
     const deltaY = event.clientY - dragState.startY;
-    if (!dragState.moved && Math.hypot(deltaX, deltaY) < LAUNCHER_DRAG_THRESHOLD) return;
+    if (
+      !dragState.moved &&
+      Math.hypot(deltaX, deltaY) < LAUNCHER_DRAG_THRESHOLD
+    )
+      return;
     if (!dragState.moved) {
       dragState.moved = true;
       setDragging(true);
@@ -201,14 +223,18 @@ export function AiLauncher({
     dragStateRef.current = null;
     const deltaX = event.clientX - dragState.startX;
     const deltaY = event.clientY - dragState.startY;
-    const moved = dragState.moved
-      || (!cancelled && Math.hypot(deltaX, deltaY) >= LAUNCHER_DRAG_THRESHOLD);
+    const moved =
+      dragState.moved ||
+      (!cancelled && Math.hypot(deltaX, deltaY) >= LAUNCHER_DRAG_THRESHOLD);
 
     if (moved && !cancelled) {
-      updatePosition({
-        x: dragState.originX + deltaX,
-        y: dragState.originY + deltaY,
-      }, true);
+      updatePosition(
+        {
+          x: dragState.originX + deltaX,
+          y: dragState.originY + deltaY,
+        },
+        true,
+      );
     } else if (dragState.moved && positionRef.current) {
       storeLauncherPosition(positionRef.current);
     }
@@ -247,15 +273,16 @@ export function AiLauncher({
 
   const handleKeyboardMove = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (!event.altKey || event.ctrlKey || event.metaKey) return;
-    const direction = event.key === "ArrowLeft"
-      ? { x: -1, y: 0 }
-      : event.key === "ArrowRight"
-        ? { x: 1, y: 0 }
-        : event.key === "ArrowUp"
-          ? { x: 0, y: -1 }
-          : event.key === "ArrowDown"
-            ? { x: 0, y: 1 }
-            : null;
+    const direction =
+      event.key === "ArrowLeft"
+        ? { x: -1, y: 0 }
+        : event.key === "ArrowRight"
+          ? { x: 1, y: 0 }
+          : event.key === "ArrowUp"
+            ? { x: 0, y: -1 }
+            : event.key === "ArrowDown"
+              ? { x: 0, y: 1 }
+              : null;
     if (!direction) return;
     event.preventDefault();
     const rect = launcherRef.current?.getBoundingClientRect();
@@ -263,18 +290,28 @@ export function AiLauncher({
       x: rect?.left || 0,
       y: rect?.top || 0,
     };
-    const step = event.shiftKey ? LAUNCHER_KEYBOARD_STEP * 3 : LAUNCHER_KEYBOARD_STEP;
-    updatePosition({
-      x: currentPosition.x + direction.x * step,
-      y: currentPosition.y + direction.y * step,
-    }, true);
+    const step = event.shiftKey
+      ? LAUNCHER_KEYBOARD_STEP * 3
+      : LAUNCHER_KEYBOARD_STEP;
+    updatePosition(
+      {
+        x: currentPosition.x + direction.x * step,
+        y: currentPosition.y + direction.y * step,
+      },
+      true,
+    );
   };
 
   const launcherStyle = position
-    ? ({ left: position.x, top: position.y, right: "auto", bottom: "auto" } satisfies CSSProperties)
+    ? ({
+        left: position.x,
+        top: position.y,
+        right: "auto",
+        bottom: "auto",
+      } satisfies CSSProperties)
     : undefined;
-  const hintOnRight = position !== null
-    && position.x + LAUNCHER_SIZE / 2 < window.innerWidth / 2;
+  const hintOnRight =
+    position !== null && position.x + LAUNCHER_SIZE / 2 < window.innerWidth / 2;
   const macLikePlatform = isMacLikePlatform();
   const movementModifier = macLikePlatform ? "Option" : "Alt";
   const shortcutLabel = macLikePlatform ? "⌘J" : "Ctrl+J";
@@ -286,11 +323,11 @@ export function AiLauncher({
         className={`ai-launcher${dragging ? " is-dragging" : ""}${hintOnRight ? " is-hint-right" : ""}${visible ? "" : " is-hidden"}`}
         style={launcherStyle}
         type="button"
-        aria-label={`打开 ${displayName}`}
+        aria-label={t("ai.open", { name: displayName })}
         aria-describedby={descriptionId}
         aria-expanded="false"
         aria-keyshortcuts="Control+J Meta+J Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight"
-        title={`拖动可移动；${movementModifier} + 方向键可微调位置`}
+        title={t("ai.dragHint", { modifier: movementModifier })}
         draggable={false}
         onClick={handleClick}
         onKeyDown={handleKeyboardMove}
@@ -301,15 +338,13 @@ export function AiLauncher({
         onLostPointerCapture={(event) => finishPointerInteraction(event, true)}
       >
         <span className="ai-launcher-hint" aria-hidden="true">
-          <span>和{displayName}聊聊</span>
+          <span>{t("ai.chatHint", { name: displayName })}</span>
           <kbd>{shortcutLabel}</kbd>
         </span>
         <PolarBearMark accessory={assistantAccessory} />
       </button>
       <span id={descriptionId} className="sr-only">
-        可拖动到窗口内任意位置；也可按
-        {movementModifier}
-        加方向键移动。
+        {t("ai.movableHint", { modifier: movementModifier })}
       </span>
     </>
   );

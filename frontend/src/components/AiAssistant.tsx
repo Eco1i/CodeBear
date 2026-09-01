@@ -20,6 +20,7 @@ import {
   StopOutlined,
 } from "@ant-design/icons";
 import { aiApi } from "../features/ai/api";
+import { useI18n } from "../features/preferences/PreferencesProvider";
 import {
   AI_SCOPE_STORAGE_KEY,
   buildScopeOptions,
@@ -75,31 +76,47 @@ interface AiAssistantProps {
   selectedTable: TableDetail | null;
   onOpenChange: (open: boolean) => void;
   onModeChange: (mode: AiLayoutMode) => void;
-  onOpenTable: (evidence: AiEvidenceTable, options?: { exitFullscreen?: boolean }) => void;
+  onOpenTable: (
+    evidence: AiEvidenceTable,
+    options?: { exitFullscreen?: boolean },
+  ) => void;
 }
 
 export function isAssistantToggleShortcut(event: KeyboardEvent): boolean {
   const hasSinglePrimaryModifier = event.ctrlKey !== event.metaKey;
-  return !event.repeat
-    && hasSinglePrimaryModifier
-    && !event.altKey
-    && !event.shiftKey
-    && event.key.toLowerCase() === "j";
+  return (
+    !event.repeat &&
+    hasSinglePrimaryModifier &&
+    !event.altKey &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === "j"
+  );
 }
 
-const AI_LAYOUT_OPTIONS: Array<{ mode: AiLayoutMode; label: string; description: string }> = [
-  { mode: "sidebar", label: "侧边栏", description: "与数据表并排查看" },
-  { mode: "floating", label: "浮动", description: "悬浮在工作区右下角" },
-  { mode: "fullscreen", label: "全屏", description: "专注查看完整对话" },
-];
+const AI_LAYOUT_OPTIONS: AiLayoutMode[] = ["sidebar", "floating", "fullscreen"];
 
 function LayoutGlyph({ mode }: { mode: AiLayoutMode }) {
   return (
-    <svg className={`ai-layout-glyph is-${mode}`} viewBox="0 0 18 18" aria-hidden="true">
+    <svg
+      className={`ai-layout-glyph is-${mode}`}
+      viewBox="0 0 18 18"
+      aria-hidden="true"
+    >
       <rect x="2.25" y="2.25" width="13.5" height="13.5" rx="2" />
       {mode === "sidebar" ? <path d="M10.25 2.8v12.4" /> : null}
-      {mode === "floating" ? <rect x="8.1" y="8" width="6.15" height="5.65" rx="1" /> : null}
-      {mode === "fullscreen" ? <rect className="ai-layout-glyph-fill" x="4.2" y="4.2" width="9.6" height="9.6" rx="1" /> : null}
+      {mode === "floating" ? (
+        <rect x="8.1" y="8" width="6.15" height="5.65" rx="1" />
+      ) : null}
+      {mode === "fullscreen" ? (
+        <rect
+          className="ai-layout-glyph-fill"
+          x="4.2"
+          y="4.2"
+          width="9.6"
+          height="9.6"
+          rx="1"
+        />
+      ) : null}
     </svg>
   );
 }
@@ -113,6 +130,7 @@ function LayoutModePicker({
   onChange: (mode: AiLayoutMode) => void;
   onBeforeOpen?: () => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -136,10 +154,10 @@ function LayoutModePicker({
       <button
         className={open ? "is-active" : ""}
         type="button"
-        aria-label="切换 AI 显示方式"
+        aria-label={t("ai.switchDisplayMode")}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="显示方式"
+        title={t("ai.displayMode")}
         onClick={() => {
           if (!open) onBeforeOpen?.();
           setOpen((current) => !current);
@@ -148,23 +166,36 @@ function LayoutModePicker({
         <LayoutGlyph mode={mode} />
       </button>
       {open ? (
-        <div className="ai-layout-menu" role="menu" aria-label="AI 显示方式">
-          <span className="ai-layout-menu-title">显示方式</span>
+        <div
+          className="ai-layout-menu"
+          role="menu"
+          aria-label={t("ai.displayMode")}
+        >
+          <span className="ai-layout-menu-title">{t("ai.displayMode")}</span>
           {AI_LAYOUT_OPTIONS.map((option) => (
             <button
-              className={option.mode === mode ? "is-selected" : ""}
+              className={option === mode ? "is-selected" : ""}
               type="button"
               role="menuitemradio"
-              aria-checked={option.mode === mode}
-              key={option.mode}
+              aria-checked={option === mode}
+              key={option}
               onClick={() => {
-                onChange(option.mode);
+                onChange(option);
                 setOpen(false);
               }}
             >
-              <LayoutGlyph mode={option.mode} />
-              <span><b>{option.label}</b><small>{option.description}</small></span>
-              <svg className="ai-layout-check" viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8 3 3 7-7" /></svg>
+              <LayoutGlyph mode={option} />
+              <span>
+                <b>{t(`ai.layout.${option}`)}</b>
+                <small>{t(`ai.layout.${option}Hint`)}</small>
+              </span>
+              <svg
+                className="ai-layout-check"
+                viewBox="0 0 16 16"
+                aria-hidden="true"
+              >
+                <path d="m3 8 3 3 7-7" />
+              </svg>
             </button>
           ))}
         </div>
@@ -182,10 +213,15 @@ function ScopePicker({
   selectedKey: string;
   onChange: (option: ScopeOption) => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const selected = options.find((option) => option.key === selectedKey) || options[0];
+  const selected =
+    options.find((option) => option.key === selectedKey) || options[0];
+  const scopeKind = (option: ScopeOption) => t(`ai.scope.${option.scope.type}`);
+  const scopeValue = (option: ScopeOption) =>
+    option.scope.type === "all" ? t("ai.scope.allProjects") : option.value;
 
   useEffect(() => {
     const closeOnOutside = (event: PointerEvent) => {
@@ -206,7 +242,9 @@ function ScopePicker({
     optionRefs.current[(index + options.length) % options.length]?.focus();
   };
 
-  const handleButtonKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+  const handleButtonKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+  ) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
     setOpen(true);
@@ -217,7 +255,10 @@ function ScopePicker({
     window.setTimeout(() => focusOption(selectedIndex), 0);
   };
 
-  const handleOptionKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
+  const handleOptionKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       focusOption(index + 1);
@@ -245,21 +286,32 @@ function ScopePicker({
         onKeyDown={handleButtonKeyDown}
       >
         <span className="ai-scope-selection">
-          <b>{selected.kind}</b>
-          <span>{selected.value}</span>
+          <b>{scopeKind(selected)}</b>
+          <span>{scopeValue(selected)}</span>
         </span>
-        <svg className="ai-scope-chevron" viewBox="0 0 16 16" aria-hidden="true">
+        <svg
+          className="ai-scope-chevron"
+          viewBox="0 0 16 16"
+          aria-hidden="true"
+        >
           <path d="m4 6 4 4 4-4" />
         </svg>
       </button>
       {open ? (
-        <div className="ai-scope-menu" id="ai-scope-menu" role="listbox" aria-label="AI 查询范围">
+        <div
+          className="ai-scope-menu"
+          id="ai-scope-menu"
+          role="listbox"
+          aria-label={t("ai.queryScope")}
+        >
           {options.map((option, index) => {
             const isSelected = option.key === selected.key;
             return (
               <button
                 key={option.key}
-                ref={(element) => { optionRefs.current[index] = element; }}
+                ref={(element) => {
+                  optionRefs.current[index] = element;
+                }}
                 className={`ai-scope-option${isSelected ? " is-selected" : ""}`}
                 type="button"
                 role="option"
@@ -270,9 +322,11 @@ function ScopePicker({
                 }}
                 onKeyDown={(event) => handleOptionKeyDown(event, index)}
               >
-                <b>{option.kind}</b>
-                <span>{option.value}</span>
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8 3 3 6-6" /></svg>
+                <b>{scopeKind(option)}</b>
+                <span>{scopeValue(option)}</span>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="m3.5 8 3 3 6-6" />
+                </svg>
               </button>
             );
           })}
@@ -282,20 +336,35 @@ function ScopePicker({
   );
 }
 
-function EvidenceCard({ evidence, onOpen }: { evidence: AiEvidenceTable; onOpen: () => void }) {
+function EvidenceCard({
+  evidence,
+  onOpen,
+}: {
+  evidence: AiEvidenceTable;
+  onOpen: () => void;
+}) {
+  const { t } = useI18n();
   return (
-    <button className={`ai-evidence-card is-${evidence.relevance}`} type="button" onClick={onOpen}>
+    <button
+      className={`ai-evidence-card is-${evidence.relevance}`}
+      type="button"
+      onClick={onOpen}
+    >
       <span className="ai-evidence-heading">
-        <span className="ai-evidence-icon"><TableGlyph /></span>
+        <span className="ai-evidence-icon">
+          <TableGlyph />
+        </span>
         <span>
           <span className="ai-evidence-title-line">
             <strong>{evidence.table_name || evidence.table_code}</strong>
           </span>
           <code>{evidence.table_code}</code>
         </span>
-        <em>查看字段</em>
+        <em>{t("ai.viewFields")}</em>
       </span>
-      {evidence.reason ? <span className="ai-evidence-reason">{evidence.reason}</span> : null}
+      {evidence.reason ? (
+        <span className="ai-evidence-reason">{evidence.reason}</span>
+      ) : null}
       {evidence.matched_fields.length ? (
         <span className="ai-evidence-fields">
           {evidence.matched_fields.slice(0, 3).map((field) => (
@@ -306,7 +375,9 @@ function EvidenceCard({ evidence, onOpen }: { evidence: AiEvidenceTable; onOpen:
           ))}
         </span>
       ) : null}
-      <span className="ai-evidence-path">{evidence.project_name} / {evidence.relative_path}</span>
+      <span className="ai-evidence-path">
+        {evidence.project_name} / {evidence.relative_path}
+      </span>
     </button>
   );
 }
@@ -320,6 +391,7 @@ function EvidenceList({
   retrieval?: AiRetrievalSummary;
   onOpen: (item: AiEvidenceTable) => void;
 }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const direct = evidence.filter((item) => item.relevance === "direct");
   const related = evidence.filter((item) => item.relevance !== "direct");
@@ -329,37 +401,64 @@ function EvidenceList({
   return (
     <div className="ai-evidence-list">
       <span className="ai-evidence-summary">
-        <b>本机检索证据</b>
+        <b>{t("ai.localEvidence")}</b>
         {retrieval ? (
-          <small>匹配 {retrieval.candidate_count} 张 · AI 复核 {retrieval.reviewed_count} 张</small>
+          <small>
+            {t("ai.matchedReviewed", {
+              candidate: retrieval.candidate_count,
+              reviewed: retrieval.reviewed_count,
+            })}
+          </small>
         ) : null}
       </span>
       {retrieval?.matched_sources.length ? (
         <span className="ai-evidence-source">
-          已限定来源 · {retrieval.matched_sources.join("、")}
+          {t("ai.sourceLimited", {
+            sources: retrieval.matched_sources.join(", "),
+          })}
         </span>
       ) : null}
       {direct.length ? (
         <div className="ai-evidence-group">
-          <span className="ai-evidence-group-label">直接相关 <b>{direct.length}</b></span>
+          <span className="ai-evidence-group-label">
+            {t("ai.direct")} <b>{direct.length}</b>
+          </span>
           {direct.map((item) => (
-            <EvidenceCard key={item.table_id} evidence={item} onOpen={() => onOpen(item)} />
+            <EvidenceCard
+              key={item.table_id}
+              evidence={item}
+              onOpen={() => onOpen(item)}
+            />
           ))}
         </div>
       ) : null}
       {related.length ? (
         <div className="ai-evidence-group">
-          <span className="ai-evidence-group-label">关联候选 <b>{related.length}</b></span>
+          <span className="ai-evidence-group-label">
+            {t("ai.relatedCandidates")} <b>{related.length}</b>
+          </span>
           {visibleRelated.map((item) => (
-            <EvidenceCard key={item.table_id} evidence={item} onOpen={() => onOpen(item)} />
+            <EvidenceCard
+              key={item.table_id}
+              evidence={item}
+              onOpen={() => onOpen(item)}
+            />
           ))}
           {hiddenCount > 0 ? (
-            <button className="ai-evidence-expand" type="button" onClick={() => setExpanded(true)}>
-              展开其余 {hiddenCount} 张候选
+            <button
+              className="ai-evidence-expand"
+              type="button"
+              onClick={() => setExpanded(true)}
+            >
+              {t("ai.expandRemaining", { count: hiddenCount })}
             </button>
           ) : expanded && related.length > 3 ? (
-            <button className="ai-evidence-expand" type="button" onClick={() => setExpanded(false)}>
-              收起关联候选
+            <button
+              className="ai-evidence-expand"
+              type="button"
+              onClick={() => setExpanded(false)}
+            >
+              {t("ai.collapseRelated")}
             </button>
           ) : null}
         </div>
@@ -389,12 +488,19 @@ function TablePeek({
   onRetry: () => void;
   onOpenWorkspace: () => void;
 }) {
+  const { t } = useI18n();
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const fields = useMemo(() => {
     const source = detail?.fields || [];
     if (!normalizedQuery) return source;
     return source.filter((field) =>
-      [field.code, field.name, field.comment, field.data_type, field.default_value]
+      [
+        field.code,
+        field.name,
+        field.comment,
+        field.data_type,
+        field.default_value,
+      ]
         .join(" ")
         .toLocaleLowerCase()
         .includes(normalizedQuery),
@@ -406,25 +512,52 @@ function TablePeek({
 
   return (
     <>
-      <button className="ai-table-peek-backdrop" type="button" aria-label="关闭表格速览" onClick={onClose} />
-      <section className="ai-table-peek" role="dialog" aria-modal="false" aria-label={`${tableName}表格速览`}>
+      <button
+        className="ai-table-peek-backdrop"
+        type="button"
+        aria-label={t("ai.closePeek")}
+        onClick={onClose}
+      />
+      <section
+        className="ai-table-peek"
+        role="dialog"
+        aria-modal="false"
+        aria-label={`${tableName} ${t("ai.tablePeek")}`}
+      >
         <header className="ai-table-peek-header">
-          <button className="ai-table-peek-back" type="button" autoFocus aria-label="返回对话" title="返回对话" onClick={onClose}>
+          <button
+            className="ai-table-peek-back"
+            type="button"
+            autoFocus
+            aria-label={t("ai.backConversation")}
+            title={t("ai.backConversation")}
+            onClick={onClose}
+          >
             <ArrowLeftOutlined />
           </button>
-          <span className="ai-table-peek-icon"><TableGlyph /></span>
+          <span className="ai-table-peek-icon">
+            <TableGlyph />
+          </span>
           <span className="ai-table-peek-title">
-            <small>表格速览</small>
+            <small>{t("ai.tablePeek")}</small>
             <strong title={tableName}>{tableName}</strong>
             <code title={tableCode}>{tableCode}</code>
           </span>
-          <Button size="small" icon={<ExportOutlined />} onClick={onOpenWorkspace}>
-            在工作区打开
+          <Button
+            size="small"
+            icon={<ExportOutlined />}
+            onClick={onOpenWorkspace}
+          >
+            {t("ai.openWorkspace")}
           </Button>
         </header>
 
         <div className="ai-table-peek-context">
-          {tableComment ? <p title={tableComment}>{tableComment}</p> : <p>当前表暂无说明</p>}
+          {tableComment ? (
+            <p title={tableComment}>{tableComment}</p>
+          ) : (
+            <p>{t("ai.noTableDescription")}</p>
+          )}
           <span title={`${evidence.project_name} / ${evidence.relative_path}`}>
             {evidence.project_name} / {evidence.relative_path}
           </span>
@@ -435,30 +568,43 @@ function TablePeek({
             <SearchOutlined />
             <input
               value={query}
-              placeholder="搜索字段英文名、描述或备注"
-              aria-label="搜索预览字段"
+              placeholder={t("table.searchFieldPlaceholder")}
+              aria-label={t("ai.tablePeek")}
               onChange={(event) => onQueryChange(event.target.value)}
             />
             {query ? (
-              <button type="button" aria-label="清空字段搜索" onClick={() => onQueryChange("")}>
+              <button
+                type="button"
+                aria-label={t("ai.clearFieldSearch")}
+                onClick={() => onQueryChange("")}
+              >
                 <CloseOutlined />
               </button>
             ) : null}
           </label>
-          <span>{loading ? "读取中" : `${fields.length} / ${detail?.fields.length || 0} 个字段`}</span>
+          <span>
+            {loading
+              ? t("ai.reading")
+              : t("ai.fieldCount", {
+                  current: fields.length,
+                  total: detail?.fields.length || 0,
+                })}
+          </span>
         </div>
 
         <div className="ai-table-peek-body">
           {loading ? (
             <div className="ai-table-peek-state" aria-live="polite">
               <Spin size="small" />
-              <span>正在读取本机字段字典…</span>
+              <span>{t("ai.readingFields")}</span>
             </div>
           ) : error ? (
             <div className="ai-table-peek-state is-error" role="alert">
-              <strong>表格读取失败</strong>
+              <strong>{t("ai.tableReadFailed")}</strong>
               <span>{error}</span>
-              <Button size="small" onClick={onRetry}>重新读取</Button>
+              <Button size="small" onClick={onRetry}>
+                {t("ai.reread")}
+              </Button>
             </div>
           ) : (
             <div className="ai-table-peek-grid">
@@ -466,64 +612,85 @@ function TablePeek({
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>主键</th>
-                    <th>字段英文名</th>
-                    <th>字段描述</th>
-                    <th>数据类型</th>
-                    <th>长度</th>
-                    <th>可空</th>
-                    <th>缺省值</th>
-                    <th>字段备注</th>
+                    <th>{t("field.primaryKey")}</th>
+                    <th>{t("field.englishName")}</th>
+                    <th>{t("field.description")}</th>
+                    <th>{t("field.dataType")}</th>
+                    <th>{t("field.length")}</th>
+                    <th>{t("field.nullable")}</th>
+                    <th>{t("field.defaultValue")}</th>
+                    <th>{t("field.comment")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {fields.map((field) => (
                     <tr key={field.id}>
                       <td>{String(field.ordinal).padStart(2, "0")}</td>
-                      <td>{field.is_primary_key ? <b className="ai-table-peek-pk">PK</b> : <span>—</span>}</td>
-                      <td><code title={field.code}>{field.code || "—"}</code></td>
+                      <td>
+                        {field.is_primary_key ? (
+                          <b className="ai-table-peek-pk">PK</b>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </td>
+                      <td>
+                        <code title={field.code}>{field.code || "—"}</code>
+                      </td>
                       <td title={field.name}>{field.name || "—"}</td>
-                      <td><code title={field.data_type}>{field.data_type || "—"}</code></td>
+                      <td>
+                        <code title={field.data_type}>
+                          {field.data_type || "—"}
+                        </code>
+                      </td>
                       <td>{field.length || "—"}</td>
                       <td>{field.nullable ? "✓" : "—"}</td>
-                      <td title={field.default_value}>{field.default_value || "—"}</td>
+                      <td title={field.default_value}>
+                        {field.default_value || "—"}
+                      </td>
                       <td title={field.comment}>{field.comment || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {!fields.length ? (
-                <div className="ai-table-peek-empty">没有匹配“{query}”的字段</div>
-              ) : null}
+              {fields.length ? null : (
+                <div className="ai-table-peek-empty">
+                  {t("ai.noMatchingFields", { query })}
+                </div>
+              )}
             </div>
           )}
         </div>
 
         <footer className="ai-table-peek-footer">
-          <span><i />只读预览，不会修改 PDM</span>
-          <span><kbd>Esc</kbd> 返回原对话位置</span>
+          <span>
+            <i />
+            {t("ai.readOnlyPreview")}
+          </span>
+          <span>
+            <kbd>Esc</kbd> {t("ai.returnConversation")}
+          </span>
         </footer>
       </section>
     </>
   );
 }
 
-const CONFIDENCE_LABELS: Record<AiConfidence, string> = {
-  high: "把握较高",
-  medium: "需要核对",
-  low: "需要确认",
+const CONFIDENCE_KEYS: Record<AiConfidence, string> = {
+  high: "ai.confidence.high",
+  medium: "ai.confidence.medium",
+  low: "ai.confidence.low",
 };
 
-const ROLE_NAMES: Record<string, string> = {
-  core: "业务主表",
-  execution: "执行表",
-  history: "历史表",
-  log: "日志表",
-  temporary: "临时表",
-  delete: "删除表",
-  parameter: "参数表",
-  extension: "扩展表",
-  all: "全部角色",
+const ROLE_KEYS: Record<string, string> = {
+  core: "ai.role.core",
+  execution: "ai.role.execution",
+  history: "ai.role.history",
+  log: "ai.role.log",
+  temporary: "ai.role.temporary",
+  delete: "ai.role.delete",
+  parameter: "ai.role.parameter",
+  extension: "ai.role.extension",
+  all: "ai.role.all",
 };
 
 function RetrievalProcess({
@@ -533,11 +700,17 @@ function RetrievalProcess({
   retrieval: AiRetrievalSummary;
   evidenceCount: number;
 }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   if (!retrieval.resolved_question) return null;
+  const role = t(ROLE_KEYS[retrieval.target_role] || "ai.role.all");
   const filters = retrieval.ranking_reasons.length
     ? retrieval.ranking_reasons
-    : [retrieval.only_target_role ? `只保留${ROLE_NAMES[retrieval.target_role] || retrieval.target_role}` : `优先${ROLE_NAMES[retrieval.target_role] || retrieval.target_role}`];
+    : [
+        retrieval.only_target_role
+          ? t("ai.onlyRole", { role })
+          : t("ai.preferRole", { role }),
+      ];
 
   return (
     <section className={`ai-retrieval-process is-${retrieval.confidence}`}>
@@ -547,48 +720,80 @@ function RetrievalProcess({
         aria-expanded={expanded}
         onClick={() => setExpanded((current) => !current)}
       >
-        <span><SearchOutlined />为什么这样搜</span>
-        <span className={`ai-confidence is-${retrieval.confidence}`}>{CONFIDENCE_LABELS[retrieval.confidence]}</span>
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+        <span>
+          <SearchOutlined />
+          {t("ai.whySearch")}
+        </span>
+        <span className={`ai-confidence is-${retrieval.confidence}`}>
+          {t(CONFIDENCE_KEYS[retrieval.confidence])}
+        </span>
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m4 6 4 4 4-4" />
+        </svg>
       </button>
       {expanded ? (
         <div className="ai-retrieval-detail">
           <div className="ai-retrieval-row is-understanding">
-            <b>理解</b>
-            <span>{retrieval.intent_label} · {retrieval.resolved_question}</span>
+            <b>{t("ai.understanding")}</b>
+            <span>
+              {retrieval.intent_label} · {retrieval.resolved_question}
+            </span>
           </div>
           <div className="ai-retrieval-row">
-            <b>范围</b>
+            <b>{t("ai.range")}</b>
             <span>{retrieval.scope_label}</span>
           </div>
           {retrieval.business_terms.length ? (
             <div className="ai-retrieval-row">
-              <b>业务词</b>
+              <b>{t("ai.businessTerms")}</b>
               <span className="ai-retrieval-tags">
-                {retrieval.business_terms.map((term) => <i key={term}>{term}</i>)}
+                {retrieval.business_terms.map((term) => (
+                  <i key={term}>{term}</i>
+                ))}
               </span>
             </div>
           ) : null}
           {retrieval.code_terms.length ? (
             <div className="ai-retrieval-row">
-              <b>英文词根</b>
+              <b>{t("ai.codeTerms")}</b>
               <span className="ai-retrieval-tags is-code">
-                {retrieval.code_terms.map((term) => <i key={term}>{term}</i>)}
+                {retrieval.code_terms.map((term) => (
+                  <i key={term}>{term}</i>
+                ))}
               </span>
             </div>
           ) : null}
           <div className="ai-retrieval-row">
-            <b>筛选</b>
-            <span className="ai-retrieval-filters">{filters.map((reason) => <i key={reason}>{reason}</i>)}</span>
+            <b>{t("ai.filter")}</b>
+            <span className="ai-retrieval-filters">
+              {filters.map((reason) => (
+                <i key={reason}>{reason}</i>
+              ))}
+            </span>
           </div>
-          <div className="ai-retrieval-pipeline" aria-label="检索数量">
-            <span><b>{retrieval.raw_match_count}</b><small>原始命中</small></span>
+          <div
+            className="ai-retrieval-pipeline"
+            aria-label={t("ai.retrievalCount")}
+          >
+            <span>
+              <b>{retrieval.raw_match_count}</b>
+              <small>{t("ai.rawMatches")}</small>
+            </span>
             <i>→</i>
-            <span><b>{retrieval.candidate_count}</b><small>本机候选</small></span>
+            <span>
+              <b>{retrieval.candidate_count}</b>
+              <small>{t("ai.localCandidates")}</small>
+            </span>
             <i>→</i>
-            <span><b>{retrieval.reviewed_count}</b><small>AI 复核</small></span>
+            <span>
+              <b>{retrieval.reviewed_count}</b>
+              <small>{t("ai.aiReviewed")}</small>
+            </span>
             <i>→</i>
-            <span><b>{evidenceCount}</b><small>返回结果</small></span>
+            <span>
+              <b>{evidenceCount}</b>
+              <small>{t("ai.returnedResults")}</small>
+            </span>
           </div>
         </div>
       ) : null}
@@ -603,14 +808,21 @@ function ClarificationCard({
   clarification: AiClarification;
   onChoose: (query: string) => void;
 }) {
+  const { t } = useI18n();
   return (
-    <div className="ai-clarification" aria-label="请选择要查询的业务方向">
-      <span>选择一个方向，我会按这个口径继续查：</span>
+    <div className="ai-clarification" aria-label={t("ai.chooseDirection")}>
+      <span>{t("ai.chooseDirectionHint")}</span>
       <div>
         {clarification.options.map((option) => (
-          <button type="button" key={`${option.label}:${option.query}`} onClick={() => onChoose(option.query)}>
+          <button
+            type="button"
+            key={`${option.label}:${option.query}`}
+            onClick={() => onChoose(option.query)}
+          >
             {option.label}
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3 5 5-5 5" /></svg>
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m6 3 5 5-5 5" />
+            </svg>
           </button>
         ))}
       </div>
@@ -643,6 +855,7 @@ function ConversationHistory({
   onDelete: (conversation: AiConversationSummary) => void;
   onRetry: () => void;
 }) {
+  const { t } = useI18n();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingTitle, setRenamingTitle] = useState("");
   const grouped = useMemo(() => {
@@ -656,6 +869,11 @@ function ConversationHistory({
     });
     return result;
   }, [conversations]);
+  const dateGroups: Array<{ key: ConversationDateGroup; label: string }> = [
+    { key: "今天", label: t("ai.today") },
+    { key: "昨天", label: t("ai.yesterday") },
+    { key: "更早", label: t("ai.earlier") },
+  ];
 
   const beginRename = (conversation: AiConversationSummary) => {
     setRenamingId(conversation.id);
@@ -675,48 +893,54 @@ function ConversationHistory({
   };
 
   return (
-    <section className="ai-history-view" aria-label="AI 对话记录">
+    <section className="ai-history-view" aria-label={t("ai.history")}>
       <div className="ai-history-toolbar">
-        <button type="button" className="ai-history-back" onClick={onBack} aria-label="返回当前对话">
+        <button
+          type="button"
+          className="ai-history-back"
+          onClick={onBack}
+          aria-label={t("ai.backConversation")}
+        >
           <ArrowLeftOutlined />
         </button>
         <span className="ai-history-heading">
-          <strong>对话记录</strong>
-          <small>仅保存在本机 · 不随备份导出</small>
+          <strong>{t("ai.history")}</strong>
+          <small>{t("ai.historyLocal")}</small>
         </span>
         <button type="button" className="ai-history-new" onClick={onNew}>
           <PlusOutlined />
-          <span>新对话</span>
+          <span>{t("ai.newConversation")}</span>
         </button>
       </div>
 
       <div className="ai-history-list">
         {loading ? (
-          <div className="ai-history-status"><Spin size="small" /><span>正在读取本机记录…</span></div>
+          <div className="ai-history-status">
+            <Spin size="small" />
+            <span>{t("ai.readingHistory")}</span>
+          </div>
         ) : error ? (
           <div className="ai-history-status is-error">
             <HistoryOutlined />
             <span>{error}</span>
-            <button type="button" onClick={onRetry}>重新读取</button>
+            <button type="button" onClick={onRetry}>
+              {t("ai.reread")}
+            </button>
           </div>
-        ) : !conversations.length ? (
-          <div className="ai-history-empty">
-            <span><HistoryOutlined /></span>
-            <strong>还没有对话记录</strong>
-            <p>开始提问后，对话会自动保存在这台电脑上。</p>
-            <button type="button" onClick={onNew}>开始新对话</button>
-          </div>
-        ) : (
-          (["今天", "昨天", "更早"] as ConversationDateGroup[]).map((group) => (
+        ) : conversations.length ? (
+          dateGroups.map(({ key: group, label }) =>
             grouped[group].length ? (
               <div className="ai-history-group" key={group}>
-                <div className="ai-history-group-label">{group}</div>
+                <div className="ai-history-group-label">{label}</div>
                 {grouped[group].map((conversation) => {
                   const active = conversation.id === activeConversationId;
                   const renaming = conversation.id === renamingId;
                   const busy = conversation.id === busyId;
                   return (
-                    <article className={`ai-history-item${active ? " is-active" : ""}${busy ? " is-busy" : ""}`} key={conversation.id}>
+                    <article
+                      className={`ai-history-item${active ? " is-active" : ""}${busy ? " is-busy" : ""}`}
+                      key={conversation.id}
+                    >
                       {renaming ? (
                         <form
                           className="ai-history-rename"
@@ -729,8 +953,10 @@ function ConversationHistory({
                             autoFocus
                             maxLength={80}
                             value={renamingTitle}
-                            aria-label="对话标题"
-                            onChange={(event) => setRenamingTitle(event.target.value)}
+                            aria-label={t("ai.conversationTitle")}
+                            onChange={(event) =>
+                              setRenamingTitle(event.target.value)
+                            }
                             onKeyDown={(event) => {
                               if (event.key === "Escape") {
                                 event.preventDefault();
@@ -738,10 +964,19 @@ function ConversationHistory({
                               }
                             }}
                           />
-                          <button type="submit" disabled={!renamingTitle.trim() || busy} aria-label="保存标题">
+                          <button
+                            type="submit"
+                            disabled={!renamingTitle.trim() || busy}
+                            aria-label={t("ai.saveTitle")}
+                          >
                             <CheckOutlined />
                           </button>
-                          <button type="button" disabled={busy} aria-label="取消重命名" onClick={() => setRenamingId(null)}>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            aria-label={t("ai.cancelRename")}
+                            onClick={() => setRenamingId(null)}
+                          >
                             <CloseOutlined />
                           </button>
                         </form>
@@ -756,28 +991,66 @@ function ConversationHistory({
                           >
                             <span className="ai-history-item-title">
                               <strong>{conversation.title}</strong>
-                              <time dateTime={conversation.updated_at}>{conversationTime(conversation.updated_at)}</time>
+                              <time dateTime={conversation.updated_at}>
+                                {conversationTime(conversation.updated_at)}
+                              </time>
                             </span>
-                            <span className="ai-history-item-preview">{conversation.preview}</span>
-                            <small>{conversation.message_count} 条消息</small>
+                            <span className="ai-history-item-preview">
+                              {conversation.preview}
+                            </span>
+                            <small>
+                              {t("ai.messageCount", {
+                                count: conversation.message_count,
+                              })}
+                            </small>
                           </button>
                           <span className="ai-history-item-actions">
-                            <button type="button" disabled={busy} aria-label={`重命名：${conversation.title}`} onClick={() => beginRename(conversation)}>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              aria-label={t("ai.renameConversation", {
+                                title: conversation.title,
+                              })}
+                              onClick={() => beginRename(conversation)}
+                            >
                               <EditOutlined />
                             </button>
-                            <button type="button" disabled={busy} aria-label={`删除：${conversation.title}`} onClick={() => onDelete(conversation)}>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              aria-label={t("ai.deleteConversation", {
+                                title: conversation.title,
+                              })}
+                              onClick={() => onDelete(conversation)}
+                            >
                               <DeleteOutlined />
                             </button>
                           </span>
                         </>
                       )}
-                      {busy ? <Spin className="ai-history-item-spinner" size="small" /> : null}
+                      {busy ? (
+                        <Spin
+                          className="ai-history-item-spinner"
+                          size="small"
+                        />
+                      ) : null}
                     </article>
                   );
                 })}
               </div>
-            ) : null
-          ))
+            ) : null,
+          )
+        ) : (
+          <div className="ai-history-empty">
+            <span>
+              <HistoryOutlined />
+            </span>
+            <strong>{t("ai.noHistory")}</strong>
+            <p>{t("ai.historyHint")}</p>
+            <button type="button" onClick={onNew}>
+              {t("ai.startConversation")}
+            </button>
+          </div>
         )}
       </div>
     </section>
@@ -795,6 +1068,7 @@ export function AiAssistant({
   onOpenTable,
 }: AiAssistantProps) {
   const { message: notice, modal } = AntApp.useApp();
+  const { t } = useI18n();
   const [settings, setSettings] = useState<AiSettingsStatus | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsBusy, setSettingsBusy] = useState(false);
@@ -802,10 +1076,15 @@ export function AiAssistant({
   const [personalizeBusy, setPersonalizeBusy] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [assistantName, setAssistantName] = useState(DEFAULT_ASSISTANT_NAME);
-  const [assistantAccessory, setAssistantAccessory] = useState<AiAccessory>("none");
+  const [assistantAccessory, setAssistantAccessory] =
+    useState<AiAccessory>("none");
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
-  const [conversations, setConversations] = useState<AiConversationSummary[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<
+    string | null
+  >(null);
+  const [conversations, setConversations] = useState<AiConversationSummary[]>(
+    [],
+  );
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState("");
@@ -813,8 +1092,11 @@ export function AiAssistant({
   const [conversationLoading, setConversationLoading] = useState(true);
   const [question, setQuestion] = useState("");
   const [sending, setSending] = useState(false);
-  const [tablePeekEvidence, setTablePeekEvidence] = useState<AiEvidenceTable | null>(null);
-  const [tablePeekDetail, setTablePeekDetail] = useState<TableDetail | null>(null);
+  const [tablePeekEvidence, setTablePeekEvidence] =
+    useState<AiEvidenceTable | null>(null);
+  const [tablePeekDetail, setTablePeekDetail] = useState<TableDetail | null>(
+    null,
+  );
   const [tablePeekLoading, setTablePeekLoading] = useState(false);
   const [tablePeekError, setTablePeekError] = useState("");
   const [tablePeekQuery, setTablePeekQuery] = useState("");
@@ -831,25 +1113,31 @@ export function AiAssistant({
   );
   const scopeOptionsRef = useRef(scopeOptions);
   scopeOptionsRef.current = scopeOptions;
-  const { launcherVisible, onAssistantTransitionEnd } = useAssistantExitGate(open);
+  const { launcherVisible, onAssistantTransitionEnd } =
+    useAssistantExitGate(open);
   const [scopeType, setScopeType] = useState<AiScopeType>(readStoredScopeType);
-  const [restoredScopeOption, setRestoredScopeOption] = useState<ScopeOption | null>(null);
+  const [restoredScopeOption, setRestoredScopeOption] =
+    useState<ScopeOption | null>(null);
   const matchingRestoredScope = restoredScopeOption
-    ? scopeOptions.find((option) => scopesMatch(option.scope, restoredScopeOption.scope))
+    ? scopeOptions.find((option) =>
+        scopesMatch(option.scope, restoredScopeOption.scope),
+      )
     : undefined;
-  const availableScopeOptions = restoredScopeOption && !matchingRestoredScope
-    ? [restoredScopeOption, ...scopeOptions]
-    : scopeOptions;
+  const availableScopeOptions =
+    restoredScopeOption && !matchingRestoredScope
+      ? [restoredScopeOption, ...scopeOptions]
+      : scopeOptions;
   const selectedScope =
-    matchingRestoredScope
-    || restoredScopeOption
-    || scopeOptions.find((option) => option.scope.type === scopeType)
-    || scopeOptions.find((option) => option.scope.type === "project")
-    || scopeOptions.find((option) => option.scope.type === "all")
-    || scopeOptions[0];
+    matchingRestoredScope ||
+    restoredScopeOption ||
+    scopeOptions.find((option) => option.scope.type === scopeType) ||
+    scopeOptions.find((option) => option.scope.type === "project") ||
+    scopeOptions.find((option) => option.scope.type === "all") ||
+    scopeOptions[0];
 
   useEffect(() => {
-    aiApi.settings()
+    aiApi
+      .settings()
       .then((nextSettings) => {
         setSettings(nextSettings);
         setAssistantName(nextSettings.assistant_name || DEFAULT_ASSISTANT_NAME);
@@ -867,9 +1155,14 @@ export function AiAssistant({
     conversationSelectionRevisionRef.current = selectionRevision;
     setHistoryLoading(true);
     setConversationLoading(true);
-    aiApi.conversations()
+    aiApi
+      .conversations()
       .then(async (items) => {
-        if (cancelled || selectionRevision !== conversationSelectionRevisionRef.current) return;
+        if (
+          cancelled ||
+          selectionRevision !== conversationSelectionRevisionRef.current
+        )
+          return;
         setConversations(items);
         setHistoryError("");
         if (!items.length) {
@@ -877,32 +1170,55 @@ export function AiAssistant({
           return;
         }
         const storedConversationId = readStoredConversationId();
-        const initialConversation = items.find((item) => item.id === storedConversationId) || items[0];
+        const initialConversation =
+          items.find((item) => item.id === storedConversationId) || items[0];
         const detail = await aiApi.conversation(initialConversation.id);
-        if (cancelled || selectionRevision !== conversationSelectionRevisionRef.current) return;
+        if (
+          cancelled ||
+          selectionRevision !== conversationSelectionRevisionRef.current
+        )
+          return;
         setActiveConversationId(detail.id);
         storeActiveConversationId(detail.id);
         setMessages(detail.messages.map(storedConversationMessage));
         const currentScopeOptions = scopeOptionsRef.current;
-        const restoredScope = restoredScopeFromConversation(detail, currentScopeOptions);
+        const restoredScope = restoredScopeFromConversation(
+          detail,
+          currentScopeOptions,
+        );
         if (restoredScope) {
           setScopeType(restoredScope.scope.type);
           setRestoredScopeOption(
-            currentScopeOptions.some((option) => option.key === restoredScope.key) ? null : restoredScope,
+            currentScopeOptions.some(
+              (option) => option.key === restoredScope.key,
+            )
+              ? null
+              : restoredScope,
           );
           try {
-            localStorage.setItem(AI_SCOPE_STORAGE_KEY, restoredScope.scope.type);
+            localStorage.setItem(
+              AI_SCOPE_STORAGE_KEY,
+              restoredScope.scope.type,
+            );
           } catch {
             // The restored scope remains active for this session.
           }
         } else setRestoredScopeOption(null);
       })
       .catch((error) => {
-        if (cancelled || selectionRevision !== conversationSelectionRevisionRef.current) return;
+        if (
+          cancelled ||
+          selectionRevision !== conversationSelectionRevisionRef.current
+        )
+          return;
         setHistoryError(errorText(error));
       })
       .finally(() => {
-        if (cancelled || selectionRevision !== conversationSelectionRevisionRef.current) return;
+        if (
+          cancelled ||
+          selectionRevision !== conversationSelectionRevisionRef.current
+        )
+          return;
         setHistoryLoading(false);
         setConversationLoading(false);
       });
@@ -936,12 +1252,14 @@ export function AiAssistant({
     setTablePeekLoading(true);
     setTablePeekError("");
     setTablePeekDetail(null);
-    tablesApi.detail(tablePeekEvidence.table_id, controller.signal)
+    tablesApi
+      .detail(tablePeekEvidence.table_id, controller.signal)
       .then((nextDetail) => {
         if (!controller.signal.aborted) setTablePeekDetail(nextDetail);
       })
       .catch((error) => {
-        if (!controller.signal.aborted && !isAbortError(error)) setTablePeekError(errorText(error));
+        if (!controller.signal.aborted && !isAbortError(error))
+          setTablePeekError(errorText(error));
       })
       .finally(() => {
         if (!controller.signal.aborted) setTablePeekLoading(false);
@@ -980,7 +1298,8 @@ export function AiAssistant({
     const frame = window.requestAnimationFrame(() => {
       if (!conversationRef.current) return;
       if (sending) {
-        conversationRef.current.scrollTop = conversationRef.current.scrollHeight;
+        conversationRef.current.scrollTop =
+          conversationRef.current.scrollHeight;
         return;
       }
       latestAssistantRef.current?.scrollIntoView({ block: "start" });
@@ -1018,11 +1337,15 @@ export function AiAssistant({
     }
   };
 
-  const rememberConversation = (conversation: AiConversationSummary | AiConversationDetail) => {
-    setConversations((current) => [
-      conversation,
-      ...current.filter((item) => item.id !== conversation.id),
-    ].sort((left, right) => right.updated_at.localeCompare(left.updated_at)));
+  const rememberConversation = (
+    conversation: AiConversationSummary | AiConversationDetail,
+  ) => {
+    setConversations((current) =>
+      [
+        conversation,
+        ...current.filter((item) => item.id !== conversation.id),
+      ].sort((left, right) => right.updated_at.localeCompare(left.updated_at)),
+    );
   };
 
   const reloadConversationHistory = async () => {
@@ -1069,7 +1392,8 @@ export function AiAssistant({
     setHistoryBusyId(conversationId);
     try {
       const detail = await aiApi.conversation(conversationId);
-      if (selectionRevision !== conversationSelectionRevisionRef.current) return;
+      if (selectionRevision !== conversationSelectionRevisionRef.current)
+        return;
       setActiveConversationId(detail.id);
       storeActiveConversationId(detail.id);
       setMessages(detail.messages.map(storedConversationMessage));
@@ -1077,7 +1401,9 @@ export function AiAssistant({
       if (restoredScope) {
         setScopeType(restoredScope.scope.type);
         setRestoredScopeOption(
-          scopeOptions.some((option) => option.key === restoredScope.key) ? null : restoredScope,
+          scopeOptions.some((option) => option.key === restoredScope.key)
+            ? null
+            : restoredScope,
         );
         try {
           localStorage.setItem(AI_SCOPE_STORAGE_KEY, restoredScope.scope.type);
@@ -1097,16 +1423,20 @@ export function AiAssistant({
         window.setTimeout(() => inputRef.current?.focus(), 0);
       }
     } catch (error) {
-      if (selectionRevision === conversationSelectionRevisionRef.current) notice.error(errorText(error));
+      if (selectionRevision === conversationSelectionRevisionRef.current)
+        notice.error(errorText(error));
     } finally {
-      if (selectionRevision === conversationSelectionRevisionRef.current) setHistoryBusyId(null);
+      if (selectionRevision === conversationSelectionRevisionRef.current)
+        setHistoryBusyId(null);
     }
   };
 
   const renameConversation = async (conversationId: string, title: string) => {
     setHistoryBusyId(conversationId);
     try {
-      rememberConversation(await aiApi.renameConversation(conversationId, title));
+      rememberConversation(
+        await aiApi.renameConversation(conversationId, title),
+      );
     } catch (error) {
       notice.error(errorText(error));
       throw error;
@@ -1117,17 +1447,19 @@ export function AiAssistant({
 
   const deleteConversation = (conversation: AiConversationSummary) => {
     modal.confirm({
-      title: "删除这段对话？",
-      content: `“${conversation.title}”只会从这台电脑删除，无法恢复。`,
-      okText: "删除对话",
+      title: t("ai.deleteConversationConfirm"),
+      content: t("ai.deleteConversationContent", { title: conversation.title }),
+      okText: t("ai.deleteConversationAction"),
       okButtonProps: { danger: true },
-      cancelText: "取消",
+      cancelText: t("common.cancel"),
       onOk: async () => {
         setHistoryBusyId(conversation.id);
         try {
           if (conversation.id === activeConversationId) cancelPendingAnswer();
           await aiApi.deleteConversation(conversation.id);
-          setConversations((current) => current.filter((item) => item.id !== conversation.id));
+          setConversations((current) =>
+            current.filter((item) => item.id !== conversation.id),
+          );
           if (conversation.id === activeConversationId) {
             conversationSelectionRevisionRef.current += 1;
             setActiveConversationId(null);
@@ -1172,7 +1504,7 @@ export function AiAssistant({
       setAssistantAccessory(nextSettings.assistant_accessory);
       setApiKey("");
       setSettingsOpen(false);
-      notice.success(`${nextSettings.model} 连接测试通过`);
+      notice.success(t("ai.connectionTested", { model: nextSettings.model }));
     } catch (error) {
       notice.error(errorText(error));
     } finally {
@@ -1197,7 +1529,7 @@ export function AiAssistant({
       setAssistantName(nextSettings.assistant_name);
       setAssistantAccessory(nextSettings.assistant_accessory);
       setPersonalizeOpen(false);
-      notice.success("小助手形象已保存");
+      notice.success(t("ai.personaSaved"));
     } catch (error) {
       notice.error(errorText(error));
     } finally {
@@ -1207,18 +1539,18 @@ export function AiAssistant({
 
   const clearKey = () => {
     modal.confirm({
-      title: "移除 DeepSeek API Key？",
-      content: "只会删除码熊本机保存的加密密钥，不会影响 DeepSeek 账户。",
-      okText: "移除密钥",
+      title: t("ai.removeKeyConfirm"),
+      content: t("ai.removeKeyDescription"),
+      okText: t("ai.removeKey"),
       okButtonProps: { danger: true },
-      cancelText: "取消",
+      cancelText: t("common.cancel"),
       onOk: async () => {
         const nextSettings = await aiApi.clearKey();
         setSettings(nextSettings);
         setAssistantName(nextSettings.assistant_name);
         setAssistantAccessory(nextSettings.assistant_accessory);
         setApiKey("");
-        notice.success("本机 API Key 已移除");
+        notice.success(t("ai.keyRemoved"));
       },
     });
   };
@@ -1263,7 +1595,7 @@ export function AiAssistant({
   const stopQuestion = () => {
     if (!aiRequestAbortRef.current) return;
     cancelPendingAnswer();
-    notice.info("已停止本次回答");
+    notice.info(t("ai.stopped"));
     window.setTimeout(() => inputRef.current?.focus(), 0);
   };
 
@@ -1273,38 +1605,47 @@ export function AiAssistant({
     if (!settings?.configured) {
       setHistoryOpen(false);
       setSettingsOpen(true);
-      notice.warning("请先配置 DeepSeek API Key");
+      notice.warning(t("ai.configureKey"));
       return;
     }
-    const userMessage: ConversationMessage = { id: messageId(), role: "user", content: normalized };
+    const userMessage: ConversationMessage = {
+      id: messageId(),
+      role: "user",
+      content: normalized,
+    };
     const scopeOption = selectedScope;
     const scope = scopeOption.scope;
-    const targetConversationSelectionRevision = conversationSelectionRevisionRef.current;
+    const targetConversationSelectionRevision =
+      conversationSelectionRevisionRef.current;
     const history: AiHistoryMessage[] = messages
       .filter((item) => !item.error)
       .map(({ role, content, evidence, retrieval }) => ({
         role,
         content,
-        ...(evidence?.length ? {
-          evidence: evidence.map((item) => ({
-            table_id: item.table_id,
-            table_code: item.table_code,
-            table_name: item.table_name,
-            relevance: item.relevance,
-          })),
-        } : {}),
-        ...(role === "assistant" && retrieval ? {
-          retrieval: {
-            intent: retrieval.intent,
-            resolved_question: retrieval.resolved_question,
-            scope_terms: retrieval.scope_terms,
-            business_terms: retrieval.business_terms,
-            code_terms: retrieval.code_terms,
-            target_role: retrieval.target_role,
-            exclude_roles: retrieval.exclude_roles,
-            only_target_role: retrieval.only_target_role,
-          },
-        } : {}),
+        ...(evidence?.length
+          ? {
+              evidence: evidence.map((item) => ({
+                table_id: item.table_id,
+                table_code: item.table_code,
+                table_name: item.table_name,
+                relevance: item.relevance,
+              })),
+            }
+          : {}),
+        ...(role === "assistant" && retrieval
+          ? {
+              retrieval: {
+                intent: retrieval.intent,
+                resolved_question: retrieval.resolved_question,
+                scope_terms: retrieval.scope_terms,
+                business_terms: retrieval.business_terms,
+                code_terms: retrieval.code_terms,
+                target_role: retrieval.target_role,
+                exclude_roles: retrieval.exclude_roles,
+                only_target_role: retrieval.only_target_role,
+              },
+            }
+          : {}),
       }))
       .slice(-8);
     setMessages((current) => [...current, userMessage]);
@@ -1323,23 +1664,39 @@ export function AiAssistant({
         );
         rememberConversation(stored.conversation);
       } else {
-        const created = await aiApi.createConversation(conversationMessageInput(userMessage, scopeOption));
+        const created = await aiApi.createConversation(
+          conversationMessageInput(userMessage, scopeOption),
+        );
         conversationId = created.id;
         rememberConversation(created);
-        if (targetConversationSelectionRevision === conversationSelectionRevisionRef.current) {
+        if (
+          targetConversationSelectionRevision ===
+          conversationSelectionRevisionRef.current
+        ) {
           setActiveConversationId(created.id);
           storeActiveConversationId(created.id);
         }
       }
-      if (controller.signal.aborted || requestRevision !== aiRequestRevisionRef.current) return;
+      if (
+        controller.signal.aborted ||
+        requestRevision !== aiRequestRevisionRef.current
+      )
+        return;
       const result: AiChatResponse = await aiApi.chat(
         normalized,
         scope,
         history,
         controller.signal,
       );
-      if (controller.signal.aborted || requestRevision !== aiRequestRevisionRef.current) return;
-      if (result.retrieval.scope_changed && result.retrieval.applied_scope_type) {
+      if (
+        controller.signal.aborted ||
+        requestRevision !== aiRequestRevisionRef.current
+      )
+        return;
+      if (
+        result.retrieval.scope_changed &&
+        result.retrieval.applied_scope_type
+      ) {
         chooseScope(result.retrieval.applied_scope_type);
       }
       const assistantMessage: ConversationMessage = {
@@ -1360,10 +1717,16 @@ export function AiAssistant({
         );
         rememberConversation(stored.conversation);
       } catch (saveError) {
-        notice.warning(`回答已显示，但未能保存到对话记录：${errorText(saveError)}`);
+        notice.warning(
+          t("ai.saveHistoryFailed", { error: errorText(saveError) }),
+        );
       }
     } catch (error) {
-      if (controller.signal.aborted || isAbortError(error) || requestRevision !== aiRequestRevisionRef.current) {
+      if (
+        controller.signal.aborted ||
+        isAbortError(error) ||
+        requestRevision !== aiRequestRevisionRef.current
+      ) {
         return;
       }
       const failureMessage: ConversationMessage = {
@@ -1394,7 +1757,8 @@ export function AiAssistant({
   };
 
   const configured = Boolean(settings?.configured);
-  const displayName = assistantName.trim() || settings?.assistant_name || DEFAULT_ASSISTANT_NAME;
+  const displayName =
+    assistantName.trim() || settings?.assistant_name || DEFAULT_ASSISTANT_NAME;
   const conversationHistory = (
     <ConversationHistory
       conversations={conversations}
@@ -1428,24 +1792,39 @@ export function AiAssistant({
       >
         <header className="ai-assistant-header">
           <span className="ai-assistant-identity">
-            <span className="ai-header-avatar"><PolarBearMark compact accessory={assistantAccessory} /></span>
+            <span className="ai-header-avatar">
+              <PolarBearMark compact accessory={assistantAccessory} />
+            </span>
             <span>
               <strong>{displayName}</strong>
-              <small><i className={configured ? "is-ready" : ""} />DeepSeek V4 Flash · {configured ? "待命" : "待配置"}</small>
+              <small>
+                <i className={configured ? "is-ready" : ""} />
+                DeepSeek V4 Flash ·{" "}
+                {configured ? t("ai.ready") : t("ai.notConfigured")}
+              </small>
             </span>
           </span>
           <span className="ai-assistant-actions">
             <button
               className={historyOpen ? "is-active" : ""}
               type="button"
-              aria-label="查看 AI 对话记录"
+              aria-label={t("ai.viewHistory")}
               aria-expanded={historyOpen}
-              title="对话记录"
-              onClick={historyOpen ? () => setHistoryOpen(false) : openConversationHistory}
+              title={t("ai.history")}
+              onClick={
+                historyOpen
+                  ? () => setHistoryOpen(false)
+                  : openConversationHistory
+              }
             >
               <HistoryOutlined />
             </button>
-            <button type="button" aria-label="新建 AI 对话" title="新建对话" onClick={resetConversation}>
+            <button
+              type="button"
+              aria-label={t("ai.newAiConversation")}
+              title={t("ai.newConversation")}
+              onClick={resetConversation}
+            >
               <PlusOutlined />
             </button>
             <LayoutModePicker
@@ -1456,9 +1835,9 @@ export function AiAssistant({
             <button
               className={personalizeOpen ? "is-active" : ""}
               type="button"
-              aria-label="个性化 AI 小助手"
+              aria-label={t("ai.personalize")}
               aria-expanded={personalizeOpen}
-              title="个性化"
+              title={t("ai.personalize")}
               onClick={openPersonalization}
             >
               <EditOutlined />
@@ -1466,9 +1845,9 @@ export function AiAssistant({
             <button
               className={settingsOpen ? "is-active" : ""}
               type="button"
-              aria-label="AI 设置"
+              aria-label={t("ai.aiSettings")}
               aria-expanded={settingsOpen}
-              title="AI 设置"
+              title={t("ai.aiSettings")}
               onClick={() => {
                 if (settingsOpen) closeSettings();
                 else {
@@ -1481,9 +1860,10 @@ export function AiAssistant({
               <SettingOutlined />
             </button>
             <button
+              className="ai-assistant-close"
               type="button"
-              aria-label="收起 AI 助手"
-              title="收起"
+              aria-label={t("ai.collapse")}
+              title={t("ai.collapse")}
               onClick={() => {
                 setHistoryOpen(false);
                 onOpenChange(false);
@@ -1496,20 +1876,20 @@ export function AiAssistant({
 
         {!historyOpen || mode === "fullscreen" ? (
           <div className="ai-scope-strip">
-            <span className="ai-scope-label">查询范围</span>
+            <span className="ai-scope-label">{t("ai.queryScope")}</span>
             <ScopePicker
               options={availableScopeOptions}
               selectedKey={selectedScope.key}
               onChange={chooseScopeOption}
             />
-            <span className="ai-readonly-pill">只读</span>
+            <span className="ai-readonly-pill">{t("ai.readonlyQuery")}</span>
           </div>
         ) : null}
 
         {settingsOpen ? (
           <form
             className="ai-settings-panel"
-            aria-label="AI 连接设置"
+            aria-label={t("ai.connectionSettings")}
             autoComplete="off"
             onSubmit={(event) => {
               event.preventDefault();
@@ -1526,35 +1906,58 @@ export function AiAssistant({
               aria-hidden="true"
             />
             <div className="ai-settings-title">
-              <strong>连接设置</strong>
-              <span>{settings?.storage === "environment" ? "环境变量提供" : "仅保存在本机"}</span>
+              <strong>{t("ai.connectionSettings")}</strong>
+              <span>
+                {settings?.storage === "environment"
+                  ? t("ai.environmentProvided")
+                  : t("ai.localOnly")}
+              </span>
             </div>
             <label className="ai-settings-field">
-              <span>模型</span>
-              <Input value={settings?.model || MODEL_ID} disabled autoComplete="off" />
+              <span>{t("ai.model")}</span>
+              <Input
+                value={settings?.model || MODEL_ID}
+                disabled
+                autoComplete="off"
+              />
             </label>
             <label className="ai-settings-field">
               <span>API Key</span>
               <Input.Password
                 value={apiKey}
                 onChange={(event) => setApiKey(event.target.value)}
-                placeholder={settings?.configured ? `已配置 · ${settings.key_hint}` : "输入 DeepSeek API Key"}
+                placeholder={
+                  settings?.configured
+                    ? `Configured · ${settings.key_hint}`
+                    : t("ai.apiKeyPlaceholder")
+                }
                 prefix={<KeyOutlined />}
                 autoComplete="new-password"
               />
             </label>
-            <p className="ai-privacy-note">
-              正式版只发送问题和命中的表、字段结构，不上传原始 PDM 文件。密钥由操作系统安全存储保护。
-            </p>
-            {settings?.error ? <p className="ai-settings-error">{settings.error}</p> : null}
+            <p className="ai-privacy-note">{t("ai.privacyNote")}</p>
+            {settings?.error ? (
+              <p className="ai-settings-error">{settings.error}</p>
+            ) : null}
             <div className="ai-settings-actions">
               {settings?.configured && settings.storage !== "environment" ? (
-                <Button danger type="text" size="small" onClick={clearKey}>移除密钥</Button>
-              ) : <span />}
+                <Button danger type="text" size="small" onClick={clearKey}>
+                  {t("ai.removeKey")}
+                </Button>
+              ) : (
+                <span />
+              )}
               <span>
-                <Button size="small" onClick={closeSettings}>取消</Button>
-                <Button type="primary" size="small" htmlType="submit" loading={settingsBusy}>
-                  {apiKey.trim() ? "保存并测试" : "完成"}
+                <Button size="small" onClick={closeSettings}>
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  type="primary"
+                  size="small"
+                  htmlType="submit"
+                  loading={settingsBusy}
+                >
+                  {apiKey.trim() ? t("ai.saveAndTest") : t("ai.done")}
                 </Button>
               </span>
             </div>
@@ -1564,118 +1967,178 @@ export function AiAssistant({
         {historyOpen && mode !== "fullscreen" ? (
           conversationHistory
         ) : (
-        <>
-        <div className="ai-conversation" ref={conversationRef} aria-live="polite">
-          <div className="ai-conversation-inner">
-          {conversationLoading ? (
-            <div className="ai-conversation-loading"><Spin size="small" /><span>正在恢复上次对话…</span></div>
-          ) : !messages.length && !sending ? (
-            <div className="ai-empty-state">
-              <span className="ai-empty-avatar-control">
-                <span className="ai-empty-bear">
-                  <PolarBearMark accessory={assistantAccessory} />
-                </span>
-                <button className="ai-personalize-trigger" type="button" onClick={openPersonalization}>
-                  <EditOutlined />
-                  <span>个性化</span>
-                </button>
-              </span>
-              <h2>想找哪张表或哪个字段？</h2>
-              <p>直接描述业务含义。码熊先查本机 PDM 索引，再让 AI 根据命中的结构给出判断。</p>
-              <div className="ai-suggestions">
-                <button type="button" onClick={() => void sendQuestion("行情价在哪张表？")}>
-                  <LineChartOutlined /><span>行情价在哪张表？</span>
-                </button>
-                <button type="button" onClick={() => void sendQuestion("这张表主要存什么数据？")}>
-                  <DatabaseOutlined /><span>这张表主要存什么数据？</span>
-                </button>
-                <button type="button" onClick={() => void sendQuestion("帮我找和产品估值有关的表")}>
-                  <SearchOutlined /><span>帮我找和产品估值有关的表</span>
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {messages.map((item, index) => (
+          <>
             <div
-              className={`ai-message-row is-${item.role}${item.error ? " is-error" : ""}`}
-              key={item.id}
-              ref={item.role === "assistant" && index === messages.length - 1 ? latestAssistantRef : undefined}
+              className="ai-conversation"
+              ref={conversationRef}
+              aria-live="polite"
             >
-              {item.role === "assistant" ? (
-                <span className="ai-message-avatar">
-                  <PolarBearMark compact accessory={assistantAccessory} />
-                </span>
-              ) : null}
-              <div className={`ai-message-content${item.retrieval || item.evidence?.length ? " has-supporting-content" : ""}`}>
-                <p>{item.content}</p>
-                {item.clarification ? (
-                  <ClarificationCard clarification={item.clarification} onChoose={(query) => void sendQuestion(query)} />
+              <div className="ai-conversation-inner">
+                {conversationLoading ? (
+                  <div className="ai-conversation-loading">
+                    <Spin size="small" />
+                    <span>{t("ai.restoreConversation")}</span>
+                  </div>
+                ) : !messages.length && !sending ? (
+                  <div className="ai-empty-state">
+                    <span className="ai-empty-avatar-control">
+                      <span className="ai-empty-bear">
+                        <PolarBearMark accessory={assistantAccessory} />
+                      </span>
+                      <button
+                        className="ai-personalize-trigger"
+                        type="button"
+                        onClick={openPersonalization}
+                      >
+                        <EditOutlined />
+                        <span>{t("ai.personalize")}</span>
+                      </button>
+                    </span>
+                    <h2>{t("ai.emptyTitle")}</h2>
+                    <p>{t("ai.emptyDescription")}</p>
+                    <div className="ai-suggestions">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void sendQuestion(t("ai.suggestionPrice"))
+                        }
+                      >
+                        <LineChartOutlined />
+                        <span>{t("ai.suggestionPrice")}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void sendQuestion(t("ai.suggestionData"))
+                        }
+                      >
+                        <DatabaseOutlined />
+                        <span>{t("ai.suggestionData")}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void sendQuestion(t("ai.suggestionProduct"))
+                        }
+                      >
+                        <SearchOutlined />
+                        <span>{t("ai.suggestionProduct")}</span>
+                      </button>
+                    </div>
+                  </div>
                 ) : null}
-                {item.retrieval ? (
-                  <RetrievalProcess retrieval={item.retrieval} evidenceCount={item.evidence?.length || 0} />
+
+                {messages.map((item, index) => (
+                  <div
+                    className={`ai-message-row is-${item.role}${item.error ? " is-error" : ""}`}
+                    key={item.id}
+                    ref={
+                      item.role === "assistant" && index === messages.length - 1
+                        ? latestAssistantRef
+                        : undefined
+                    }
+                  >
+                    {item.role === "assistant" ? (
+                      <span className="ai-message-avatar">
+                        <PolarBearMark compact accessory={assistantAccessory} />
+                      </span>
+                    ) : null}
+                    <div
+                      className={`ai-message-content${item.retrieval || item.evidence?.length ? " has-supporting-content" : ""}`}
+                    >
+                      <p>{item.content}</p>
+                      {item.clarification ? (
+                        <ClarificationCard
+                          clarification={item.clarification}
+                          onChoose={(query) => void sendQuestion(query)}
+                        />
+                      ) : null}
+                      {item.retrieval ? (
+                        <RetrievalProcess
+                          retrieval={item.retrieval}
+                          evidenceCount={item.evidence?.length || 0}
+                        />
+                      ) : null}
+                      {item.evidence?.length ? (
+                        <EvidenceList
+                          evidence={item.evidence}
+                          retrieval={item.retrieval}
+                          onOpen={openEvidenceTable}
+                        />
+                      ) : null}
+                      {item.model ? (
+                        <small className="ai-message-model">{item.model}</small>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+
+                {sending ? (
+                  <div className="ai-message-row is-assistant">
+                    <span className="ai-message-avatar">
+                      <PolarBearMark compact accessory={assistantAccessory} />
+                    </span>
+                    <div
+                      className="ai-thinking"
+                      aria-label={`${displayName} · ${t("ai.analyzing")}`}
+                    >
+                      <span />
+                      <span />
+                      <span />
+                      <em>{t("ai.analyzing")}</em>
+                    </div>
+                  </div>
                 ) : null}
-                {item.evidence?.length ? (
-                  <EvidenceList evidence={item.evidence} retrieval={item.retrieval} onOpen={openEvidenceTable} />
-                ) : null}
-                {item.model ? <small className="ai-message-model">{item.model}</small> : null}
               </div>
             </div>
-          ))}
 
-          {sending ? (
-            <div className="ai-message-row is-assistant">
-              <span className="ai-message-avatar">
-                <PolarBearMark compact accessory={assistantAccessory} />
-              </span>
-              <div className="ai-thinking" aria-label={`${displayName}正在分析`}>
-                <span /><span /><span />
-                <em>正在检索本机索引并分析…</em>
+            <footer className="ai-composer-shell">
+              <div className="ai-composer-frame">
+                <div className="ai-composer">
+                  <Input.TextArea
+                    ref={inputRef}
+                    value={question}
+                    maxLength={1000}
+                    autoSize={{ minRows: 2, maxRows: 5 }}
+                    placeholder={t("ai.questionPlaceholder")}
+                    onChange={(event) => setQuestion(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void sendQuestion();
+                      }
+                    }}
+                  />
+                  <button
+                    className={`ai-send-button${sending ? " is-stop" : ""}`}
+                    type="button"
+                    aria-label={
+                      sending ? t("ai.stopAnswer") : t("ai.sendQuestion")
+                    }
+                    title={sending ? t("ai.stopAnswer") : t("ai.sendQuestion")}
+                    disabled={!sending && !question.trim()}
+                    onClick={sending ? stopQuestion : () => void sendQuestion()}
+                  >
+                    {sending ? <StopOutlined /> : <SendOutlined />}
+                  </button>
+                </div>
+                <div className="ai-composer-meta">
+                  <span
+                    className="ai-model-signature"
+                    title={t("ai.modelReadonlyTitle")}
+                  >
+                    <i className={configured ? "is-ready" : ""} />
+                    <strong>{settings?.model || MODEL_ID}</strong>
+                    <em>· {t("ai.readonlyQuery")}</em>
+                  </span>
+                  <span className="ai-shortcuts">
+                    <kbd>Enter</kbd> {t("ai.send")} · <kbd>Shift</kbd> +{" "}
+                    <kbd>Enter</kbd> {t("ai.newline")}
+                  </span>
+                </div>
               </div>
-            </div>
-          ) : null}
-          </div>
-        </div>
-
-        <footer className="ai-composer-shell">
-          <div className="ai-composer-frame">
-            <div className="ai-composer">
-              <Input.TextArea
-                ref={inputRef}
-                value={question}
-                maxLength={1000}
-                autoSize={{ minRows: 2, maxRows: 5 }}
-                placeholder="例如：行情价在哪里？"
-                onChange={(event) => setQuestion(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    void sendQuestion();
-                  }
-                }}
-              />
-              <button
-                className={`ai-send-button${sending ? " is-stop" : ""}`}
-                type="button"
-                aria-label={sending ? "停止本次回答" : "发送问题"}
-                title={sending ? "停止回答" : "发送问题"}
-                disabled={!sending && !question.trim()}
-                onClick={sending ? stopQuestion : () => void sendQuestion()}
-              >
-                {sending ? <StopOutlined /> : <SendOutlined />}
-              </button>
-            </div>
-            <div className="ai-composer-meta">
-              <span className="ai-model-signature" title="DeepSeek 模型 · 仅查询，不会修改 PDM">
-                <i className={configured ? "is-ready" : ""} />
-                <strong>{settings?.model || MODEL_ID}</strong>
-                <em>· 只读查询</em>
-              </span>
-              <span className="ai-shortcuts"><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd> + <kbd>Enter</kbd> 换行</span>
-            </div>
-          </div>
-        </footer>
-        </>
+            </footer>
+          </>
         )}
 
         {mode === "fullscreen" ? (
@@ -1686,10 +2149,15 @@ export function AiAssistant({
             <button
               className="ai-history-drawer-backdrop"
               type="button"
-              aria-label="关闭对话记录"
+              aria-label={t("ai.history")}
               onClick={() => setHistoryOpen(false)}
             />
-            <section className="ai-history-drawer" role="dialog" aria-modal="true" aria-label="AI 对话记录抽屉">
+            <section
+              className="ai-history-drawer"
+              role="dialog"
+              aria-modal="true"
+              aria-label={t("ai.history")}
+            >
               {conversationHistory}
             </section>
           </div>
@@ -1705,7 +2173,9 @@ export function AiAssistant({
             onQueryChange={setTablePeekQuery}
             onClose={closeTablePeek}
             onRetry={() => setTablePeekRevision((current) => current + 1)}
-            onOpenWorkspace={() => onOpenTable(tablePeekEvidence, { exitFullscreen: true })}
+            onOpenWorkspace={() =>
+              onOpenTable(tablePeekEvidence, { exitFullscreen: true })
+            }
           />
         ) : null}
       </aside>

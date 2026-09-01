@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { App as AntApp, Form, Input, Modal, Select } from "antd";
+import { useI18n } from "../../preferences/PreferencesProvider";
 import { relationsApi } from "../api";
 import { CARDINALITY_OPTIONS } from "../model";
 import type { Relation, RelationOptionTable } from "../types";
@@ -17,6 +18,7 @@ interface RelationFormModalProps {
 interface RelationFormValues {
   name: string;
   cardinality: string;
+  source_type: "auto" | "manual";
   note: string;
   source_table_id: string;
   source_field_id: string;
@@ -24,8 +26,16 @@ interface RelationFormValues {
   target_field_id: string;
 }
 
-export function RelationFormModal({ open, tableId, editing, options, onClose, onSaved }: RelationFormModalProps) {
+export function RelationFormModal({
+  open,
+  tableId,
+  editing,
+  options,
+  onClose,
+  onSaved,
+}: RelationFormModalProps) {
   const { message } = AntApp.useApp();
+  const { t } = useI18n();
   const [form] = Form.useForm<RelationFormValues>();
   const [saving, setSaving] = useState(false);
   const sourceTableId = Form.useWatch("source_table_id", form);
@@ -37,6 +47,7 @@ export function RelationFormModal({ open, tableId, editing, options, onClose, on
       form.setFieldsValue({
         name: editing.name,
         cardinality: editing.cardinality || "1..n",
+        source_type: editing.source_type,
         note: editing.note,
         source_table_id: editing.source_table.id,
         source_field_id: editing.source_field.id,
@@ -45,10 +56,12 @@ export function RelationFormModal({ open, tableId, editing, options, onClose, on
       });
     } else {
       const source = options.find((item) => item.id === tableId) || options[0];
-      const target = options.find((item) => item.id !== source?.id) || options[0];
+      const target =
+        options.find((item) => item.id !== source?.id) || options[0];
       form.setFieldsValue({
         name: `FK_${Date.now().toString(36).toUpperCase()}`,
         cardinality: "1..n",
+        source_type: "manual",
         note: "",
         source_table_id: source?.id,
         source_field_id: source?.fields[0]?.id,
@@ -59,10 +72,12 @@ export function RelationFormModal({ open, tableId, editing, options, onClose, on
   }, [open, editing, options, tableId, form]);
 
   const fieldOptions = (tableId?: string) =>
-    (options.find((item) => item.id === tableId)?.fields || []).map((field) => ({
-      value: field.id,
-      label: `${field.code} · ${field.name}`,
-    }));
+    (options.find((item) => item.id === tableId)?.fields || []).map(
+      (field) => ({
+        value: field.id,
+        label: `${field.code} · ${field.name}`,
+      }),
+    );
 
   const save = async () => {
     try {
@@ -74,7 +89,7 @@ export function RelationFormModal({ open, tableId, editing, options, onClose, on
           cardinality: values.cardinality,
           note: values.note || "",
         });
-        message.success("关系已更新");
+        message.success(t("relation.updated"));
       } else {
         await relationsApi.create({
           name: values.name,
@@ -85,7 +100,7 @@ export function RelationFormModal({ open, tableId, editing, options, onClose, on
           target_table_id: values.target_table_id,
           target_field_id: values.target_field_id,
         });
-        message.success(`已新增关系「${values.name}」`);
+        message.success(t("relation.created", { name: values.name }));
       }
       onSaved();
       onClose();
@@ -100,51 +115,118 @@ export function RelationFormModal({ open, tableId, editing, options, onClose, on
   return (
     <Modal
       open={open}
-      width={600}
+      width={720}
       centered
       onCancel={onClose}
       className="relation-form-modal"
-      title={<span className="relation-form-title">{editing ? "编辑关系" : "新增表关系"}</span>}
-      okText="保存"
-      cancelText="取消"
+      title={
+        <span className="relation-form-title-copy">
+          <span className="relation-form-title">
+            {editing ? t("relation.editTitle") : t("relation.addTitle")}
+          </span>
+          <small>{t("relation.formSubtitle")}</small>
+        </span>
+      }
+      okText={t("relation.save")}
+      cancelText={t("common.cancel")}
       confirmLoading={saving}
       onOk={() => void save()}
     >
       <Form form={form} layout="vertical" className="relation-form">
         <div className="relation-form-grid">
-          <Form.Item className="relation-form-full" label="关系名称" name="name" rules={[{ required: true, message: "请输入关系名称" }]}>
-            <Input maxLength={200} placeholder="例如：FK_PEND_TRADE" />
+          <Form.Item
+            className="relation-form-full"
+            label={t("relation.name")}
+            name="name"
+            rules={[{ required: true, message: t("relation.nameRequired") }]}
+          >
+            <Input
+              maxLength={200}
+              placeholder={t("relation.namePlaceholder")}
+            />
           </Form.Item>
-          <Form.Item label="源表（引用方）" name="source_table_id" rules={[{ required: true }]}>
+          <Form.Item
+            label={t("relation.sourceTable")}
+            name="source_table_id"
+            rules={[{ required: true }]}
+          >
             <Select
               showSearch
               optionFilterProp="label"
-              options={options.map((item) => ({ value: item.id, label: `${item.name}（${item.code}）` }))}
+              options={options.map((item) => ({
+                value: item.id,
+                label: `${item.name}（${item.code}）`,
+              }))}
               onChange={() => form.setFieldValue("source_field_id", undefined)}
             />
           </Form.Item>
-          <Form.Item label="源字段" name="source_field_id" rules={[{ required: true, message: "请选择源字段" }]}>
-            <Select showSearch optionFilterProp="label" options={fieldOptions(sourceTableId)} />
-          </Form.Item>
-          <Form.Item label="目标表（被引用方）" name="target_table_id" rules={[{ required: true }]}>
+          <Form.Item
+            label={t("relation.sourceField")}
+            name="source_field_id"
+            rules={[
+              { required: true, message: t("relation.sourceFieldRequired") },
+            ]}
+          >
             <Select
               showSearch
               optionFilterProp="label"
-              options={options.map((item) => ({ value: item.id, label: `${item.name}（${item.code}）` }))}
+              options={fieldOptions(sourceTableId)}
+            />
+          </Form.Item>
+          <Form.Item
+            label={t("relation.targetTable")}
+            name="target_table_id"
+            rules={[{ required: true }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              options={options.map((item) => ({
+                value: item.id,
+                label: `${item.name}（${item.code}）`,
+              }))}
               onChange={() => form.setFieldValue("target_field_id", undefined)}
             />
           </Form.Item>
-          <Form.Item label="目标字段" name="target_field_id" rules={[{ required: true, message: "请选择目标字段" }]}>
-            <Select showSearch optionFilterProp="label" options={fieldOptions(targetTableId)} />
+          <Form.Item
+            label={t("relation.targetField")}
+            name="target_field_id"
+            rules={[
+              { required: true, message: t("relation.targetFieldRequired") },
+            ]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              options={fieldOptions(targetTableId)}
+            />
           </Form.Item>
-          <Form.Item label="基数" name="cardinality">
-            <Select options={CARDINALITY_OPTIONS.map((value) => ({ value, label: value }))} />
+          <Form.Item label={t("relation.cardinality")} name="cardinality">
+            <Select
+              options={CARDINALITY_OPTIONS.map((value) => ({
+                value,
+                label: value,
+              }))}
+            />
           </Form.Item>
-          <Form.Item label="说明" name="note">
-            <Input maxLength={1000} placeholder="可选，如：一条委托可分批成交" />
+          <Form.Item label={t("relation.type")} name="source_type">
+            <Select
+              disabled
+              options={[{ value: "manual", label: t("relation.manual") }]}
+            />
+          </Form.Item>
+          <Form.Item
+            className="relation-form-full"
+            label={t("relation.note")}
+            name="note"
+          >
+            <Input
+              maxLength={1000}
+              placeholder={t("relation.notePlaceholder")}
+            />
           </Form.Item>
         </div>
-        <p className="relation-form-hint">保存后关系立即出现在相关两张表的「表关系」抽屉与关系图中；同一对「源表.字段 → 目标表.字段」不可重复维护。</p>
+        <p className="relation-form-hint">{t("relation.formHint")}</p>
       </Form>
     </Modal>
   );

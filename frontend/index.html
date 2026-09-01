@@ -6,6 +6,18 @@
     <meta name="theme-color" content="#f4f7fb" />
     <link rel="icon" type="image/png" href="/codebear-icon-v3.png" />
     <title>码熊 · PDM 数据字典工作台</title>
+    <script>
+      try {
+        const theme = localStorage.getItem("codebear.theme-mode.v1");
+        const language = localStorage.getItem("codebear.language.v1");
+        if (theme === "light" || theme === "dark")
+          document.documentElement.dataset.theme = theme;
+        if (language === "zh-CN" || language === "en-US")
+          document.documentElement.lang = language;
+      } catch {
+        // Preferences are optional before the application starts.
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

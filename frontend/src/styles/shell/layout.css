@@ -1,6 +1,6 @@
 .app-root {
   width: 100%;
-  min-width: 1120px;
+  min-width: 0;
   height: 100%;
   padding-right: 0;
   overflow: hidden;
@@ -24,9 +24,18 @@
 }
 
 .brand-block {
-  width: calc(var(--sidebar-width) + var(--workspace-edge) + var(--sidebar-resizer-center));
+  width: calc(
+    var(--sidebar-width) +
+    var(--workspace-edge) +
+    var(--sidebar-resizer-center)
+  );
   height: 100%;
-  flex: 0 0 calc(var(--sidebar-width) + var(--workspace-edge) + var(--sidebar-resizer-center));
+  flex: 0 0
+    calc(
+      var(--sidebar-width) +
+      var(--workspace-edge) +
+      var(--sidebar-resizer-center)
+    );
   display: flex;
   align-items: center;
   gap: 11px;
@@ -42,6 +51,31 @@
   border-radius: 9px;
   object-fit: contain;
   box-shadow: 0 5px 12px rgba(52, 120, 212, 0.23);
+}
+
+.brand-preferences-trigger {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.brand-preferences-trigger:hover {
+  border-color: var(--blue-border);
+  background: var(--blue-soft);
+}
+
+.brand-preferences-trigger:focus-visible {
+  outline: 2px solid var(--blue-border);
+  outline-offset: 1px;
 }
 
 .brand-copy {
@@ -84,6 +118,14 @@
   font-size: 13px;
 }
 
+.header-context > span,
+.header-context > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .header-context i {
   color: #c0cad7;
   font-style: normal;
@@ -117,7 +159,10 @@
 
 .app-body {
   display: grid;
-  grid-template-columns: var(--sidebar-width) var(--sidebar-resizer-width) minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) var(--sidebar-resizer-width) minmax(
+      0,
+      1fr
+    );
   height: calc(100% - var(--header-height));
   min-height: 0;
   padding: 7px var(--workspace-edge) var(--workspace-edge);
@@ -144,7 +189,9 @@
   background: #cdd8e5;
   content: "";
   opacity: 0;
-  transition: opacity 140ms ease, background-color 140ms ease;
+  transition:
+    opacity 140ms ease,
+    background-color 140ms ease;
 }
 
 .sidebar-resizer:hover::after,

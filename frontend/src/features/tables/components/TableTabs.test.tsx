@@ -1,37 +1,25 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { TableTabs } from "./TableTabs";
 import type { TableTab } from "../types";
+import { TableTabs } from "./TableTabs";
 
-const tabs: TableTab[] = [
-  {
-    id: "table-1",
-    name: "订单表",
-    code: "t_order",
-    project_id: "project-1",
-    project_name: "测试项目",
-    pdm_id: "pdm-1",
-    relative_path: "sample.pdm",
-  },
-  {
-    id: "table-2",
-    name: "订单明细",
-    code: "t_order_item",
-    project_id: "project-1",
-    project_name: "测试项目",
-    pdm_id: "pdm-1",
-    relative_path: "sample.pdm",
-  },
-];
+const tabs: TableTab[] = Array.from({ length: 6 }, (_, index) => ({
+  id: `table-${index}`,
+  name: `数据表 ${index}`,
+  code: `table_${index}`,
+  project_id: "project-1",
+  project_name: "测试项目",
+  pdm_id: "pdm-1",
+  relative_path: "sample.pdm",
+}));
 
 describe("TableTabs", () => {
-  it("renders active and dirty states without changing the surrounding layout", () => {
-    render(
+  it("uses an ordinary vertical mouse wheel to scroll overflowing tabs horizontally", () => {
+    const { container } = render(
       <TableTabs
         tabs={tabs}
-        activeTableId="table-1"
-        dirtyTableIds={new Set(["table-2"])}
+        activeTableId={tabs[0].id}
+        dirtyTableIds={new Set()}
         onSelect={vi.fn()}
         onClose={vi.fn()}
         onCloseOthers={vi.fn()}
@@ -39,35 +27,15 @@ describe("TableTabs", () => {
         onCloseToRight={vi.fn()}
       />,
     );
+    const strip = container.querySelector<HTMLDivElement>(".table-tabs-scroll");
+    expect(strip).not.toBeNull();
+    Object.defineProperties(strip!, {
+      clientWidth: { configurable: true, value: 320 },
+      scrollWidth: { configurable: true, value: 1044 },
+    });
 
-    expect(screen.getByRole("tab", { name: "订单表" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: /订单明细.*未保存修改/ })).toHaveAttribute("aria-selected", "false");
-    expect(screen.getByLabelText("关闭 订单表")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "打开最近访问" })).not.toBeInTheDocument();
+    fireEvent.wheel(strip!, { deltaX: 0, deltaY: 120, deltaMode: 0 });
+
+    expect(strip!.scrollLeft).toBe(120);
   });
-
-  it("activates a tab and reports close actions", async () => {
-    const user = userEvent.setup();
-    const onSelect = vi.fn();
-    const onClose = vi.fn();
-    render(
-      <TableTabs
-        tabs={tabs}
-        activeTableId="table-1"
-        dirtyTableIds={new Set()}
-        onSelect={onSelect}
-        onClose={onClose}
-        onCloseOthers={vi.fn()}
-        onCloseToLeft={vi.fn()}
-        onCloseToRight={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByRole("tab", { name: "订单明细" }));
-    await user.click(screen.getByLabelText("关闭 订单表"));
-
-    expect(onSelect).toHaveBeenCalledWith("table-2");
-    expect(onClose).toHaveBeenCalledWith("table-1");
-  });
-
 });

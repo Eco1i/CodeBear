@@ -16,6 +16,8 @@ import { FieldPanel } from "./components/FieldPanel";
 import type { FieldPanelHandle } from "./components/FieldPanel";
 import { ProjectNavigator } from "./components/ProjectNavigator";
 import { ProjectGlyph } from "./components/PrototypeGlyphs";
+import { PreferencesPopover } from "./features/preferences/components/PreferencesPopover";
+import { usePreferences } from "./features/preferences/PreferencesProvider";
 import { TablePanel } from "./components/TablePanel";
 import { TableDeleteConfirmModal } from "./features/tables/components/TableDeleteConfirmModal";
 import {
@@ -110,31 +112,50 @@ const toTableTab = (table: TableSummary): TableTab => ({
 
 export default function App() {
   const { message, modal } = AntApp.useApp();
+  const { t, themeMode } = usePreferences();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [trees, setTrees] = useState<WorkspaceNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<WorkspaceNode | null>(null);
   const [navigationLoading, setNavigationLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshProgress, setRefreshProgress] = useState<RefreshProgressView | null>(null);
+  const [refreshProgress, setRefreshProgress] =
+    useState<RefreshProgressView | null>(null);
   const [tables, setTables] = useState<Array<TableSummary | undefined>>([]);
   const [tableTotal, setTableTotal] = useState(0);
   const [tableFieldTotal, setTableFieldTotal] = useState(0);
   const [tablePdmTotal, setTablePdmTotal] = useState(0);
   const [tableDatasetRevision, setTableDatasetRevision] = useState(0);
   const [storedTableTabs] = useState(() => loadTableTabsState());
-  const [selectedTableId, setSelectedTableId] = useState<string | null>(() => storedTableTabs.activeTableId);
-  const [openTableTabs, setOpenTableTabs] = useState<TableTab[]>(() => storedTableTabs.tabs);
-  const [dirtyTableIds, setDirtyTableIds] = useState<Set<string>>(() => new Set());
-  const [pendingClose, setPendingClose] = useState<PendingTableClose | null>(null);
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(
+    () => storedTableTabs.activeTableId,
+  );
+  const [openTableTabs, setOpenTableTabs] = useState<TableTab[]>(
+    () => storedTableTabs.tabs,
+  );
+  const [dirtyTableIds, setDirtyTableIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [pendingClose, setPendingClose] = useState<PendingTableClose | null>(
+    null,
+  );
   const [closingTab, setClosingTab] = useState(false);
-  const [selectedTableIds, setSelectedTableIds] = useState<Set<string>>(() => new Set());
-  const [smartRankingEnabled, setSmartRankingEnabled] = useState(() => readSmartSearchPreference());
-  const [hasSearchMemory, setHasSearchMemory] = useState(() => loadSearchMemory().length > 0);
-  const [preferredTableIds, setPreferredTableIds] = useState<Set<string>>(() => new Set());
+  const [selectedTableIds, setSelectedTableIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [smartRankingEnabled, setSmartRankingEnabled] = useState(() =>
+    readSmartSearchPreference(),
+  );
+  const [hasSearchMemory, setHasSearchMemory] = useState(
+    () => loadSearchMemory().length > 0,
+  );
+  const [preferredTableIds, setPreferredTableIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [searchMemoryRevision, setSearchMemoryRevision] = useState(0);
   const [deletingTables, setDeletingTables] = useState(false);
-  const [tableDeleteDialog, setTableDeleteDialog] = useState<TableDeleteDialogState | null>(null);
+  const [tableDeleteDialog, setTableDeleteDialog] =
+    useState<TableDeleteDialogState | null>(null);
   const [navigatorLocateRevision, setNavigatorLocateRevision] = useState(0);
   const [tableLoading, setTableLoading] = useState(false);
   const [detail, setDetail] = useState<TableDetail | null>(null);
@@ -197,7 +218,9 @@ export default function App() {
   const workspaceChangeConfirmOpenRef = useRef(false);
   const allowForcedReloadRef = useRef(false);
   const fieldPanelRef = useRef<FieldPanelHandle>(null);
-  const hasUnsavedChanges = Boolean(selectedTableId && dirtyTableIds.has(selectedTableId));
+  const hasUnsavedChanges = Boolean(
+    selectedTableId && dirtyTableIds.has(selectedTableId),
+  );
   const hasDirtyTabs = dirtyTableIds.size > 0;
 
   useEffect(() => {
@@ -206,67 +229,83 @@ export default function App() {
 
   const addTableTab = useCallback((table: TableSummary | TableTab) => {
     const tab = "source_hash" in table ? toTableTab(table) : table;
-    setOpenTableTabs((current) => (
-      current.some((item) => item.id === tab.id) ? current : [...current, tab]
-    ));
+    setOpenTableTabs((current) =>
+      current.some((item) => item.id === tab.id) ? current : [...current, tab],
+    );
   }, []);
 
-  const rememberTableSelection = useCallback((query: TableQuery | null, tableId: string) => {
-    if (!smartRankingEnabled || !query?.query.trim()) return;
-    const key = searchMemoryKey(query);
-    const nextMemory = recordSearchSelection(loadSearchMemory(), key, tableId);
-    saveSearchMemory(nextMemory);
-    setHasSearchMemory(nextMemory.length > 0);
-    setPreferredTableIds(new Set(preferredTableIdsForSearch(nextMemory, key)));
-  }, [smartRankingEnabled]);
+  const rememberTableSelection = useCallback(
+    (query: TableQuery | null, tableId: string) => {
+      if (!smartRankingEnabled || !query?.query.trim()) return;
+      const key = searchMemoryKey(query);
+      const nextMemory = recordSearchSelection(
+        loadSearchMemory(),
+        key,
+        tableId,
+      );
+      saveSearchMemory(nextMemory);
+      setHasSearchMemory(nextMemory.length > 0);
+      setPreferredTableIds(
+        new Set(preferredTableIdsForSearch(nextMemory, key)),
+      );
+    },
+    [smartRankingEnabled],
+  );
 
   const activateTableTab = useCallback((tableId: string) => {
     setSelectedTableId(tableId);
   }, []);
 
-  const loadWorkspace = useCallback(async (preferred?: WorkspaceNode | null) => {
-    setNavigationLoading(true);
-    try {
-      const [nextSettings, nextProjects] = await Promise.all([
-        workspaceApi.settings(),
-        workspaceApi.projects(),
-      ]);
-      const nextTrees = await Promise.all(
-        nextProjects.map((project) => workspaceApi.tree(project.id)),
-      );
-      setSettings(nextSettings);
-      setProjects(nextProjects);
-      setTrees(nextTrees);
-      setSelectedNode((current) => {
-        const target = preferred || current;
-        if (target) {
-          const targetProjectId = getProjectId(target);
-          const matched = walkNodes(
-            nextTrees,
-            (node) =>
-              (node.id === target.id ||
-                (node.type === target.type && node.relative_path === target.relative_path)) &&
-              getProjectId(node) === targetProjectId,
-          );
-          if (matched) return matched;
-        }
-        return nextTrees[0] || null;
-      });
-    } catch (error) {
-      message.error(errorMessage(error));
-    } finally {
-      setNavigationLoading(false);
-    }
-  }, [message]);
+  const loadWorkspace = useCallback(
+    async (preferred?: WorkspaceNode | null) => {
+      setNavigationLoading(true);
+      try {
+        const [nextSettings, nextProjects] = await Promise.all([
+          workspaceApi.settings(),
+          workspaceApi.projects(),
+        ]);
+        const nextTrees = await Promise.all(
+          nextProjects.map((project) => workspaceApi.tree(project.id)),
+        );
+        setSettings(nextSettings);
+        setProjects(nextProjects);
+        setTrees(nextTrees);
+        setSelectedNode((current) => {
+          const target = preferred || current;
+          if (target) {
+            const targetProjectId = getProjectId(target);
+            const matched = walkNodes(
+              nextTrees,
+              (node) =>
+                (node.id === target.id ||
+                  (node.type === target.type &&
+                    node.relative_path === target.relative_path)) &&
+                getProjectId(node) === targetProjectId,
+            );
+            if (matched) return matched;
+          }
+          return nextTrees[0] || null;
+        });
+      } catch (error) {
+        message.error(errorMessage(error));
+      } finally {
+        setNavigationLoading(false);
+      }
+    },
+    [message],
+  );
 
   useEffect(() => {
     void loadWorkspace();
   }, [loadWorkspace]);
 
   useEffect(() => {
-    updatesApi.check().then(setUpdateState).catch(() => {
-      // 更新检查失败保持未知状态，不打扰用户。
-    });
+    updatesApi
+      .check()
+      .then(setUpdateState)
+      .catch(() => {
+        // 更新检查失败保持未知状态，不打扰用户。
+      });
     const params = new URLSearchParams(window.location.search);
     if (params.has("update")) {
       window.history.replaceState(null, "", window.location.pathname);
@@ -282,7 +321,7 @@ export default function App() {
 
   const openRelations = () => {
     if (!detail) {
-      message.info("请先选择一张数据表");
+      message.info(t("message.selectTableFirst"));
       return;
     }
     setRelationFeatureLoaded(true);
@@ -290,11 +329,18 @@ export default function App() {
   };
 
   const relationTable = detail
-    ? { id: detail.id, name: detail.name, code: detail.code, comment: detail.comment || "" }
+    ? {
+        id: detail.id,
+        name: detail.name,
+        code: detail.code,
+        comment: detail.comment || "",
+      }
     : null;
 
   const jumpRelationTable = (tableId: string) => {
-    const table = tables.find((item): item is TableSummary => Boolean(item?.id === tableId));
+    const table = tables.find((item): item is TableSummary =>
+      Boolean(item?.id === tableId),
+    );
     if (table) {
       addTableTab(table);
     } else if (!openTableTabs.some((item) => item.id === tableId)) {
@@ -348,10 +394,12 @@ export default function App() {
 
       workspaceChangeConfirmOpenRef.current = true;
       modal.confirm({
-        title: "检测到工作区已变化",
-        content: `程序当前工作区已变为“${nextSettings.workspace_root}”。重新加载会放弃已打开标签中的未保存修改。`,
-        okText: "放弃修改并重新加载",
-        cancelText: "暂不重新加载",
+        title: t("confirm.workspaceChangedTitle"),
+        content: t("confirm.workspaceChangedContent", {
+          path: nextSettings.workspace_root,
+        }),
+        okText: t("confirm.discardAndReload"),
+        cancelText: t("message.workspaceReloadLater"),
         okButtonProps: { danger: true },
         onOk: () => {
           allowForcedReloadRef.current = true;
@@ -366,7 +414,7 @@ export default function App() {
       });
       return true;
     },
-    [hasDirtyTabs, modal, settings],
+    [hasDirtyTabs, modal, settings, t],
   );
 
   useEffect(() => {
@@ -406,7 +454,12 @@ export default function App() {
   }, [handleExternalWorkspaceChange, settings]);
 
   const requestTablePage = useCallback(
-    async (query: TableQuery, page: number, generation: number, initial = false) => {
+    async (
+      query: TableQuery,
+      page: number,
+      generation: number,
+      initial = false,
+    ) => {
       if (
         generation !== tableGenerationRef.current ||
         loadedTablePagesRef.current.has(page) ||
@@ -428,7 +481,10 @@ export default function App() {
           ...query,
           limit: TABLE_PAGE_SIZE,
           offset,
-          preferredTableIds: preferredTableIdsForSearch(rankingRecords, rankingKey),
+          preferredTableIds: preferredTableIdsForSearch(
+            rankingRecords,
+            rankingKey,
+          ),
           signal: controller.signal,
         });
         if (generation !== tableGenerationRef.current) return;
@@ -442,7 +498,9 @@ export default function App() {
           : { items: result.items, preferredIds: [] };
         setTables((current) => {
           const next: Array<TableSummary | undefined> =
-            current.length === result.total ? current.slice() : new Array(result.total);
+            current.length === result.total
+              ? current.slice()
+              : new Array(result.total);
           ranking.items.forEach((table, index) => {
             next[offset + index] = table;
           });
@@ -455,7 +513,9 @@ export default function App() {
         if (page === 0) {
           const preferredTableId = pendingAiTableIdRef.current;
           if (preferredTableId) {
-            const firstTable = ranking.items.find((table) => table.id === preferredTableId) || ranking.items[0];
+            const firstTable =
+              ranking.items.find((table) => table.id === preferredTableId) ||
+              ranking.items[0];
             if (firstTable) {
               addTableTab(firstTable);
               setSelectedTableId(firstTable.id);
@@ -464,7 +524,11 @@ export default function App() {
           }
         }
       } catch (error) {
-        if (controller.signal.aborted || generation !== tableGenerationRef.current) return;
+        if (
+          controller.signal.aborted ||
+          generation !== tableGenerationRef.current
+        )
+          return;
         if (initial) {
           setTables([]);
           setTableTotal(0);
@@ -476,7 +540,8 @@ export default function App() {
       } finally {
         pendingTablePagesRef.current.delete(page);
         tableAbortControllersRef.current.delete(controller);
-        if (initial && generation === tableGenerationRef.current) setTableLoading(false);
+        if (initial && generation === tableGenerationRef.current)
+          setTableLoading(false);
       }
     },
     [addTableTab, message, smartRankingEnabled],
@@ -487,9 +552,12 @@ export default function App() {
       const query = tableQueryRef.current;
       if (!query || endIndex <= startIndex) return;
       const generation = tableGenerationRef.current;
-      const firstPage = Math.floor(Math.max(0, startIndex - TABLE_PREFETCH_ROWS) / TABLE_PAGE_SIZE);
+      const firstPage = Math.floor(
+        Math.max(0, startIndex - TABLE_PREFETCH_ROWS) / TABLE_PAGE_SIZE,
+      );
       const lastPage = Math.floor(
-        Math.max(startIndex, endIndex + TABLE_PREFETCH_ROWS - 1) / TABLE_PAGE_SIZE,
+        Math.max(startIndex, endIndex + TABLE_PREFETCH_ROWS - 1) /
+          TABLE_PAGE_SIZE,
       );
       for (let page = firstPage; page <= lastPage; page += 1) {
         void requestTablePage(query, page, generation);
@@ -501,7 +569,9 @@ export default function App() {
   useEffect(() => {
     const generation = tableGenerationRef.current + 1;
     tableGenerationRef.current = generation;
-    tableAbortControllersRef.current.forEach((controller) => controller.abort());
+    tableAbortControllersRef.current.forEach((controller) =>
+      controller.abort(),
+    );
     tableAbortControllersRef.current.clear();
     loadedTablePagesRef.current.clear();
     pendingTablePagesRef.current.clear();
@@ -545,7 +615,9 @@ export default function App() {
 
   useEffect(
     () => () => {
-      tableAbortControllersRef.current.forEach((controller) => controller.abort());
+      tableAbortControllersRef.current.forEach((controller) =>
+        controller.abort(),
+      );
     },
     [],
   );
@@ -583,14 +655,17 @@ export default function App() {
     };
   }, [selectedTableId, message]);
 
-  const handleTabDirtyChange = useCallback((tableId: string, dirty: boolean) => {
-    setDirtyTableIds((current) => {
-      const next = new Set(current);
-      if (dirty) next.add(tableId);
-      else next.delete(tableId);
-      return next;
-    });
-  }, []);
+  const handleTabDirtyChange = useCallback(
+    (tableId: string, dirty: boolean) => {
+      setDirtyTableIds((current) => {
+        const next = new Set(current);
+        if (dirty) next.add(tableId);
+        else next.delete(tableId);
+        return next;
+      });
+    },
+    [],
+  );
 
   const handleDirtyChange = useCallback((_dirty: boolean) => {
     // The tab-aware callback below owns dirty state; this callback preserves FieldPanel's legacy contract.
@@ -608,10 +683,10 @@ export default function App() {
       if (discardConfirmOpenRef.current) return;
       discardConfirmOpenRef.current = true;
       modal.confirm({
-        title: copy?.title || "放弃未保存的修改？",
-        content: copy?.content || "当前表的字段修改尚未保存。切换后这些修改会丢失。",
-        okText: copy?.okText || "放弃并切换",
-        cancelText: "继续编辑",
+        title: copy?.title || t("confirm.discardTitle"),
+        content: copy?.content || t("confirm.discardContent"),
+        okText: copy?.okText || t("confirm.discardAndSwitch"),
+        cancelText: t("confirm.keepEditing"),
         okButtonProps: { danger: true },
         onOk: () => {
           discardConfirmOpenRef.current = false;
@@ -633,7 +708,7 @@ export default function App() {
         },
       });
     },
-    [hasUnsavedChanges, modal, selectedTableId],
+    [hasUnsavedChanges, modal, selectedTableId, t],
   );
 
   useEffect(() => {
@@ -644,7 +719,8 @@ export default function App() {
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", preventAccidentalExit);
-    return () => window.removeEventListener("beforeunload", preventAccidentalExit);
+    return () =>
+      window.removeEventListener("beforeunload", preventAccidentalExit);
   }, [hasDirtyTabs]);
 
   const selectNode = (node: WorkspaceNode) => {
@@ -659,62 +735,95 @@ export default function App() {
     setSelectedTableId(table.id);
   };
 
-  const removeTableTabs = useCallback((tableIds: string[], preferredId: string | null) => {
-    const closingIds = new Set(tableIds);
-    if (!closingIds.size) return;
-    const remainingTabs = openTableTabs.filter((tab) => !closingIds.has(tab.id));
-    const nextSelectedId = preferredId && remainingTabs.some((tab) => tab.id === preferredId)
-      ? preferredId
-      : selectedTableId && !closingIds.has(selectedTableId) && remainingTabs.some((tab) => tab.id === selectedTableId)
-        ? selectedTableId
-        : remainingTabs[0]?.id || null;
-    setOpenTableTabs(remainingTabs);
-    setDirtyTableIds((current) => {
-      const next = new Set(current);
-      closingIds.forEach((id) => next.delete(id));
-      return next;
-    });
-    setSelectedTableId(nextSelectedId);
-  }, [openTableTabs, selectedTableId]);
+  const removeTableTabs = useCallback(
+    (tableIds: string[], preferredId: string | null) => {
+      const closingIds = new Set(tableIds);
+      if (!closingIds.size) return;
+      const remainingTabs = openTableTabs.filter(
+        (tab) => !closingIds.has(tab.id),
+      );
+      const nextSelectedId =
+        preferredId && remainingTabs.some((tab) => tab.id === preferredId)
+          ? preferredId
+          : selectedTableId &&
+              !closingIds.has(selectedTableId) &&
+              remainingTabs.some((tab) => tab.id === selectedTableId)
+            ? selectedTableId
+            : remainingTabs[0]?.id || null;
+      setOpenTableTabs(remainingTabs);
+      setDirtyTableIds((current) => {
+        const next = new Set(current);
+        closingIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      setSelectedTableId(nextSelectedId);
+    },
+    [openTableTabs, selectedTableId],
+  );
 
-  const requestCloseTableTabs = useCallback((tableIds: string[], preferredId: string | null) => {
-    const targetIds = Array.from(new Set(tableIds)).filter((id) => openTableTabs.some((tab) => tab.id === id));
-    if (!targetIds.length) return;
-    const dirtyIds = targetIds.filter((id) => dirtyTableIds.has(id));
-    if (dirtyIds.length) {
-      setPendingClose({ targetIds, dirtyIds, preferredId });
-      if (selectedTableId !== dirtyIds[0]) setSelectedTableId(dirtyIds[0]);
-      return;
-    }
-    removeTableTabs(targetIds, preferredId);
-  }, [dirtyTableIds, openTableTabs, removeTableTabs, selectedTableId]);
+  const requestCloseTableTabs = useCallback(
+    (tableIds: string[], preferredId: string | null) => {
+      const targetIds = Array.from(new Set(tableIds)).filter((id) =>
+        openTableTabs.some((tab) => tab.id === id),
+      );
+      if (!targetIds.length) return;
+      const dirtyIds = targetIds.filter((id) => dirtyTableIds.has(id));
+      if (dirtyIds.length) {
+        setPendingClose({ targetIds, dirtyIds, preferredId });
+        if (selectedTableId !== dirtyIds[0]) setSelectedTableId(dirtyIds[0]);
+        return;
+      }
+      removeTableTabs(targetIds, preferredId);
+    },
+    [dirtyTableIds, openTableTabs, removeTableTabs, selectedTableId],
+  );
 
-  const closeTableTab = useCallback((tableId: string) => {
-    const tabIndex = openTableTabs.findIndex((tab) => tab.id === tableId);
-    if (tabIndex < 0) return;
-    const replacement = openTableTabs[tabIndex + 1] || openTableTabs[tabIndex - 1] || null;
-    const preferredId = selectedTableId === tableId ? replacement?.id || null : selectedTableId;
-    requestCloseTableTabs([tableId], preferredId);
-  }, [openTableTabs, requestCloseTableTabs, selectedTableId]);
+  const closeTableTab = useCallback(
+    (tableId: string) => {
+      const tabIndex = openTableTabs.findIndex((tab) => tab.id === tableId);
+      if (tabIndex < 0) return;
+      const replacement =
+        openTableTabs[tabIndex + 1] || openTableTabs[tabIndex - 1] || null;
+      const preferredId =
+        selectedTableId === tableId ? replacement?.id || null : selectedTableId;
+      requestCloseTableTabs([tableId], preferredId);
+    },
+    [openTableTabs, requestCloseTableTabs, selectedTableId],
+  );
 
-  const closeOtherTableTabs = useCallback((tableId: string) => {
-    requestCloseTableTabs(
-      openTableTabs.filter((tab) => tab.id !== tableId).map((tab) => tab.id),
-      tableId,
-    );
-  }, [openTableTabs, requestCloseTableTabs]);
+  const closeOtherTableTabs = useCallback(
+    (tableId: string) => {
+      requestCloseTableTabs(
+        openTableTabs.filter((tab) => tab.id !== tableId).map((tab) => tab.id),
+        tableId,
+      );
+    },
+    [openTableTabs, requestCloseTableTabs],
+  );
 
-  const closeTableTabsToLeft = useCallback((tableId: string) => {
-    const tabIndex = openTableTabs.findIndex((tab) => tab.id === tableId);
-    if (tabIndex < 0) return;
-    requestCloseTableTabs(openTableTabs.slice(0, tabIndex).map((tab) => tab.id), tableId);
-  }, [openTableTabs, requestCloseTableTabs]);
+  const closeTableTabsToLeft = useCallback(
+    (tableId: string) => {
+      const tabIndex = openTableTabs.findIndex((tab) => tab.id === tableId);
+      if (tabIndex < 0) return;
+      requestCloseTableTabs(
+        openTableTabs.slice(0, tabIndex).map((tab) => tab.id),
+        tableId,
+      );
+    },
+    [openTableTabs, requestCloseTableTabs],
+  );
 
-  const closeTableTabsToRight = useCallback((tableId: string) => {
-    const tabIndex = openTableTabs.findIndex((tab) => tab.id === tableId);
-    if (tabIndex < 0) return;
-    requestCloseTableTabs(openTableTabs.slice(tabIndex + 1).map((tab) => tab.id), tableId);
-  }, [openTableTabs, requestCloseTableTabs]);
+  const closeTableTabsToRight = useCallback(
+    (tableId: string) => {
+      const tabIndex = openTableTabs.findIndex((tab) => tab.id === tableId);
+      if (tabIndex < 0) return;
+      requestCloseTableTabs(
+        openTableTabs.slice(tabIndex + 1).map((tab) => tab.id),
+        tableId,
+      );
+    },
+    [openTableTabs, requestCloseTableTabs],
+  );
 
   const advancePendingClose = useCallback(() => {
     const current = pendingClose;
@@ -764,7 +873,7 @@ export default function App() {
 
   const locateSelectedTable = () => {
     if (!detail) {
-      message.info("请先选择一张数据表");
+      message.info(t("message.selectTableFirst"));
       return;
     }
     const pdmNode = walkNodes(
@@ -772,10 +881,11 @@ export default function App() {
       (node) =>
         node.type === "pdm" &&
         getProjectId(node) === detail.project_id &&
-        (node.pdm_id === detail.pdm_id || node.relative_path === detail.relative_path),
+        (node.pdm_id === detail.pdm_id ||
+          node.relative_path === detail.relative_path),
     );
     if (!pdmNode) {
-      message.warning("没有在项目目录中找到该表所属的 PDM");
+      message.warning(t("message.pdmNotFound"));
       return;
     }
     requestContextChange(() => {
@@ -784,7 +894,10 @@ export default function App() {
     });
   };
 
-  const openAiEvidenceTable = (evidence: AiEvidenceTable, options?: { exitFullscreen?: boolean }) => {
+  const openAiEvidenceTable = (
+    evidence: AiEvidenceTable,
+    options?: { exitFullscreen?: boolean },
+  ) => {
     requestContextChange(() => {
       const pdmNode = walkNodes(
         trees,
@@ -806,15 +919,21 @@ export default function App() {
   };
 
   const activeProject = projectForNode(projects, selectedNode);
-  const scopeTitle = allNodes ? "所有项目" : selectedNode?.name || "码熊工作区";
+  const scopeTitle = allNodes
+    ? t("scope.allProjects")
+    : selectedNode?.name || t("app.workspace");
   const scopeDescription = allNodes
-    ? "正在全局检索所有项目节点"
+    ? t("scope.globalSearch")
     : selectedNode?.type === "pdm"
-      ? "当前 PDM · 展示文件中的数据表"
+      ? t("scope.currentPdm")
       : selectedNode?.type === "folder"
-        ? "当前文件夹 · 包含所有下级 PDM"
-        : "当前项目 · 展示范围内的数据表";
-  const submitTableSearch = (mode: SearchMode, query: string, searchAllNodes: boolean) => {
+        ? t("scope.currentFolder")
+        : t("scope.currentProject");
+  const submitTableSearch = (
+    mode: SearchMode,
+    query: string,
+    searchAllNodes: boolean,
+  ) => {
     requestContextChange(() => {
       setSelectedTableIds(new Set());
       setSearchMode(mode);
@@ -829,14 +948,17 @@ export default function App() {
     setRevision((value) => value + 1);
   };
 
-  const toggleTableSelection = useCallback((table: TableSummary, checked: boolean) => {
-    setSelectedTableIds((current) => {
-      const next = new Set(current);
-      if (checked) next.add(table.id);
-      else next.delete(table.id);
-      return next;
-    });
-  }, []);
+  const toggleTableSelection = useCallback(
+    (table: TableSummary, checked: boolean) => {
+      setSelectedTableIds((current) => {
+        const next = new Set(current);
+        if (checked) next.add(table.id);
+        else next.delete(table.id);
+        return next;
+      });
+    },
+    [],
+  );
 
   const clearTableSelection = useCallback(() => {
     setSelectedTableIds(new Set());
@@ -870,8 +992,12 @@ export default function App() {
       const deletedIds = new Set(result.deleted_ids);
       setTableDeleteDialog(null);
       setSelectedTableIds(new Set());
-      const deletedActiveTab = selectedTableId ? deletedIds.has(selectedTableId) : false;
-      const remainingTabs = openTableTabs.filter((tab) => !deletedIds.has(tab.id));
+      const deletedActiveTab = selectedTableId
+        ? deletedIds.has(selectedTableId)
+        : false;
+      const remainingTabs = openTableTabs.filter(
+        (tab) => !deletedIds.has(tab.id),
+      );
       setOpenTableTabs(remainingTabs);
       setDirtyTableIds((current) => {
         const next = new Set(current);
@@ -879,16 +1005,21 @@ export default function App() {
         return next;
       });
       if (deletedActiveTab) {
-        const activeIndex = openTableTabs.findIndex((tab) => tab.id === selectedTableId);
-        const replacement = openTableTabs[activeIndex + 1] || openTableTabs[activeIndex - 1] || null;
+        const activeIndex = openTableTabs.findIndex(
+          (tab) => tab.id === selectedTableId,
+        );
+        const replacement =
+          openTableTabs[activeIndex + 1] ||
+          openTableTabs[activeIndex - 1] ||
+          null;
         setSelectedTableId(replacement?.id || null);
         if (!replacement) setDetail(null);
       }
       await refreshAfterMutation(selectedNode);
       message.success(
         result.table_count === 1
-          ? "数据表已删除，PDM 原文件备份已保留"
-          : `${result.table_count} 张数据表已删除，PDM 原文件备份已保留`,
+          ? t("message.tableDeleted")
+          : t("message.tablesDeleted", { count: result.table_count }),
       );
     } catch (error) {
       message.error(errorMessage(error));
@@ -898,14 +1029,11 @@ export default function App() {
   };
 
   const requestTableDeletion = (candidates: TableSummary[]) => {
-    requestContextChange(
-      () => void confirmTableDeletion(candidates),
-      {
-        title: "放弃未保存的字典修改？",
-        content: "删除数据表会改写 PDM。当前字典修改尚未保存，继续后这些编辑稿会丢失。",
-        okText: "放弃修改并继续",
-      },
-    );
+    requestContextChange(() => void confirmTableDeletion(candidates), {
+      title: t("confirm.deleteTitle"),
+      content: t("confirm.deleteContent"),
+      okText: t("confirm.discardAndContinue"),
+    });
   };
 
   const handleBackupImported = async (_result: BackupImportResult) => {
@@ -918,7 +1046,10 @@ export default function App() {
     await refreshAfterMutation(null);
   };
 
-  const openDialog = (kind: Exclude<DialogKind, null>, node?: WorkspaceNode) => {
+  const openDialog = (
+    kind: Exclude<DialogKind, null>,
+    node?: WorkspaceNode,
+  ) => {
     setDialog({ kind, node });
     setDialogValue(kind === "rename" ? node?.name || "" : "");
   };
@@ -944,7 +1075,7 @@ export default function App() {
   const submitDialog = async () => {
     const value = dialogValue.trim();
     if (!value) {
-      message.warning(dialog.kind === "settings" ? "请输入工作区路径" : "请输入名称");
+      message.warning(t("dialog.enterName"));
       return;
     }
     setDialogBusy(true);
@@ -958,25 +1089,30 @@ export default function App() {
           name: project.name,
           relative_path: "",
         });
-        message.success(`项目“${project.name}”已创建`);
+        message.success(t("message.projectCreated", { name: project.name }));
       } else if (dialog.kind === "folder" && dialog.node) {
         const node = dialog.node;
         const projectId = getProjectId(node)!;
-        const parent = node.type === "folder" ? node.relative_path : node.type === "pdm" ? pathParent(node.relative_path) : "";
+        const parent =
+          node.type === "folder"
+            ? node.relative_path
+            : node.type === "pdm"
+              ? pathParent(node.relative_path)
+              : "";
         await workspaceApi.createFolder(projectId, parent, value);
         await refreshAfterMutation(node);
-        message.success("文件夹已创建");
+        message.success(t("message.folderCreated"));
       } else if (dialog.kind === "rename" && dialog.node) {
         const node = dialog.node;
         const projectId = getProjectId(node)!;
         await workspaceApi.renameNode(projectId, node.relative_path, value);
         await refreshAfterMutation(null);
-        message.success("节点已重命名");
+        message.success(t("message.nodeRenamed"));
       } else if (dialog.kind === "settings") {
         const updated = await workspaceApi.updateWorkspace(value);
         setSettings(updated);
         await refreshAfterMutation(null);
-        message.success("工作区已更新");
+        message.success(t("message.workspaceUpdated"));
       }
       setDialog({ kind: null });
       setDialogValue("");
@@ -990,38 +1126,67 @@ export default function App() {
   const triggerImport = (node: WorkspaceNode | null) => {
     const target = node || selectedNode || trees[0] || null;
     if (!target) {
-      message.info("请先新建一个项目");
+      message.info(t("message.createProjectFirst"));
       return;
     }
     importTargetRef.current = target;
     fileInputRef.current?.click();
   };
 
-  const uploadFiles = async (files: File[], target: WorkspaceNode, overwrite: boolean) => {
+  const uploadFiles = async (
+    files: File[],
+    target: WorkspaceNode,
+    overwrite: boolean,
+  ) => {
     const projectId = getProjectId(target);
-    if (!projectId) throw new Error("无法识别导入目标项目");
+    if (!projectId) throw new Error(t("message.cannotIdentifyProject"));
     const parentPath =
-      target.type === "folder" ? target.relative_path : target.type === "pdm" ? pathParent(target.relative_path) : "";
-    const result = await workspaceApi.importPdm(projectId, parentPath, files, overwrite);
+      target.type === "folder"
+        ? target.relative_path
+        : target.type === "pdm"
+          ? pathParent(target.relative_path)
+          : "";
+    const result = await workspaceApi.importPdm(
+      projectId,
+      parentPath,
+      files,
+      overwrite,
+    );
     await refreshAfterMutation(target);
     if (result.imported.length) {
-      message.success(`已导入 ${result.imported.length} 个 PDM，共解析 ${result.imported.reduce((sum, item) => sum + item.table_count, 0)} 张表`);
+      message.success(
+        t("message.imported", {
+          count: result.imported.length,
+          tables: result.imported.reduce(
+            (sum, item) => sum + item.table_count,
+            0,
+          ),
+        }),
+      );
     }
     if (result.errors.length) {
       modal.warning({
-        title: "部分文件未能导入",
-        content: result.errors.map((item) => `${item.name}：${item.error}`).join("；"),
+        title: t("message.importPartialTitle"),
+        content: result.errors
+          .map((item) => `${item.name}：${item.error}`)
+          .join("；"),
       });
     }
   };
 
-  const handleFileSelection = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelection = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const files = Array.from(event.target.files || []);
     const target = importTargetRef.current;
     event.target.value = "";
     if (!files.length || !target) return;
     const key = "pdm-import";
-    message.loading({ key, content: `正在复制并解析 ${files.length} 个 PDM…`, duration: 0 });
+    message.loading({
+      key,
+      content: t("message.copyingAndParsing", { count: files.length }),
+      duration: 0,
+    });
     try {
       await uploadFiles(files, target, false);
       message.destroy(key);
@@ -1030,12 +1195,18 @@ export default function App() {
       if (error instanceof ApiError && error.code === "import_conflict") {
         const data = error.data as { conflicts?: string[] } | undefined;
         modal.confirm({
-          title: "发现同名 PDM",
-          content: `以下文件已存在：${data?.conflicts?.join("、") || "同名文件"}。是否备份旧文件并覆盖项目副本？`,
-          okText: "覆盖导入",
-          cancelText: "取消",
+          title: t("message.importConflictTitle"),
+          content: t("message.importConflictContent", {
+            files: data?.conflicts?.join(", ") || t("common.table"),
+          }),
+          okText: t("message.overwriteImport"),
+          cancelText: t("common.cancel"),
           onOk: async () => {
-            message.loading({ key, content: "正在备份、覆盖并重新解析…", duration: 0 });
+            message.loading({
+              key,
+              content: t("message.backupAndParsing"),
+              duration: 0,
+            });
             try {
               await uploadFiles(files, target, true);
             } finally {
@@ -1049,11 +1220,19 @@ export default function App() {
     }
   };
 
-  const runProjectRefresh = async (node: WorkspaceNode | null, force: boolean) => {
+  const runProjectRefresh = async (
+    node: WorkspaceNode | null,
+    force: boolean,
+  ) => {
     const projectId = getProjectId(node) || projects[0]?.id;
     if (!projectId) return;
     setRefreshing(true);
-    const pending: RefreshProgressView = { force, processed: 0, total: 0, currentFile: "" };
+    const pending: RefreshProgressView = {
+      force,
+      processed: 0,
+      total: 0,
+      currentFile: "",
+    };
     const refreshPromise = workspaceApi.refresh(projectId, force);
     const pollProgress = () => {
       workspaceApi
@@ -1068,25 +1247,37 @@ export default function App() {
           // 进度轮询失败不阻塞刷新主流程
         });
     };
-    let modalVisible = false;
     const showTimer = window.setTimeout(() => {
-      modalVisible = true;
       setRefreshProgress({ ...pending });
       pollProgress();
     }, REFRESH_MODAL_DELAY_MS);
     pollProgress();
-    const pollTimer = window.setInterval(pollProgress, REFRESH_POLL_INTERVAL_MS);
+    const pollTimer = window.setInterval(
+      pollProgress,
+      REFRESH_POLL_INTERVAL_MS,
+    );
     try {
       const result = await refreshPromise;
       window.clearTimeout(showTimer);
       window.clearInterval(pollTimer);
       setRefreshProgress(null);
       await refreshAfterMutation(node);
-      const summary = force
-        ? `强制重新解析完成：重新解析 ${result.indexed} 个，内容未变化跳过 ${result.skipped} 个，失败 ${result.errors.length} 个`
-        : result.pdm_count === 0
-          ? "扫描完成：当前项目没有 PDM"
-          : `扫描完成：重新解析 ${result.indexed} 个，未变化 ${result.unchanged} 个，失败 ${result.errors.length} 个`;
+      let summary: string;
+      if (force) {
+        summary = t("message.refreshForceComplete", {
+          indexed: result.indexed,
+          skipped: result.skipped,
+          errors: result.errors.length,
+        });
+      } else if (result.pdm_count === 0) {
+        summary = t("message.refreshEmpty");
+      } else {
+        summary = t("message.refreshComplete", {
+          indexed: result.indexed,
+          unchanged: result.unchanged,
+          errors: result.errors.length,
+        });
+      }
       const notify = result.errors.length ? message.warning : message.success;
       notify({ content: summary, duration: 4 });
     } catch (error) {
@@ -1108,21 +1299,30 @@ export default function App() {
     if (refreshing) return;
     const projectId = getProjectId(node) || projects[0]?.id;
     if (!projectId) return;
-    const projectName = projects.find((project) => project.id === projectId)?.name || "当前项目";
+    const projectName =
+      projects.find((project) => project.id === projectId)?.name ||
+      t("scope.currentProject");
     modal.confirm({
-      title: "强制全部重新解析？",
-      content: `将忽略文件大小和修改时间，按内容重新解析项目“${projectName}”中的全部 PDM；内容未变化的会自动跳过重建。`,
-      okText: "强制重新解析",
-      cancelText: "取消",
-      onOk: () => requestContextChange(() => void runProjectRefresh(node, true)),
+      title: t("message.forceRefreshConfirmTitle"),
+      content: t("message.forceRefreshConfirmContent", {
+        project: projectName,
+      }),
+      okText: t("message.forceRefreshAction"),
+      cancelText: t("common.cancel"),
+      onOk: () =>
+        requestContextChange(() => void runProjectRefresh(node, true)),
     });
   };
 
   const moveNode = async (source: WorkspaceNode, target: WorkspaceNode) => {
     try {
-      await workspaceApi.moveNode(getProjectId(source)!, source.relative_path, target.relative_path);
+      await workspaceApi.moveNode(
+        getProjectId(source)!,
+        source.relative_path,
+        target.relative_path,
+      );
       await refreshAfterMutation(target);
-      message.success("节点已移动");
+      message.success(t("message.nodeMoved"));
     } catch (error) {
       message.error(errorMessage(error));
     }
@@ -1130,16 +1330,19 @@ export default function App() {
 
   const trashNode = (node: WorkspaceNode) => {
     modal.confirm({
-      title: `将“${node.name}”移入回收站？`,
+      title: t("message.trashConfirmTitle", { name: node.name }),
       icon: <DeleteOutlined style={{ color: "#e25c5c" }} />,
-      content: node.type === "project" ? "项目目录及其全部 PDM 会进入码熊回收站，可稍后恢复。" : "节点会从当前项目移除，可稍后从回收站恢复。",
-      okText: "移入回收站",
+      content:
+        node.type === "project"
+          ? t("message.trashProjectContent")
+          : t("message.trashNodeContent"),
+      okText: t("nav.moveToTrash"),
       okButtonProps: { danger: true },
-      cancelText: "取消",
+      cancelText: t("common.cancel"),
       onOk: async () => {
         await workspaceApi.trashNode(getProjectId(node)!, node.relative_path);
         await refreshAfterMutation(null);
-        message.success("已移入回收站");
+        message.success(t("message.nodeTrashed"));
       },
     });
   };
@@ -1159,9 +1362,11 @@ export default function App() {
   const restoreTrash = async (item: TrashItem) => {
     try {
       await workspaceApi.restoreTrash(item.id);
-      setTrashItems((current) => current.filter((candidate) => candidate.id !== item.id));
+      setTrashItems((current) =>
+        current.filter((candidate) => candidate.id !== item.id),
+      );
       await refreshAfterMutation(null);
-      message.success(`“${item.name}”已恢复`);
+      message.success(t("message.nodeRestored", { name: item.name }));
     } catch (error) {
       message.error(errorMessage(error));
     }
@@ -1172,10 +1377,16 @@ export default function App() {
     ? openTableTabs.find((tab) => tab.id === pendingCloseTableId) || null
     : null;
   const closeTabDialogReady = Boolean(
-    pendingCloseTab && selectedTableId === pendingCloseTab.id && detail?.id === pendingCloseTab.id && !detailLoading,
+    pendingCloseTab &&
+      selectedTableId === pendingCloseTab.id &&
+      detail?.id === pendingCloseTab.id &&
+      !detailLoading,
   );
 
-  const saveDictionary = async (table: TableMetadataUpdate, fields: FieldDefinition[]) => {
+  const saveDictionary = async (
+    table: TableMetadataUpdate,
+    fields: FieldDefinition[],
+  ) => {
     if (!detail) return;
     const previousFieldCount = detail.field_count;
     setSaving(true);
@@ -1187,9 +1398,11 @@ export default function App() {
         fields,
       );
       setDetail(updated);
-      setOpenTableTabs((current) => current.map((tab) => (
-        tab.id === updated.id ? toTableTab(updated) : tab
-      )));
+      setOpenTableTabs((current) =>
+        current.map((tab) =>
+          tab.id === updated.id ? toTableTab(updated) : tab,
+        ),
+      );
       setDirtyTableIds((current) => {
         const next = new Set(current);
         next.delete(updated.id);
@@ -1198,7 +1411,8 @@ export default function App() {
       setTables((current) =>
         current.map((item) => {
           if (!item || item.pdm_id !== updated.pdm_id) return item;
-          if (item.id !== updated.id) return { ...item, source_hash: updated.source_hash };
+          if (item.id !== updated.id)
+            return { ...item, source_hash: updated.source_hash };
           return {
             ...item,
             name: updated.name,
@@ -1209,8 +1423,10 @@ export default function App() {
           };
         }),
       );
-      setTableFieldTotal((current) => Math.max(0, current + updated.field_count - previousFieldCount));
-      message.success("数据字典已写回项目 PDM，原文件备份已保留");
+      setTableFieldTotal((current) =>
+        Math.max(0, current + updated.field_count - previousFieldCount),
+      );
+      message.success(t("message.dictionarySaved"));
     } catch (error) {
       message.error(errorMessage(error));
       throw error;
@@ -1227,17 +1443,34 @@ export default function App() {
     >
       <header className="app-header">
         <div className="brand-block">
-          <img className="brand-mark" src="/codebear-icon-v3.png" alt="" aria-hidden="true" />
+          <PreferencesPopover>
+            <button
+              type="button"
+              className="brand-preferences-trigger"
+              aria-label={t("preferences.open")}
+              title={t("preferences.open")}
+            >
+              <img
+                className="brand-mark"
+                src="/codebear-icon-v3.png"
+                alt=""
+                aria-hidden="true"
+              />
+            </button>
+          </PreferencesPopover>
           <span className="brand-copy">
-            <span><strong>码熊</strong><b>CODE BEAR</b></span>
-            <small>PDM 数据字典工作台</small>
+            <span>
+              <strong>码熊</strong>
+              <b>CODE BEAR</b>
+            </span>
+            <small>{t("app.brandSubtitle")}</small>
           </span>
         </div>
         <div className="header-context">
-          <span>码熊工作区</span>
+          <span>{t("app.workspace")}</span>
           <i>/</i>
-          <strong>{activeProject?.name || "欢迎使用"}</strong>
-          <Tag color="blue">本地工作台</Tag>
+          <strong>{activeProject?.name || t("app.welcome")}</strong>
+          <Tag color="blue">{t("app.localWorkspace")}</Tag>
         </div>
         <div className="header-actions">
           <Button
@@ -1247,7 +1480,7 @@ export default function App() {
               setBackupOpen(true);
             }}
           >
-            备份迁移
+            {t("header.backupMigration")}
           </Button>
           <Button
             icon={<CodeOutlined />}
@@ -1257,7 +1490,7 @@ export default function App() {
               setDdlExportOpen(true);
             }}
           >
-            导出 SQL
+            {t("header.exportSql")}
           </Button>
           <Button
             icon={<BookOutlined />}
@@ -1266,7 +1499,7 @@ export default function App() {
               setDictionaryOpen(true);
             }}
           >
-            字典中心
+            {t("header.dictionaryCenter")}
           </Button>
           <UpdateIndicator state={updateState} onClick={openUpdatePanel} />
         </div>
@@ -1277,11 +1510,15 @@ export default function App() {
           selectedNode={selectedNode}
           settings={settings}
           loading={navigationLoading || refreshing}
-          locateNode={detail ? {
-            projectId: detail.project_id,
-            pdmId: detail.pdm_id,
-            relativePath: detail.relative_path,
-          } : null}
+          locateNode={
+            detail
+              ? {
+                  projectId: detail.project_id,
+                  pdmId: detail.pdm_id,
+                  relativePath: detail.relative_path,
+                }
+              : null
+          }
           locateRevision={navigatorLocateRevision}
           onLocate={locateSelectedTable}
           onSelect={selectNode}
@@ -1300,13 +1537,13 @@ export default function App() {
           ref={sidebarResizerRef}
           className={`sidebar-resizer${sidebarResizing ? " is-dragging" : ""}`}
           role="separator"
-          aria-label="调整项目目录宽度"
+          aria-label={t("nav.adjustDirectoryWidth")}
           aria-orientation="vertical"
           aria-valuemin={SIDEBAR_MIN_WIDTH}
           aria-valuemax={SIDEBAR_MAX_WIDTH}
           aria-valuenow={Math.round(effectiveSidebarWidth)}
           tabIndex={0}
-          title="拖动调整目录宽度"
+          title={t("nav.dragResizeDirectory")}
           onPointerDown={startSidebarResize}
           onPointerMove={moveSidebarResize}
           onPointerUp={finishSidebarResize}
@@ -1316,7 +1553,7 @@ export default function App() {
         />
         <main className="workspace-main">
           <section className="scope-header">
-            <span className="scope-icon">
+            <span className="scope-icon" aria-hidden="true">
               <ProjectGlyph />
             </span>
             <span className="scope-copy">
@@ -1324,9 +1561,15 @@ export default function App() {
               <small>{scopeDescription}</small>
             </span>
             <div className="scope-stats">
-              <span><b>{tableTotal}</b> 张表</span>
-              <span><b>{tableFieldTotal}</b> 个字段</span>
-              <span><b>{tablePdmTotal}</b> 个 PDM</span>
+              <span>
+                <b>{tableTotal}</b> {t("common.tables")}
+              </span>
+              <span>
+                <b>{tableFieldTotal}</b> {t("common.fields")}
+              </span>
+              <span>
+                <b>{tablePdmTotal}</b> {t("common.pdms")}
+              </span>
             </div>
           </section>
           <div className="workspace-stack">
@@ -1442,7 +1685,9 @@ export default function App() {
         onBackupImported={handleBackupImported}
         onCloseDdl={() => setDdlExportOpen(false)}
         onCloseDictionary={() => setDictionaryOpen(false)}
-        onDictionaryBindingsChanged={() => setDictionaryBindingRevision((current) => current + 1)}
+        onDictionaryBindingsChanged={() =>
+          setDictionaryBindingRevision((current) => current + 1)
+        }
         onCloseUpdate={() => setUpdateOpen(false)}
         onRefreshUpdate={() => void refreshUpdates()}
         onIgnoreUpdate={(version: string) => void ignoreUpdate(version)}
@@ -1457,7 +1702,7 @@ export default function App() {
 
       <Modal
         open={closeTabDialogReady}
-        title="当前标签有未保存修改"
+        title={t("confirm.closeTabTitle")}
         onCancel={() => {
           if (!closingTab) setPendingClose(null);
         }}
@@ -1466,11 +1711,20 @@ export default function App() {
         keyboard={!closingTab}
         okButtonProps={{ loading: closingTab }}
         footer={[
-          <Button key="cancel" onClick={() => setPendingClose(null)} disabled={closingTab}>
-            继续编辑
+          <Button
+            key="cancel"
+            onClick={() => setPendingClose(null)}
+            disabled={closingTab}
+          >
+            {t("confirm.keepEditing")}
           </Button>,
-          <Button key="discard" danger onClick={handleCloseTabDiscard} disabled={closingTab}>
-            放弃修改
+          <Button
+            key="discard"
+            danger
+            onClick={handleCloseTabDiscard}
+            disabled={closingTab}
+          >
+            {t("confirm.discardChanges")}
           </Button>,
           <Button
             key="save"
@@ -1478,21 +1732,36 @@ export default function App() {
             loading={closingTab}
             onClick={() => void handleCloseTabSave()}
           >
-            保存并关闭
+            {t("confirm.saveAndClose")}
           </Button>,
         ]}
       >
-        <p>关闭“{pendingCloseTab?.name || pendingCloseTab?.code || "当前表"}”后，当前字段修改将会丢失。</p>
+        <p>
+          {t("confirm.closeTabContent", {
+            name:
+              pendingCloseTab?.name ||
+              pendingCloseTab?.code ||
+              t("common.table"),
+          })}
+        </p>
         <div className="table-tab-close-summary">
-          <strong>{pendingCloseTab?.name || pendingCloseTab?.code || "当前表"}</strong>
+          <strong>
+            {pendingCloseTab?.name ||
+              pendingCloseTab?.code ||
+              t("common.table")}
+          </strong>
           {pendingCloseTab?.code ? <code>{pendingCloseTab.code}</code> : null}
-          <span>请先选择处理方式</span>
+          <span>{t("confirm.chooseAction")}</span>
         </div>
       </Modal>
 
       <Modal
         open={refreshProgress !== null}
-        title={refreshProgress?.force ? "强制重新解析 PDM" : "扫描 PDM 文件"}
+        title={
+          refreshProgress?.force
+            ? t("refresh.forceTitle")
+            : t("refresh.scanTitle")
+        }
         footer={null}
         closable={false}
         maskClosable={false}
@@ -1503,18 +1772,29 @@ export default function App() {
         <Progress
           percent={
             refreshProgress && refreshProgress.total > 0
-              ? Math.min(100, Math.round((refreshProgress.processed / refreshProgress.total) * 100))
+              ? Math.min(
+                  100,
+                  Math.round(
+                    (refreshProgress.processed / refreshProgress.total) * 100,
+                  ),
+                )
               : 0
           }
           status="active"
-          strokeColor={{ from: "#347ee8", to: "#23b99a" }}
+          strokeColor={{
+            from: themeMode === "dark" ? "#c1c7ce" : "#347ee8",
+            to: themeMode === "dark" ? "#e0e4e7" : "#23b99a",
+          }}
         />
         <div className="refresh-progress-copy">
           {refreshProgress?.currentFile
-            ? `正在解析 ${refreshProgress.currentFile}`
-            : "准备中…"}
+            ? t("refresh.parsing", { file: refreshProgress.currentFile })
+            : t("refresh.preparing")}
           <span className="refresh-progress-count">
-            {refreshProgress?.processed ?? 0} / {refreshProgress?.total ?? 0}
+            {t("refresh.count", {
+              processed: refreshProgress?.processed ?? 0,
+              total: refreshProgress?.total ?? 0,
+            })}
           </span>
         </div>
       </Modal>

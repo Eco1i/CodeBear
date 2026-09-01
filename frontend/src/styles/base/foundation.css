@@ -1,5 +1,7 @@
 :root {
-  font-family: "JetBrains Mono", "Noto Sans SC Variable", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+  font-family:
+    "JetBrains Mono", "Noto Sans SC Variable", "Noto Sans SC",
+    "Microsoft YaHei UI", sans-serif;
   color: #20314d;
   background: #f4f7fb;
   font-synthesis: none;
@@ -11,6 +13,9 @@
   --sidebar-resizer-center: 3px;
   --blue: #347ee8;
   --blue-soft: #eaf3ff;
+  --blue-hover: #7ea9e6;
+  --blue-ink: #355d91;
+  --blue-border: #c7d9ee;
   --green: #23b99a;
   --border: #dbe5f1;
   --muted: #7384a0;
@@ -37,7 +42,9 @@ button,
 input,
 textarea,
 .ant-app {
-  font-family: "JetBrains Mono", "Noto Sans SC Variable", "Noto Sans SC", "Microsoft YaHei UI", sans-serif !important;
+  font-family:
+    "JetBrains Mono", "Noto Sans SC Variable", "Noto Sans SC",
+    "Microsoft YaHei UI", sans-serif !important;
 }
 
 .ant-app {
@@ -59,4 +66,20 @@ input {
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.cb-draggable-modal-frame {
+  will-change: transform;
+}
+
+.cb-draggable-modal-title,
+.cb-draggable-modal-frame .ant-modal-header {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.cb-draggable-modal-title:active,
+.cb-draggable-modal-frame .ant-modal-header:active {
+  cursor: grabbing;
 }

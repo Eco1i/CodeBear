@@ -1,5 +1,9 @@
 import type { DataNode } from "antd/es/tree";
-import type { BackupExportNode, BackupImportNode, BackupInspection } from "./types";
+import type {
+  BackupExportNode,
+  BackupImportNode,
+  BackupInspection,
+} from "./types";
 import type { NodeType, WorkspaceNode } from "../workspace/types";
 
 export type ConflictPolicy = "skip" | "rename" | "overwrite";
@@ -28,11 +32,16 @@ export interface SelectionSummary {
   totalBytes: number;
 }
 
-export function normalizeProjectNode(node: WorkspaceNode, projectId: string): WorkspaceNode {
+export function normalizeProjectNode(
+  node: WorkspaceNode,
+  projectId: string,
+): WorkspaceNode {
   return {
     ...node,
     project_id: node.project_id || projectId,
-    children: node.children?.map((child) => normalizeProjectNode(child, projectId)),
+    children: node.children?.map((child) =>
+      normalizeProjectNode(child, projectId),
+    ),
   };
 }
 
@@ -63,7 +72,11 @@ export function backupTree(inspection: BackupInspection): TransferNode[] {
       label: project.name,
       nodeType: "project",
       size: 0,
-      importSelection: { project_key: project.key, type: "project", relative_path: "" },
+      importSelection: {
+        project_key: project.key,
+        type: "project",
+        relative_path: "",
+      },
       children: [],
     };
     const folderNodes = new Map<string, TransferNode>();
@@ -122,7 +135,10 @@ export function collectSubtreeKeys(node: TransferNode, result: string[]): void {
   node.children?.forEach((child) => collectSubtreeKeys(child, result));
 }
 
-export function compactSelection(keys: string[], index: TreeIndex): TransferNode[] {
+export function compactSelection(
+  keys: string[],
+  index: TreeIndex,
+): TransferNode[] {
   const checked = new Set(keys);
   return keys
     .filter((key) => {
@@ -137,7 +153,10 @@ export function compactSelection(keys: string[], index: TreeIndex): TransferNode
     .filter((node): node is TransferNode => Boolean(node));
 }
 
-export function selectionSummary(keys: string[], index: TreeIndex): SelectionSummary {
+export function selectionSummary(
+  keys: string[],
+  index: TreeIndex,
+): SelectionSummary {
   const projects = new Set<string>();
   let folderCount = 0;
   let pdmCount = 0;
@@ -147,9 +166,17 @@ export function selectionSummary(keys: string[], index: TreeIndex): SelectionSum
     if (!node) return;
     const selection = node.exportSelection || node.importSelection;
     if (node.nodeType === "project") {
-      projects.add(node.exportSelection?.project_id || node.importSelection?.project_key || key);
+      projects.add(
+        node.exportSelection?.project_id ||
+          node.importSelection?.project_key ||
+          key,
+      );
     } else if (selection) {
-      projects.add("project_id" in selection ? selection.project_id : selection.project_key);
+      projects.add(
+        "project_id" in selection
+          ? selection.project_id
+          : selection.project_key,
+      );
     }
     if (node.nodeType === "folder") folderCount += 1;
     if (node.nodeType === "pdm") {
@@ -160,7 +187,10 @@ export function selectionSummary(keys: string[], index: TreeIndex): SelectionSum
   return { projectCount: projects.size, folderCount, pdmCount, totalBytes };
 }
 
-export function filterTree(node: TransferNode, query: string): TransferNode | null {
+export function filterTree(
+  node: TransferNode,
+  query: string,
+): TransferNode | null {
   if (!query) return node;
   const children = (node.children || [])
     .map((child) => filterTree(child, query))
@@ -174,13 +204,22 @@ export function filterTree(node: TransferNode, query: string): TransferNode | nu
 export function formatBytes(bytes: number): string {
   if (!bytes) return "0 B";
   const units = ["B", "KB", "MB", "GB"];
-  const order = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const order = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
   const value = bytes / 1024 ** order;
   return `${value >= 10 || order === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[order]}`;
 }
 
-export function formatCreatedAt(value: string): string {
-  if (!value) return "旧版数据目录";
+export function formatCreatedAt(
+  value: string,
+  language: "zh-CN" | "en-US" = "zh-CN",
+): string {
+  if (!value)
+    return language === "en-US" ? "Legacy data directory" : "旧版数据目录";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN", { hour12: false });
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(language, { hour12: false });
 }

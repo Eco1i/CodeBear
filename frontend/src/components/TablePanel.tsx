@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DeleteOutlined, SearchOutlined, SettingOutlined } from "@ant-design/icons";
+import {
+  DeleteOutlined,
+  SearchOutlined,
+  SettingOutlined,
+} from "@ant-design/icons";
 import {
   Button,
   Checkbox,
@@ -13,6 +17,7 @@ import {
   Tooltip,
 } from "antd";
 import type { SearchMode, TableSummary } from "../types";
+import { useI18n } from "../features/preferences/PreferencesProvider";
 import { useGridScrollbarGutter } from "../useGridScrollbarGutter";
 import { HighlightedText } from "./HighlightedText";
 
@@ -67,6 +72,7 @@ export function TablePanel({
   onSmartRankingChange = () => {},
   onClearSearchMemory = () => {},
 }: TablePanelProps) {
+  const { t } = useI18n();
   const [draftMode, setDraftMode] = useState<SearchMode>(mode);
   const [draftQuery, setDraftQuery] = useState(query);
   const [draftAllNodes, setDraftAllNodes] = useState(allNodes);
@@ -90,7 +96,8 @@ export function TablePanel({
 
   useEffect(
     () => () => {
-      if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current);
+      if (scrollFrameRef.current !== null)
+        window.cancelAnimationFrame(scrollFrameRef.current);
     },
     [],
   );
@@ -100,19 +107,23 @@ export function TablePanel({
     const startIndex = Math.max(0, firstVisibleIndex - TABLE_OVERSCAN);
     const endIndex = Math.min(
       total,
-      Math.ceil((scrollTop + TABLE_VIEWPORT_HEIGHT) / TABLE_ROW_HEIGHT) + TABLE_OVERSCAN,
+      Math.ceil((scrollTop + TABLE_VIEWPORT_HEIGHT) / TABLE_ROW_HEIGHT) +
+        TABLE_OVERSCAN,
     );
     return { startIndex, endIndex };
   }, [scrollTop, total]);
 
   const visibleRows = useMemo(
-    () => Array.from(
-      { length: Math.max(0, visibleRange.endIndex - visibleRange.startIndex) },
-      (_, offset) => {
-        const index = visibleRange.startIndex + offset;
-        return { table: tables[index], index };
-      },
-    ),
+    () =>
+      Array.from(
+        {
+          length: Math.max(0, visibleRange.endIndex - visibleRange.startIndex),
+        },
+        (_, offset) => {
+          const index = visibleRange.startIndex + offset;
+          return { table: tables[index], index };
+        },
+      ),
     [tables, visibleRange],
   );
 
@@ -135,25 +146,27 @@ export function TablePanel({
   const tableHighlightQuery = mode === "table" ? query.trim() : "";
   const searchSettings = (
     <div className="table-search-settings">
-      <div className="table-search-settings-title">搜索偏好</div>
+      <div className="table-search-settings-title">
+        {t("table.searchPreferences")}
+      </div>
       <div className="table-search-setting-block">
         <div className="table-search-setting-row">
-          <strong>智能排序</strong>
+          <strong>{t("table.smartRanking")}</strong>
           <Switch
             size="small"
             checked={smartRankingEnabled}
             onChange={onSmartRankingChange}
-            aria-label="启用智能排序"
+            aria-label={t("table.enableSmartRanking")}
           />
         </div>
-        <small>精确匹配优先，最近打开优先</small>
+        <small>{t("table.smartRankingHint")}</small>
       </div>
       <div className="table-search-setting-row table-search-memory-row">
-        <strong>搜索记忆</strong>
+        <strong>{t("table.searchMemory")}</strong>
         <Popconfirm
-          title="确认清除搜索记忆？"
-          okText="确认"
-          cancelText="取消"
+          title={t("table.clearSearchMemoryConfirm")}
+          okText={t("table.confirmClear")}
+          cancelText={t("common.cancel")}
           placement="left"
           arrow={{ pointAtCenter: true }}
           classNames={{ root: "table-search-clear-popconfirm" }}
@@ -162,17 +175,21 @@ export function TablePanel({
           <Button
             danger
             size="small"
+            className="table-search-clear-button"
             icon={<DeleteOutlined />}
             disabled={!hasSearchMemory}
           >
-            清除
+            {t("table.clearSearchMemory")}
           </Button>
         </Popconfirm>
       </div>
     </div>
   );
   const selectedTables = useMemo(
-    () => tables.filter((table): table is TableSummary => Boolean(table && selectedTableIds.has(table.id))),
+    () =>
+      tables.filter((table): table is TableSummary =>
+        Boolean(table && selectedTableIds.has(table.id)),
+      ),
     [selectedTableIds, tables],
   );
 
@@ -184,14 +201,16 @@ export function TablePanel({
         <div className="section-title">
           <span className="section-index">01</span>
           <span>
-            <strong>数据表</strong>
-            <small>在当前节点浏览，选择一行查看字段字典</small>
+            <strong>{t("table.title")}</strong>
+            <small>{t("table.subtitle")}</small>
           </span>
         </div>
         {selectedTableIds.size > 0 ? (
           <div className="table-bulk-controls" aria-live="polite">
-            <span>已选择 <b>{selectedTableIds.size}</b> 张表</span>
-            <Button type="text" disabled={deleting} onClick={onClearSelection}>取消选择</Button>
+            <span>{t("table.selected", { count: selectedTableIds.size })}</span>
+            <Button type="text" disabled={deleting} onClick={onClearSelection}>
+              {t("table.clearSelection")}
+            </Button>
             <Button
               danger
               icon={<DeleteOutlined />}
@@ -199,7 +218,7 @@ export function TablePanel({
               disabled={selectedTables.length !== selectedTableIds.size}
               onClick={() => onDelete(selectedTables)}
             >
-              批量删除
+              {t("table.batchDelete")}
             </Button>
           </div>
         ) : (
@@ -208,33 +227,40 @@ export function TablePanel({
               size="small"
               value={draftMode}
               options={[
-                { label: "搜表", value: "table" },
-                { label: "搜字段", value: "field" },
+                { label: t("table.searchTable"), value: "table" },
+                { label: t("table.searchField"), value: "field" },
               ]}
               onChange={(value) => setDraftMode(value as SearchMode)}
             />
             <Input
               allowClear
-              prefix={(
+              prefix={
                 <button
                   type="button"
                   className="input-search-trigger"
-                  aria-label="搜索数据表"
-                  title="搜索"
+                  aria-label={t("common.search")}
+                  title={t("common.search")}
                   disabled={loading}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={submitSearch}
                 >
                   <SearchOutlined />
                 </button>
-              )}
+              }
               value={draftQuery}
-              placeholder={draftMode === "table" ? "输入表名、描述或注释" : "输入字段名、描述或备注"}
+              placeholder={
+                draftMode === "table"
+                  ? t("table.searchTablePlaceholder")
+                  : t("table.searchFieldPlaceholder")
+              }
               onChange={(event) => setDraftQuery(event.target.value)}
               onPressEnter={submitSearch}
             />
-            <Checkbox checked={draftAllNodes} onChange={(event) => setDraftAllNodes(event.target.checked)}>
-              所有节点
+            <Checkbox
+              checked={draftAllNodes}
+              onChange={(event) => setDraftAllNodes(event.target.checked)}
+            >
+              {t("table.allNodes")}
             </Checkbox>
             <Popover
               content={searchSettings}
@@ -248,8 +274,8 @@ export function TablePanel({
                 type="text"
                 size="small"
                 icon={<SettingOutlined />}
-                aria-label="搜索设置"
-                title="搜索设置"
+                aria-label={t("table.searchSettings")}
+                title={t("table.searchSettings")}
                 className="table-search-settings-trigger"
               />
             </Popover>
@@ -258,16 +284,16 @@ export function TablePanel({
       </header>
       <div ref={gridRef} className="data-grid table-list-grid">
         <div className="data-grid-head table-list-row">
-          <span className="table-selection-cell">选择</span>
+          <span className="table-selection-cell">{t("table.select")}</span>
           <div className="table-grid-columns table-grid-core">
-            <span>序号</span>
-            <span>表名</span>
-            <span>表描述</span>
-            <span>项目名称</span>
-            <span>PDM 文件路径</span>
-            <span>字段数</span>
+            <span>{t("table.index")}</span>
+            <span>{t("table.name")}</span>
+            <span>{t("table.description")}</span>
+            <span>{t("table.projectName")}</span>
+            <span>{t("table.pdmPath")}</span>
+            <span>{t("table.fieldCount")}</span>
           </div>
-          <span className="table-action-cell">操作</span>
+          <span className="table-action-cell">{t("common.actions")}</span>
         </div>
         <div
           ref={scrollBodyRef}
@@ -277,14 +303,14 @@ export function TablePanel({
         >
           {loading && (
             <div className="grid-loading">
-              <Spin size="small" /> 正在读取索引…
+              <Spin size="small" /> {t("table.readingIndex")}
             </div>
           )}
           {!loading && total === 0 && (
             <div className="grid-empty">
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={query ? "没有匹配的数据表" : "当前范围暂无数据表"}
+                description={query ? t("table.noMatch") : t("table.empty")}
               />
             </div>
           )}
@@ -293,7 +319,8 @@ export function TablePanel({
               className="table-virtual-space"
               style={{ height: total * TABLE_ROW_HEIGHT }}
             >
-              {visibleRows.map(({ table, index }) => table ? (
+              {visibleRows.map(({ table, index }) =>
+                table ? (
                   <div
                     className={`data-grid-row table-list-row ${selectedTableId === table.id ? "is-selected" : ""}${selectedTableIds.has(table.id) ? " is-marked" : ""}`}
                     key={table.id}
@@ -304,10 +331,14 @@ export function TablePanel({
                   >
                     <span className="table-selection-cell">
                       <Checkbox
-                        aria-label={`选择数据表 ${table.code || table.name}`}
+                        aria-label={t("table.selectTable", {
+                          name: table.code || table.name || t("table.unnamed"),
+                        })}
                         checked={selectedTableIds.has(table.id)}
                         disabled={deleting}
-                        onChange={(event) => onToggleSelection(table, event.target.checked)}
+                        onChange={(event) =>
+                          onToggleSelection(table, event.target.checked)
+                        }
                       />
                     </span>
                     <button
@@ -315,9 +346,14 @@ export function TablePanel({
                       className="table-row-open table-grid-columns table-grid-core"
                       onClick={() => onSelect(table)}
                     >
-                      <span className="grid-index">{String(index + 1).padStart(2, "0")}</span>
+                      <span className="grid-index">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
                       <span className="code-cell" title={table.code}>
-                        <HighlightedText text={table.code || "—"} query={tableHighlightQuery} />
+                        <HighlightedText
+                          text={table.code || "—"}
+                          query={tableHighlightQuery}
+                        />
                       </span>
                       <span
                         className="table-name-cell"
@@ -330,21 +366,34 @@ export function TablePanel({
                           />
                         </span>
                         {preferredTableIds.has(table.id) ? (
-                          <span className="recent-table-badge">最近打开</span>
+                          <span className="recent-table-badge">
+                            {t("table.recentlyOpened")}
+                          </span>
                         ) : null}
                       </span>
-                      <span title={table.project_name}>{table.project_name}</span>
-                      <span className="path-cell" title={table.relative_path}>{table.relative_path}</span>
+                      <span title={table.project_name}>
+                        {table.project_name}
+                      </span>
+                      <span className="path-cell" title={table.relative_path}>
+                        {table.relative_path}
+                      </span>
                       <span className="number-cell">{table.field_count}</span>
                     </button>
                     <span className="table-action-cell">
-                      <Tooltip title={`删除数据表 ${table.code || table.name}`}>
+                      <Tooltip
+                        title={t("table.deleteTable", {
+                          name: table.code || table.name || t("table.unnamed"),
+                        })}
+                      >
                         <Button
                           type="text"
                           danger
                           size="small"
                           icon={<DeleteOutlined />}
-                          aria-label={`删除数据表 ${table.code || table.name}`}
+                          aria-label={t("table.deleteTable", {
+                            name:
+                              table.code || table.name || t("table.unnamed"),
+                          })}
                           disabled={deleting}
                           onClick={() => onDelete([table])}
                         />
@@ -360,8 +409,10 @@ export function TablePanel({
                   >
                     <span className="table-selection-cell" />
                     <div className="table-grid-columns table-grid-core">
-                      <span className="grid-index">{String(index + 1).padStart(2, "0")}</span>
-                      <span>正在加载…</span>
+                      <span className="grid-index">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <span>{t("table.loading")}</span>
                       <span />
                       <span />
                       <span />
@@ -369,7 +420,8 @@ export function TablePanel({
                     </div>
                     <span className="table-action-cell" />
                   </div>
-                ))}
+                ),
+              )}
             </div>
           )}
         </div>

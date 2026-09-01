@@ -1,12 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type WheelEvent } from "react";
 import { Button, Dropdown } from "antd";
 import type { MenuProps } from "antd";
-import {
-  CloseOutlined,
-  MoreOutlined,
-  TableOutlined,
-} from "@ant-design/icons";
+import { CloseOutlined, MoreOutlined, TableOutlined } from "@ant-design/icons";
 import type { TableTab } from "../types";
+import { useI18n } from "../../preferences/PreferencesProvider";
+
+const WHEEL_DELTA_LINE = 1;
+const WHEEL_DELTA_PAGE = 2;
 
 interface TableTabsProps {
   tabs: TableTab[];
@@ -29,6 +29,7 @@ export function TableTabs({
   onCloseToLeft,
   onCloseToRight,
 }: TableTabsProps) {
+  const { t } = useI18n();
   const activeTabRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -41,10 +42,18 @@ export function TableTabs({
   const getTabMenuItems = (tableId: string): MenuProps["items"] => {
     const index = tabs.findIndex((tab) => tab.id === tableId);
     return [
-      { key: "close-current", label: "关闭当前" },
-      { key: "close-left", label: "关闭左侧", disabled: index <= 0 },
-      { key: "close-right", label: "关闭右侧", disabled: index < 0 || index >= tabs.length - 1 },
-      { key: "close-others", label: "关闭其他", disabled: tabs.length < 2 },
+      { key: "close-current", label: t("table.closeCurrent") },
+      { key: "close-left", label: t("table.closeLeft"), disabled: index <= 0 },
+      {
+        key: "close-right",
+        label: t("table.closeRight"),
+        disabled: index < 0 || index >= tabs.length - 1,
+      },
+      {
+        key: "close-others",
+        label: t("table.closeOthers"),
+        disabled: tabs.length < 2,
+      },
     ];
   };
 
@@ -63,9 +72,37 @@ export function TableTabs({
     if (activeTableId) handleMenuClick(activeTableId, key);
   };
 
+  const handleTabsWheel = (event: WheelEvent<HTMLDivElement>) => {
+    if (event.defaultPrevented) return;
+    const strip = event.currentTarget;
+    const maxScrollLeft = strip.scrollWidth - strip.clientWidth;
+    if (maxScrollLeft <= 0) return;
+
+    const rawDelta =
+      Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX
+        : event.deltaY;
+    if (rawDelta === 0) return;
+
+    const deltaScale =
+      event.deltaMode === WHEEL_DELTA_LINE
+        ? 16
+        : event.deltaMode === WHEEL_DELTA_PAGE
+          ? strip.clientWidth
+          : 1;
+    const nextScrollLeft = Math.max(
+      0,
+      Math.min(maxScrollLeft, strip.scrollLeft + rawDelta * deltaScale),
+    );
+    if (nextScrollLeft === strip.scrollLeft) return;
+
+    event.preventDefault();
+    strip.scrollLeft = nextScrollLeft;
+  };
+
   return (
-    <div className="table-tabs" role="tablist" aria-label="已打开的数据表">
-      <div className="table-tabs-scroll">
+    <div className="table-tabs" role="tablist" aria-label={t("table.openTabs")}>
+      <div className="table-tabs-scroll" onWheel={handleTabsWheel}>
         {tabs.map((tab) => {
           const active = tab.id === activeTableId;
           const dirty = dirtyTableIds.has(tab.id);
@@ -78,6 +115,7 @@ export function TableTabs({
               }}
               trigger={["contextMenu"]}
               placement="bottomLeft"
+              classNames={{ root: "table-tabs-dropdown" }}
             >
               <div className={`table-tab${active ? " is-active" : ""}`}>
                 <button
@@ -86,20 +124,18 @@ export function TableTabs({
                   className="table-tab-main"
                   role="tab"
                   aria-selected={active}
-                  aria-label={`${tab.name || tab.code || "数据表"}${dirty ? "，有未保存修改" : ""}`}
-                  title={`${tab.name || tab.code || "数据表"}${tab.code ? ` · ${tab.code}` : ""}`}
+                  aria-label={`${tab.name || tab.code || t("common.table")}${dirty ? `, ${t("table.unsaved")}` : ""}`}
+                  title={`${tab.name || tab.code || t("common.table")}${tab.code ? ` · ${tab.code}` : ""}`}
                   onClick={() => onSelect(tab.id)}
                   onKeyDown={(event) => {
                     const index = tabs.findIndex((item) => item.id === tab.id);
-                    const nextIndex = event.key === "ArrowRight"
-                      ? (index + 1) % tabs.length
-                      : event.key === "ArrowLeft"
-                        ? (index + tabs.length - 1) % tabs.length
-                        : event.key === "Home"
-                          ? 0
-                          : event.key === "End"
-                            ? tabs.length - 1
-                            : -1;
+                    let nextIndex = -1;
+                    if (event.key === "ArrowRight")
+                      nextIndex = (index + 1) % tabs.length;
+                    else if (event.key === "ArrowLeft")
+                      nextIndex = (index + tabs.length - 1) % tabs.length;
+                    else if (event.key === "Home") nextIndex = 0;
+                    else if (event.key === "End") nextIndex = tabs.length - 1;
                     if (nextIndex >= 0) {
                       event.preventDefault();
                       onSelect(tabs[nextIndex].id);
@@ -107,17 +143,23 @@ export function TableTabs({
                   }}
                 >
                   <TableOutlined />
-                  <span className="table-tab-name">{tab.code || tab.name || "未命名表"}</span>
-                  {dirty ? <span className="table-tab-dirty" aria-hidden="true" /> : null}
+                  <span className="table-tab-name">
+                    {tab.code || tab.name || t("table.unnamed")}
+                  </span>
+                  {dirty ? (
+                    <span className="table-tab-dirty" aria-hidden="true" />
+                  ) : null}
                 </button>
-                <Button
-                  type="text"
-                  size="small"
+                <button
+                  type="button"
                   className="table-tab-close"
-                  icon={<CloseOutlined />}
-                  aria-label={`关闭 ${tab.name || tab.code || "数据表"}`}
+                  aria-label={t("table.close", {
+                    name: tab.name || tab.code || t("common.table"),
+                  })}
                   onClick={() => onClose(tab.id)}
-                />
+                >
+                  <CloseOutlined />
+                </button>
               </div>
             </Dropdown>
           );
@@ -128,14 +170,15 @@ export function TableTabs({
           menu={{ items: activeMenuItems, onClick: handleActiveMenuClick }}
           trigger={["click"]}
           placement="bottomRight"
+          classNames={{ root: "table-tabs-dropdown" }}
         >
           <Button
             type="text"
             size="small"
             className="table-tab-action"
             icon={<MoreOutlined />}
-            aria-label="标签页菜单"
-            title="标签页菜单"
+            aria-label={t("table.tabMenu")}
+            title={t("table.tabMenu")}
           />
         </Dropdown>
       </div>

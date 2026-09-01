@@ -21,7 +21,6 @@ import {
   Segmented,
   Spin,
   Tabs,
-  Tag,
   Tree,
 } from "antd";
 import { backupApi } from "../features/backup/api";
@@ -50,7 +49,14 @@ import type {
   BackupInspection,
   WorkspaceNode,
 } from "../types";
-import { FolderGlyph, PdmGlyph, ProjectGlyph, TreeChevronGlyph } from "./PrototypeGlyphs";
+import { useI18n } from "../features/preferences/PreferencesProvider";
+import { DraggableModal } from "./DraggableModal";
+import {
+  FolderGlyph,
+  PdmGlyph,
+  ProjectGlyph,
+  TreeChevronGlyph,
+} from "./PrototypeGlyphs";
 
 interface BackupMigrationModalProps {
   open: boolean;
@@ -75,18 +81,43 @@ function nodeTitle(node: TransferNode) {
     <span className="backup-node-title" title={node.label}>
       {icon}
       <span>{node.label}</span>
-      {node.nodeType === "pdm" && node.size > 0 && <small>{formatBytes(node.size)}</small>}
+      {node.nodeType === "pdm" && node.size > 0 && (
+        <small>{formatBytes(node.size)}</small>
+      )}
     </span>
   );
 }
 
-function SelectionReceipt({ summary }: { summary: SelectionSummary }) {
+type Translate = (
+  key: string,
+  params?: Record<string, string | number>,
+) => string;
+
+function SelectionReceipt({
+  summary,
+  t,
+}: {
+  summary: SelectionSummary;
+  t: Translate;
+}) {
   return (
     <div className="backup-receipt">
-      <span><b>{summary.projectCount}</b><small>项目</small></span>
-      <span><b>{summary.folderCount}</b><small>文件夹</small></span>
-      <span><b>{summary.pdmCount}</b><small>PDM</small></span>
-      <span><b>{formatBytes(summary.totalBytes)}</b><small>文件总量</small></span>
+      <span>
+        <b>{summary.projectCount}</b>
+        <small>{t("common.project")}</small>
+      </span>
+      <span>
+        <b>{summary.folderCount}</b>
+        <small>{t("common.folder")}</small>
+      </span>
+      <span>
+        <b>{summary.pdmCount}</b>
+        <small>{t("common.pdm")}</small>
+      </span>
+      <span>
+        <b>{formatBytes(summary.totalBytes)}</b>
+        <small>{t("backup.totalFileSize")}</small>
+      </span>
     </div>
   );
 }
@@ -101,13 +132,15 @@ export function BackupMigrationModal({
   onImported,
 }: BackupMigrationModalProps) {
   const { message, modal } = AntApp.useApp();
+  const { t, language, errorText } = useI18n();
   const [activeTab, setActiveTab] = useState("export");
   const [exportQuery, setExportQuery] = useState("");
   const [exportCheckedKeys, setExportCheckedKeys] = useState<string[]>([]);
   const [exportExpandedKeys, setExportExpandedKeys] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
   const [includeDictionaries, setIncludeDictionaries] = useState(true);
-  const [includeDictionaryBindings, setIncludeDictionaryBindings] = useState(true);
+  const [includeDictionaryBindings, setIncludeDictionaryBindings] =
+    useState(true);
   const [includeRelations, setIncludeRelations] = useState(true);
   const [importSource, setImportSource] = useState<ImportSource>("archive");
   const [legacyPath, setLegacyPath] = useState("");
@@ -115,7 +148,8 @@ export function BackupMigrationModal({
   const [importQuery, setImportQuery] = useState("");
   const [importCheckedKeys, setImportCheckedKeys] = useState<string[]>([]);
   const [importExpandedKeys, setImportExpandedKeys] = useState<string[]>([]);
-  const [conflictPolicy, setConflictPolicy] = useState<ConflictPolicy>("rename");
+  const [conflictPolicy, setConflictPolicy] =
+    useState<ConflictPolicy>("rename");
   const [inspecting, setInspecting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
@@ -142,7 +176,10 @@ export function BackupMigrationModal({
     [exportCheckedKeys, exportIndex],
   );
 
-  const importTree = useMemo(() => (inspection ? backupTree(inspection) : []), [inspection]);
+  const importTree = useMemo(
+    () => (inspection ? backupTree(inspection) : []),
+    [inspection],
+  );
   const importIndex = useMemo(() => buildTreeIndex(importTree), [importTree]);
   const visibleImportTree = useMemo(() => {
     const query = importQuery.trim().toLocaleLowerCase();
@@ -157,7 +194,9 @@ export function BackupMigrationModal({
 
   useEffect(() => {
     if (!open || !exportIndex.keys.length) return;
-    const selected = selectedNode ? exportIndex.nodes.get(selectedNode.id) : undefined;
+    const selected = selectedNode
+      ? exportIndex.nodes.get(selectedNode.id)
+      : undefined;
     const initial: string[] = [];
     collectSubtreeKeys(selected || exportTree[0], initial);
     setExportCheckedKeys(initial);
@@ -169,7 +208,9 @@ export function BackupMigrationModal({
       return;
     }
     const expanded = new Set(exportTree.map((node) => node.key));
-    let parent = selectedNode ? exportIndex.parents.get(selectedNode.id) : undefined;
+    let parent = selectedNode
+      ? exportIndex.parents.get(selectedNode.id)
+      : undefined;
     while (parent) {
       expanded.add(parent);
       parent = exportIndex.parents.get(parent);
@@ -186,11 +227,14 @@ export function BackupMigrationModal({
     }
   }, [importIndex, importTree, inspection]);
 
-  useEffect(() => () => {
-    if (importProgressTimerRef.current !== null) {
-      window.clearInterval(importProgressTimerRef.current);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (importProgressTimerRef.current !== null) {
+        window.clearInterval(importProgressTimerRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!importing) return undefined;
@@ -199,7 +243,8 @@ export function BackupMigrationModal({
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", confirmBeforeLeaving);
-    return () => window.removeEventListener("beforeunload", confirmBeforeLeaving);
+    return () =>
+      window.removeEventListener("beforeunload", confirmBeforeLeaving);
   }, [importing]);
 
   const stopImportProgressTimer = () => {
@@ -212,14 +257,15 @@ export function BackupMigrationModal({
     stopImportProgressTimer();
     setImportProgress(6);
     importProgressTimerRef.current = window.setInterval(() => {
-      setImportProgress((current) => (
-        Math.min(92, current + Math.max(0.7, (92 - current) * 0.075))
-      ));
+      setImportProgress((current) =>
+        Math.min(92, current + Math.max(0.7, (92 - current) * 0.075)),
+      );
     }, 180);
   };
 
   const discardInspection = (current = inspection) => {
-    if (current?.token) void backupApi.discard(current.token).catch(() => undefined);
+    if (current?.token)
+      void backupApi.discard(current.token).catch(() => undefined);
     setInspection(null);
     setImportCheckedKeys([]);
     setImportExpandedKeys([]);
@@ -237,14 +283,15 @@ export function BackupMigrationModal({
       .map((node) => node.exportSelection)
       .filter((node): node is BackupExportNode => Boolean(node));
     if (!nodes.length) {
-      message.warning("请至少选择一个待导出节点");
+      message.warning(t("backup.selectExportRequired"));
       return;
     }
     setExporting(true);
     try {
       const result = await backupApi.export(nodes, {
         includeDictionaries,
-        includeDictionaryBindings: includeDictionaries && includeDictionaryBindings,
+        includeDictionaryBindings:
+          includeDictionaries && includeDictionaryBindings,
         includeRelations,
       });
       const url = URL.createObjectURL(result.blob);
@@ -255,9 +302,9 @@ export function BackupMigrationModal({
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      message.success(`备份已生成：${result.fileName}`);
+      message.success(t("backup.generated", { file: result.fileName }));
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "导出备份失败");
+      message.error(errorText(error, "backup.exportFailed"));
     } finally {
       setExporting(false);
     }
@@ -265,17 +312,18 @@ export function BackupMigrationModal({
 
   const inspectArchive = async (file: File) => {
     if (file.size > 2 * 1024 * 1024 * 1024) {
-      message.error("备份包不能超过 2 GB");
+      message.error(t("backup.tooLarge"));
       return;
     }
     setInspecting(true);
     const previous = inspection;
     try {
       const result = await backupApi.inspect(file);
-      if (previous) void backupApi.discard(previous.token).catch(() => undefined);
+      if (previous)
+        void backupApi.discard(previous.token).catch(() => undefined);
       setInspection(result);
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "无法读取备份包");
+      message.error(errorText(error, "backup.readArchiveFailed"));
     } finally {
       setInspecting(false);
     }
@@ -283,17 +331,18 @@ export function BackupMigrationModal({
 
   const inspectLegacy = async () => {
     if (!legacyPath.trim()) {
-      message.warning("请输入旧版码熊的 data 目录路径");
+      message.warning(t("backup.enterLegacyPath"));
       return;
     }
     setInspecting(true);
     const previous = inspection;
     try {
       const result = await backupApi.inspectLegacy(legacyPath.trim());
-      if (previous) void backupApi.discard(previous.token).catch(() => undefined);
+      if (previous)
+        void backupApi.discard(previous.token).catch(() => undefined);
       setInspection(result);
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "无法读取旧版 data 目录");
+      message.error(errorText(error, "backup.readLegacyFailed"));
     } finally {
       setInspecting(false);
     }
@@ -305,27 +354,35 @@ export function BackupMigrationModal({
       .map((node) => node.importSelection)
       .filter((node): node is BackupImportNode => Boolean(node));
     if (!nodes.length) {
-      message.warning("请至少选择一个待导入节点");
+      message.warning(t("backup.selectImportRequired"));
       return;
     }
     setImporting(true);
     startImportProgress();
     try {
-      const result = await backupApi.import(inspection.token, nodes, conflictPolicy);
+      const result = await backupApi.import(
+        inspection.token,
+        nodes,
+        conflictPolicy,
+      );
       stopImportProgressTimer();
       setImportProgress(100);
       await new Promise((resolve) => window.setTimeout(resolve, 420));
       await backupApi.discard(inspection.token).catch(() => undefined);
       await onImported(result);
-      const suffix = result.parse_errors.length ? `，${result.parse_errors.length} 个 PDM 解析失败` : "";
-      message.success(`已导入 ${result.imported.length} 个 PDM${suffix}`);
+      const suffix = result.parse_errors.length
+        ? t("backup.partialPdmFailure", { count: result.parse_errors.length })
+        : "";
+      message.success(
+        t("backup.imported", { count: result.imported.length, suffix }),
+      );
       setInspection(null);
       setImportCheckedKeys([]);
       onClose();
     } catch (error) {
       stopImportProgressTimer();
       setImportProgress(0);
-      message.error(error instanceof Error ? error.message : "导入失败");
+      message.error(errorText(error, "backup.importFailed"));
     } finally {
       stopImportProgressTimer();
       setImporting(false);
@@ -339,10 +396,10 @@ export function BackupMigrationModal({
         return;
       }
       modal.confirm({
-        title: "确认覆盖同路径 PDM？",
-        content: "码熊会先保存内部备份，但当前工作区中的同路径 PDM 将被备份包版本替换。",
-        okText: "确认覆盖并导入",
-        cancelText: "取消",
+        title: t("backup.confirmOverwriteTitle"),
+        content: t("backup.confirmOverwriteContent"),
+        okText: t("backup.confirmOverwrite"),
+        cancelText: t("common.cancel"),
         okButtonProps: { danger: true },
         onOk: performImport,
       });
@@ -353,17 +410,32 @@ export function BackupMigrationModal({
     <div className="backup-layout">
       <section className="backup-tree-pane">
         <div className="backup-pane-heading">
-          <span><b>选择导出范围</b><small>可勾选项目、文件夹或单个 PDM</small></span>
+          <span>
+            <b>{t("backup.exportScope")}</b>
+            <small>{t("backup.exportScopeHint")}</small>
+          </span>
           <span className="backup-mini-actions">
-            <Button type="link" size="small" onClick={() => setExportCheckedKeys(exportIndex.keys)}>全选</Button>
-            <Button type="link" size="small" onClick={() => setExportCheckedKeys([])}>清空</Button>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => setExportCheckedKeys(exportIndex.keys)}
+            >
+              {t("backup.selectAll")}
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => setExportCheckedKeys([])}
+            >
+              {t("backup.clear")}
+            </Button>
           </span>
         </div>
         <Input.Search
           allowClear
           value={exportQuery}
           onChange={(event) => setExportQuery(event.target.value)}
-          placeholder="筛选项目、文件夹或 PDM"
+          placeholder={t("backup.filterNodes")}
           className="backup-tree-search"
         />
         <div className="backup-tree-scroll">
@@ -374,7 +446,9 @@ export function BackupMigrationModal({
               selectable={false}
               motion={null}
               showLine={{ showLeafIcon: false }}
-              switcherIcon={(props) => <TreeChevronGlyph expanded={Boolean(props.expanded)} />}
+              switcherIcon={(props) => (
+                <TreeChevronGlyph expanded={Boolean(props.expanded)} />
+              )}
               treeData={visibleExportTree}
               titleRender={(data) => nodeTitle(data as TransferNode)}
               checkedKeys={exportCheckedKeys}
@@ -382,43 +456,70 @@ export function BackupMigrationModal({
               onExpand={(keys) => {
                 if (!exportQuery) setExportExpandedKeys(keys.map(String));
               }}
-              onCheck={(keys) => setExportCheckedKeys((Array.isArray(keys) ? keys : keys.checked).map(String))}
+              onCheck={(keys) =>
+                setExportCheckedKeys(
+                  (Array.isArray(keys) ? keys : keys.checked).map(String),
+                )
+              }
             />
           ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的节点" />
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={t("backup.noMatchingNodes")}
+            />
           )}
         </div>
       </section>
       <aside className="backup-summary-pane">
-        <span className="backup-summary-icon"><SafetyCertificateOutlined /></span>
-        <h3>生成可迁移备份</h3>
-        <p>保留所选目录结构和原始 PDM。数据库索引不打包，导入后由码熊重新建立，体积更小也更可靠。</p>
-        <SelectionReceipt summary={exportSummary} />
+        <span className="backup-summary-icon">
+          <SafetyCertificateOutlined />
+        </span>
+        <h3>{t("backup.generateTitle")}</h3>
+        <p>{t("backup.generateDescription")}</p>
+        <SelectionReceipt summary={exportSummary} t={t} />
         <div className="backup-note-list">
-          <span><CheckCircleOutlined /> 包含空文件夹和所选 PDM</span>
-          <span><CheckCircleOutlined /> 每个文件写入 SHA-256 校验值</span>
-          <span><CheckCircleOutlined /> 不包含缓存、回收站和本机设置</span>
+          <span>
+            <CheckCircleOutlined /> {t("backup.includesFiles")}
+          </span>
+          <span>
+            <CheckCircleOutlined /> {t("backup.includesHashes")}
+          </span>
+          <span>
+            <CheckCircleOutlined /> {t("backup.excludesLocal")}
+          </span>
         </div>
         <div className="backup-dictionary-options">
-          <Checkbox checked={includeDictionaries} onChange={(event) => {
-            setIncludeDictionaries(event.target.checked);
-            if (!event.target.checked) setIncludeDictionaryBindings(false);
-          }}>
-            导出字典数据
+          <Checkbox
+            checked={includeDictionaries}
+            onChange={(event) => {
+              setIncludeDictionaries(event.target.checked);
+              if (!event.target.checked) setIncludeDictionaryBindings(false);
+            }}
+          >
+            {t("backup.exportDictionaries")}
           </Checkbox>
           <Checkbox
             checked={includeDictionaries && includeDictionaryBindings}
             disabled={!includeDictionaries}
-            onChange={(event) => setIncludeDictionaryBindings(event.target.checked)}
+            onChange={(event) =>
+              setIncludeDictionaryBindings(event.target.checked)
+            }
           >
-            导出字段绑定信息
+            {t("backup.exportBindings")}
           </Checkbox>
-          <Checkbox checked={includeRelations} onChange={(event) => setIncludeRelations(event.target.checked)}>
-            导出手工维护的表关系
+          <Checkbox
+            checked={includeRelations}
+            onChange={(event) => setIncludeRelations(event.target.checked)}
+          >
+            {t("backup.exportRelations")}
           </Checkbox>
         </div>
         {hasUnsavedChanges && (
-          <Alert type="warning" showIcon message="请先保存或放弃当前字段修改，再导出备份。" />
+          <Alert
+            type="warning"
+            showIcon
+            message={t("backup.saveBeforeExport")}
+          />
         )}
         <Button
           type="primary"
@@ -429,7 +530,7 @@ export function BackupMigrationModal({
           disabled={!exportCheckedKeys.length || hasUnsavedChanges}
           onClick={() => void exportSelected()}
         >
-          导出 .cbbak 备份包
+          {t("backup.exportPackage")}
         </Button>
       </aside>
     </div>
@@ -447,8 +548,16 @@ export function BackupMigrationModal({
               setImportSource(value);
             }}
             options={[
-              { label: "备份包", value: "archive", icon: <FileZipOutlined /> },
-              { label: "旧版 data 目录", value: "legacy", icon: <FolderOpenOutlined /> },
+              {
+                label: t("backup.archive"),
+                value: "archive",
+                icon: <FileZipOutlined />,
+              },
+              {
+                label: t("backup.legacy"),
+                value: "legacy",
+                icon: <FolderOpenOutlined />,
+              },
             ]}
           />
           {importSource === "archive" ? (
@@ -458,7 +567,7 @@ export function BackupMigrationModal({
               disabled={importing}
               onClick={() => backupInputRef.current?.click()}
             >
-              选择 .cbbak
+              {t("backup.chooseArchive")}
             </Button>
           ) : null}
         </div>
@@ -469,7 +578,7 @@ export function BackupMigrationModal({
               disabled={inspecting || importing}
               onChange={(event) => setLegacyPath(event.target.value)}
               onPressEnter={() => void inspectLegacy()}
-              placeholder="输入旧版本 data 目录的完整路径"
+              placeholder={t("backup.legacyPath")}
             />
             <Button
               type="primary"
@@ -477,31 +586,49 @@ export function BackupMigrationModal({
               disabled={importing}
               onClick={() => void inspectLegacy()}
             >
-              读取目录
+              {t("backup.readDirectory")}
             </Button>
           </div>
         )}
         {inspection && (
           <>
             <div className="backup-pane-heading backup-import-heading">
-              <span><b>选择导入范围</b><small>{inspection.file_name}</small></span>
+              <span>
+                <b>{t("backup.importScope")}</b>
+                <small>{inspection.file_name}</small>
+              </span>
               <span className="backup-mini-actions">
-                <Button type="link" size="small" onClick={() => setImportCheckedKeys(importIndex.keys)}>全选</Button>
-                <Button type="link" size="small" onClick={() => setImportCheckedKeys([])}>清空</Button>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => setImportCheckedKeys(importIndex.keys)}
+                >
+                  {t("backup.selectAll")}
+                </Button>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => setImportCheckedKeys([])}
+                >
+                  {t("backup.clear")}
+                </Button>
               </span>
             </div>
             <Input.Search
               allowClear
               value={importQuery}
               onChange={(event) => setImportQuery(event.target.value)}
-              placeholder="筛选备份中的节点"
+              placeholder={t("backup.filterNodesInArchive")}
               className="backup-tree-search"
             />
           </>
         )}
         <div className="backup-tree-scroll">
           {inspecting ? (
-            <div className="backup-inspecting"><Spin /><span>正在读取并校验内容…</span></div>
+            <div className="backup-inspecting">
+              <Spin />
+              <span>{t("backup.inspecting")}</span>
+            </div>
           ) : inspection ? (
             <Tree
               checkable
@@ -509,7 +636,9 @@ export function BackupMigrationModal({
               selectable={false}
               motion={null}
               showLine={{ showLeafIcon: false }}
-              switcherIcon={(props) => <TreeChevronGlyph expanded={Boolean(props.expanded)} />}
+              switcherIcon={(props) => (
+                <TreeChevronGlyph expanded={Boolean(props.expanded)} />
+              )}
               treeData={visibleImportTree}
               titleRender={(data) => nodeTitle(data as TransferNode)}
               checkedKeys={importCheckedKeys}
@@ -517,16 +646,28 @@ export function BackupMigrationModal({
               onExpand={(keys) => {
                 if (!importQuery) setImportExpandedKeys(keys.map(String));
               }}
-              onCheck={(keys) => setImportCheckedKeys((Array.isArray(keys) ? keys : keys.checked).map(String))}
+              onCheck={(keys) =>
+                setImportCheckedKeys(
+                  (Array.isArray(keys) ? keys : keys.checked).map(String),
+                )
+              }
             />
           ) : (
             <div className="backup-source-empty">
-              {importSource === "archive" ? <FileZipOutlined /> : <FolderOpenOutlined />}
-              <strong>{importSource === "archive" ? "选择码熊备份包" : "读取旧版 data 目录"}</strong>
+              {importSource === "archive" ? (
+                <FileZipOutlined />
+              ) : (
+                <FolderOpenOutlined />
+              )}
+              <strong>
+                {importSource === "archive"
+                  ? t("backup.chooseArchiveTitle")
+                  : t("backup.chooseLegacyTitle")}
+              </strong>
               <span>
                 {importSource === "archive"
-                  ? "校验通过后，才能选择要导入的项目和节点。"
-                  : "适用于没有导出功能的旧版绿色程序。原目录不会被修改。"}
+                  ? t("backup.archiveHint")
+                  : t("backup.legacyHint")}
               </span>
             </div>
           )}
@@ -535,56 +676,79 @@ export function BackupMigrationModal({
       <aside className="backup-summary-pane">
         {inspection ? (
           <>
-            <span className="backup-summary-icon is-import"><ImportOutlined /></span>
-            <h3>确认迁移内容</h3>
+            <span className="backup-summary-icon is-import">
+              <ImportOutlined />
+            </span>
+            <h3>{t("backup.confirmTitle")}</h3>
             <div className="backup-source-meta">
-              <span><small>来源版本</small><b>{inspection.app_version || "未知"}</b></span>
-              <span><small>创建时间</small><b>{formatCreatedAt(inspection.created_at)}</b></span>
+              <span>
+                <small>{t("backup.sourceVersion")}</small>
+                <b>{inspection.app_version || t("backup.unknown")}</b>
+              </span>
+              <span>
+                <small>{t("backup.createdAt")}</small>
+                <b>{formatCreatedAt(inspection.created_at, language)}</b>
+              </span>
             </div>
-            <SelectionReceipt summary={importSummary} />
-            {(inspection.stats.dictionary_count || inspection.stats.binding_count) ? (
+            <SelectionReceipt summary={importSummary} t={t} />
+            {inspection.stats.dictionary_count ||
+            inspection.stats.binding_count ? (
               <div className="backup-dictionary-receipt">
                 <BookOutlined />
-                <span><b>{inspection.stats.dictionary_count || 0} 套字典</b><small>{inspection.stats.binding_count || 0} 条字段绑定将自动恢复</small></span>
+                <span>
+                  <b>
+                    {t("backup.dictionarySummary", {
+                      count: inspection.stats.dictionary_count || 0,
+                    })}
+                  </b>
+                  <small>
+                    {t("backup.bindingRestoreSummary", {
+                      count: inspection.stats.binding_count || 0,
+                    })}
+                  </small>
+                </span>
               </div>
             ) : null}
             <div className="backup-policy">
-              <label>同路径 PDM 已存在时</label>
+              <label>{t("backup.conflictWhenExists")}</label>
               <Radio.Group
                 value={conflictPolicy}
-                onChange={(event) => setConflictPolicy(event.target.value as ConflictPolicy)}
+                onChange={(event) =>
+                  setConflictPolicy(event.target.value as ConflictPolicy)
+                }
                 optionType="button"
                 buttonStyle="solid"
                 options={[
-                  { label: "自动改名", value: "rename" },
-                  { label: "跳过", value: "skip" },
-                  { label: "覆盖", value: "overwrite" },
+                  { label: t("backup.rename"), value: "rename" },
+                  { label: t("backup.skip"), value: "skip" },
+                  { label: t("backup.overwrite"), value: "overwrite" },
                 ]}
               />
               <small>
                 {conflictPolicy === "rename"
-                  ? "保留现有文件，新文件自动添加“(导入)”后缀。"
+                  ? t("backup.renameHint")
                   : conflictPolicy === "skip"
-                    ? "保留现有文件，仅导入没有冲突的内容。"
-                    : "用备份内容替换现有 PDM，操作前会再次确认。"}
+                    ? t("backup.skipHint")
+                    : t("backup.overwriteHint")}
               </small>
             </div>
-            <Alert
-              type="info"
-              showIcon
-              message="导入只写入当前程序工作区，备份包和旧版 data 均不会被修改。"
-            />
+            <Alert type="info" showIcon message={t("backup.importInfo")} />
             {importing ? (
               <div
                 className="backup-import-progress"
                 role="progressbar"
-                aria-label="备份导入进度"
+                aria-label={t("backup.importProgress")}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(importProgress)}
-                aria-valuetext={`已导入 ${Math.round(importProgress)}%`}
+                aria-valuetext={t("backup.importedPercent", {
+                  percent: Math.round(importProgress),
+                })}
               >
-                <div className="backup-import-progress-track" aria-hidden="true">
+                <div
+                  className="backup-import-progress-track"
+                  aria-hidden="true"
+                >
                   <span style={{ width: `${importProgress}%` }} />
                 </div>
                 <b>{Math.round(importProgress)}%</b>
@@ -598,19 +762,27 @@ export function BackupMigrationModal({
                 disabled={!importCheckedKeys.length}
                 onClick={requestImport}
               >
-                开始导入所选节点
+                {t("backup.startImport")}
               </Button>
             )}
           </>
         ) : (
           <>
-            <span className="backup-summary-icon is-muted"><SafetyCertificateOutlined /></span>
-            <h3>先检查，再写入</h3>
-            <p>码熊会验证备份格式、路径边界、文件大小和校验值。检查阶段不会改动当前工作区。</p>
+            <span className="backup-summary-icon is-muted">
+              <SafetyCertificateOutlined />
+            </span>
+            <h3>{t("backup.checkFirstTitle")}</h3>
+            <p>{t("backup.checkFirstDescription")}</p>
             <div className="backup-note-list">
-              <span><CheckCircleOutlined /> 支持按项目、目录、PDM 选择</span>
-              <span><CheckCircleOutlined /> 支持旧版绿色程序 data 迁移</span>
-              <span><CheckCircleOutlined /> 冲突处理由你决定</span>
+              <span>
+                <CheckCircleOutlined /> {t("backup.supportSelection")}
+              </span>
+              <span>
+                <CheckCircleOutlined /> {t("backup.supportLegacy")}
+              </span>
+              <span>
+                <CheckCircleOutlined /> {t("backup.chooseConflict")}
+              </span>
             </div>
           </>
         )}
@@ -619,9 +791,13 @@ export function BackupMigrationModal({
   );
 
   return (
-    <Modal
+    <DraggableModal
       open={open}
-      title={<span className="backup-modal-title"><SafetyCertificateOutlined /> 备份与迁移</span>}
+      title={
+        <span className="backup-modal-title">
+          <SafetyCertificateOutlined /> {t("backup.modalTitle")}
+        </span>
+      }
       width={1040}
       footer={null}
       closable={!exporting && !inspecting && !importing}
@@ -645,10 +821,26 @@ export function BackupMigrationModal({
         activeKey={activeTab}
         onChange={setActiveTab}
         items={[
-          { key: "export", label: <span><DownloadOutlined /> 导出备份</span>, children: exportPanel },
-          { key: "import", label: <span><ImportOutlined /> 导入 / 迁移</span>, children: importPanel },
+          {
+            key: "export",
+            label: (
+              <span>
+                <DownloadOutlined /> {t("backup.modalExport")}
+              </span>
+            ),
+            children: exportPanel,
+          },
+          {
+            key: "import",
+            label: (
+              <span>
+                <ImportOutlined /> {t("backup.modalImport")}
+              </span>
+            ),
+            children: importPanel,
+          },
         ]}
       />
-    </Modal>
+    </DraggableModal>
   );
 }
