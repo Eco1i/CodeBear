@@ -50,6 +50,11 @@ import type {
   WorkspaceNode,
 } from "../types";
 import { useI18n } from "../features/preferences/PreferencesProvider";
+import {
+  chooseSaveFileTarget,
+  downloadBlob,
+  isSaveDialogCancellation,
+} from "../shared/fileDownload";
 import { DraggableModal } from "./DraggableModal";
 import {
   FolderGlyph,
@@ -86,6 +91,14 @@ function nodeTitle(node: TransferNode) {
       )}
     </span>
   );
+}
+
+function suggestedBackupFileName(now = new Date()) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const timestamp =
+    [now.getFullYear(), pad(now.getMonth() + 1), pad(now.getDate())].join("") +
+    `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return `CodeBear-Backup-${timestamp}.cbbak`;
 }
 
 type Translate = (
@@ -288,23 +301,30 @@ export function BackupMigrationModal({
     }
     setExporting(true);
     try {
+      // Open the picker before the export request so the browser still has the
+      // user activation required by the File System Access API.
+      const saveTarget = await chooseSaveFileTarget(suggestedBackupFileName(), {
+        description: "码熊备份包",
+        mimeType: "application/octet-stream",
+        extension: ".cbbak",
+      });
       const result = await backupApi.export(nodes, {
         includeDictionaries,
         includeDictionaryBindings:
           includeDictionaries && includeDictionaryBindings,
         includeRelations,
       });
-      const url = URL.createObjectURL(result.blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = result.fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      message.success(t("backup.generated", { file: result.fileName }));
+      if (saveTarget) {
+        await saveTarget.write(result.blob);
+        message.success(t("backup.saved", { file: saveTarget.fileName }));
+      } else {
+        downloadBlob(result.blob, result.fileName);
+        message.success(t("backup.downloaded", { file: result.fileName }));
+      }
     } catch (error) {
-      message.error(errorText(error, "backup.exportFailed"));
+      if (!isSaveDialogCancellation(error)) {
+        message.error(errorText(error, "backup.exportFailed"));
+      }
     } finally {
       setExporting(false);
     }

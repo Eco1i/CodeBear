@@ -66,7 +66,10 @@ export function PreferencesPopover({ children }: PreferencesPopoverProps) {
       trigger="click"
       placement="bottomLeft"
       arrow={{ pointAtCenter: true }}
-      classNames={{ root: "preferences-popover" }}
+      classNames={{
+        root: "preferences-popover",
+        arrow: "preferences-popover-arrow",
+      }}
     >
       {children || (
         <Button

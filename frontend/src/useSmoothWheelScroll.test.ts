@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { nextRowBoundary, normalizeWheelDelta } from "./useSmoothWheelScroll";
+import {
+  nextRowBoundary,
+  normalizeWheelDelta,
+  shouldUseNativeWheel,
+} from "./useSmoothWheelScroll";
 
 describe("normalizeWheelDelta", () => {
   it("maps any large mouse-wheel event to one row", () => {
@@ -13,6 +17,19 @@ describe("normalizeWheelDelta", () => {
 
   it("keeps small high-resolution deltas precise", () => {
     expect(normalizeWheelDelta(8, 0, 192)).toBe(8);
+  });
+});
+
+describe("shouldUseNativeWheel", () => {
+  it("leaves small pixel-mode deltas to native scrolling", () => {
+    expect(shouldUseNativeWheel(0, 8, 0)).toBe(true);
+    expect(shouldUseNativeWheel(-12.5, 0, 0)).toBe(true);
+  });
+
+  it("keeps discrete and large wheel events on the custom path", () => {
+    expect(shouldUseNativeWheel(0, 50, 0)).toBe(false);
+    expect(shouldUseNativeWheel(0, 120, 0)).toBe(false);
+    expect(shouldUseNativeWheel(0, 8, 1)).toBe(false);
   });
 });
 
@@ -34,7 +51,7 @@ describe("nextRowBoundary", () => {
     expect(nextRowBoundary(63.75, -32, 32, 320)).toBe(32);
   });
 
-  it("never stops on a partial final row", () => {
-    expect(nextRowBoundary(288, 32, 32, 319)).toBe(288);
+  it("uses the native lower edge so the final row is fully visible", () => {
+    expect(nextRowBoundary(288, 32, 32, 319)).toBe(319);
   });
 });

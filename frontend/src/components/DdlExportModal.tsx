@@ -27,6 +27,11 @@ import {
 
 import { ddlApi } from "../features/ddl/api";
 import { useI18n } from "../features/preferences/PreferencesProvider";
+import {
+  chooseSaveFileTarget,
+  downloadBlob,
+  isSaveDialogCancellation,
+} from "../shared/fileDownload";
 import { DraggableModal } from "./DraggableModal";
 import {
   cacheCatalogTables,
@@ -795,7 +800,7 @@ export function DdlExportModal({
     }
   };
 
-  const downloadScript = () => {
+  const downloadScript = async () => {
     const script = getCurrentScript();
     if (!script || !project) return;
     const fileName =
@@ -803,17 +808,25 @@ export function DdlExportModal({
         `${project.name}_${databaseLabel(config.database, result?.database_label || currentDatabase?.label, language)}_${result?.version || config.version}`,
         language,
       ) + (result?.extension || ".sql");
-    const url = URL.createObjectURL(
-      new Blob([script], { type: "text/sql;charset=utf-8" }),
-    );
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    message.success(t("ddl.downloaded", { file: fileName }));
+    const blob = new Blob([script], { type: "text/sql;charset=utf-8" });
+    try {
+      const saveTarget = await chooseSaveFileTarget(fileName, {
+        description: "SQL 建表脚本",
+        mimeType: "text/sql",
+        extension: result?.extension || ".sql",
+      });
+      if (saveTarget) {
+        await saveTarget.write(blob);
+        message.success(t("ddl.saved", { file: saveTarget.fileName }));
+      } else {
+        downloadBlob(blob, fileName);
+        message.success(t("ddl.downloaded", { file: fileName }));
+      }
+    } catch (error) {
+      if (!isSaveDialogCancellation(error)) {
+        message.error(errorText(error, "ddl.downloadFailed"));
+      }
+    }
   };
 
   const closeModal = () => {

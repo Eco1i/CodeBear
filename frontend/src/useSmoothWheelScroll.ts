@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 
+const WHEEL_DELTA_PIXEL = 0;
 const WHEEL_DELTA_LINE = 1;
 const WHEEL_DELTA_PAGE = 2;
 const MOUSE_WHEEL_THRESHOLD = 50;
+const NATIVE_WHEEL_GESTURE_MS = 120;
 const DEFAULT_WHEEL_STEP = 32;
 const MAX_ROW_BOUNDARY_TOLERANCE = 2;
 const OBSERVED_POSITION_EPSILON = 0.01;
@@ -186,6 +188,23 @@ export function normalizeWheelDelta(
     : rawDelta;
 }
 
+/**
+ * Keeps high-resolution pixel scrolling on the browser's native path. Trackpads
+ * emit small, frequent deltas and rely on compositor scrolling for momentum;
+ * routing those events through the row animation makes them visibly lag.
+ */
+export function shouldUseNativeWheel(
+  deltaX: number,
+  deltaY: number,
+  deltaMode: number,
+): boolean {
+  return (
+    deltaMode === WHEEL_DELTA_PIXEL &&
+    (deltaX !== 0 || deltaY !== 0) &&
+    Math.max(Math.abs(deltaX), Math.abs(deltaY)) < MOUSE_WHEEL_THRESHOLD
+  );
+}
+
 export function nextRowBoundary(
   currentPosition: number,
   direction: number,
@@ -206,8 +225,11 @@ export function nextRowBoundary(
   } else {
     nextRow = Math.ceil(currentRow) - 1;
   }
-  const lastWholeRow = Math.floor(maximum / rowStep) * rowStep;
-  return clamp(nextRow * rowStep, 0, lastWholeRow);
+  // The native maximum can fall between row boundaries when the viewport
+  // height is not an exact multiple of the row height. At the lower edge,
+  // use that maximum so the final row can be fully revealed instead of
+  // stopping one partial row early.
+  return clamp(nextRow * rowStep, 0, maximum);
 }
 
 class RowScrollTracker {
@@ -232,18 +254,42 @@ class RowScrollTracker {
         Math.abs(currentPosition - state.observedPosition) <
           OBSERVED_POSITION_EPSILON);
     const lastWholeRowIndex = Math.floor(maximum / rowStep);
-    const rowIndex = trackingIsCurrent
-      ? clamp(state.rowIndex + Math.sign(direction), 0, lastWholeRowIndex)
-      : Math.round(
-          nextRowBoundary(currentPosition, direction, rowStep, maximum) /
-            rowStep,
-        );
+    const lastWholeRowPosition = lastWholeRowIndex * rowStep;
+    const hasPartialFinalScroll =
+      maximum - lastWholeRowPosition > OBSERVED_POSITION_EPSILON;
+    const bottomRowIndex = hasPartialFinalScroll
+      ? lastWholeRowIndex + 1
+      : lastWholeRowIndex;
+    let rowIndex: number;
+    let nextPosition: number;
+    if (trackingIsCurrent) {
+      const requestedRowIndex = state.rowIndex + Math.sign(direction);
+      nextPosition =
+        direction > 0 && requestedRowIndex > lastWholeRowIndex
+          ? maximum
+          : clamp(requestedRowIndex * rowStep, 0, maximum);
+      rowIndex =
+        nextPosition === maximum && hasPartialFinalScroll
+          ? bottomRowIndex
+          : clamp(requestedRowIndex, 0, lastWholeRowIndex);
+    } else {
+      nextPosition = nextRowBoundary(
+        currentPosition,
+        direction,
+        rowStep,
+        maximum,
+      );
+      rowIndex =
+        nextPosition === maximum && hasPartialFinalScroll
+          ? bottomRowIndex
+          : clamp(Math.round(nextPosition / rowStep), 0, lastWholeRowIndex);
+    }
     this.states.set(element, {
       rowStep,
       rowIndex,
       observedPosition: currentPosition,
     });
-    return rowIndex * rowStep;
+    return nextPosition;
   }
 
   observe(element: HTMLElement): void {
@@ -291,6 +337,7 @@ export function useSmoothWheelScroll(): void {
   useEffect(() => {
     const animations = new Map<HTMLElement, ScrollAnimation>();
     const rowScrollTracker = new RowScrollTracker();
+    let nativeWheelGestureUntil = 0;
 
     const reducedMotion = () =>
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
@@ -334,8 +381,37 @@ export function useSmoothWheelScroll(): void {
       );
     };
 
+    const releaseNativeScroll = (start: HTMLElement) => {
+      for (
+        let element: HTMLElement | null = start;
+        element;
+        element = element.parentElement
+      ) {
+        const animation = animations.get(element);
+        if (animation) {
+          window.cancelAnimationFrame(animation.frame);
+          animations.delete(element);
+        }
+        rowScrollTracker.forget(element);
+      }
+    };
+
     const handleWheel = (event: WheelEvent) => {
       if (event.ctrlKey) return;
+
+      const start = elementFromTarget(event.target);
+      if (!start || start.closest(".relation-graph-wrap")) return;
+      const now = performance.now();
+      const useNativeScroll =
+        shouldUseNativeWheel(event.deltaX, event.deltaY, event.deltaMode) ||
+        (event.deltaMode === WHEEL_DELTA_PIXEL &&
+          now < nativeWheelGestureUntil);
+      if (useNativeScroll) {
+        nativeWheelGestureUntil = now + NATIVE_WHEEL_GESTURE_MS;
+        releaseNativeScroll(start);
+        return;
+      }
+      nativeWheelGestureUntil = 0;
 
       const target = findScrollableTarget(event);
       if (!target) return;

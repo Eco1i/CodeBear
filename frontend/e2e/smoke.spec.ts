@@ -240,6 +240,39 @@ test.describe
     }) => {
       test.setTimeout(45_000);
       const projectName = `端到端测试项目-${browserName}`;
+      if (browserName === "chromium") {
+        await page.addInitScript(() => {
+          let savedFile: { name: string; bytes: number[] } | null = null;
+          Object.defineProperty(window, "__codebearSavedFile", {
+            configurable: true,
+            get: () => savedFile,
+          });
+          Object.defineProperty(window, "showSaveFilePicker", {
+            configurable: true,
+            value: async (options: { suggestedName: string }) => ({
+              name: options.suggestedName,
+              createWritable: async () => ({
+                write: async (data: Blob) => {
+                  savedFile = {
+                    name: options.suggestedName,
+                    bytes: Array.from(new Uint8Array(await data.arrayBuffer())),
+                  };
+                },
+                close: async () => undefined,
+              }),
+            }),
+          });
+        });
+      } else {
+        // Safari/WebKit does not expose the native picker; keep the fallback
+        // path covered by capturing the generated browser download.
+        await page.addInitScript(() => {
+          Object.defineProperty(window, "showSaveFilePicker", {
+            configurable: true,
+            value: undefined,
+          });
+        });
+      }
       await page.goto("/");
       await expect(page.getByText("PDM 数据字典工作台")).toBeVisible();
 
@@ -564,23 +597,50 @@ test.describe
         .filter({ hasText: "备份与迁移" });
       await expect(backupDialog).toBeVisible();
       await captureVisual(page, "backup");
-      const downloadPromise = page.waitForEvent("download");
+      let backupFileName: string;
+      let backupBuffer: Buffer;
+      const downloadPromise =
+        browserName === "chromium" ? null : page.waitForEvent("download");
       await backupDialog
         .getByRole("button", { name: "导出 .cbbak 备份包" })
         .click();
-      const download = await downloadPromise;
-      expect(download.suggestedFilename()).toMatch(/\.cbbak$/);
-      const backupPath = await download.path();
-      expect(backupPath).not.toBeNull();
+      if (browserName === "chromium") {
+        await page.waitForFunction(() => {
+          const value = (
+            window as unknown as {
+              __codebearSavedFile?: unknown;
+            }
+          ).__codebearSavedFile;
+          return value !== null && value !== undefined;
+        });
+        const savedFile = await page.evaluate(
+          () =>
+            (
+              window as unknown as {
+                __codebearSavedFile?: { name: string; bytes: number[] } | null;
+              }
+            ).__codebearSavedFile,
+        );
+        expect(savedFile).not.toBeNull();
+        backupFileName = savedFile!.name;
+        backupBuffer = Buffer.from(savedFile!.bytes);
+      } else {
+        const download = await downloadPromise!;
+        backupFileName = download.suggestedFilename();
+        expect(backupFileName).toMatch(/\.cbbak$/);
+        const backupPath = await download.path();
+        expect(backupPath).not.toBeNull();
+        backupBuffer = await readFile(backupPath!);
+      }
 
       await backupDialog.getByRole("tab", { name: "导入 / 迁移" }).click();
       const backupChooserPromise = page.waitForEvent("filechooser");
       await backupDialog.getByRole("button", { name: "选择 .cbbak" }).click();
       const backupChooser = await backupChooserPromise;
       await backupChooser.setFiles({
-        name: download.suggestedFilename(),
+        name: backupFileName,
         mimeType: "application/octet-stream",
-        buffer: await readFile(backupPath!),
+        buffer: backupBuffer,
       });
       await expect(backupDialog.getByText("确认迁移内容")).toBeVisible();
       const dictionaryReceipt = backupDialog.locator(
