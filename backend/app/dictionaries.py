@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import logging
+import re
 import sqlite3
 import uuid
 from pathlib import Path
 from threading import RLock
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, cast
 
+from defusedxml import ElementTree
 from openpyxl import load_workbook
+from openpyxl.utils.cell import column_index_from_string
 
 from .database import Database
 from .service import ServiceError, normalize_relative_path, utc_now
@@ -28,6 +31,72 @@ def _clean_text(value: object) -> str:
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value).strip()
+
+
+def _worksheet_dimensions(sheet: Any) -> tuple[int, int]:
+    """Return worksheet bounds, including XLSX files without a dimension tag.
+
+    Some Excel-compatible exporters omit ``<dimension>`` from the worksheet XML.
+    openpyxl's read-only worksheet then leaves ``max_row``/``max_column`` unset,
+    which otherwise turns a valid upload into an unhandled ``TypeError`` or
+    ``AttributeError`` during inspection/import.
+    """
+    max_row = getattr(sheet, "max_row", None)
+    max_column = getattr(sheet, "max_column", None)
+    existing_max_row = max_row if isinstance(max_row, int) and max_row > 0 else 0
+    existing_max_column = max_column if isinstance(max_column, int) and max_column > 0 else 0
+    if existing_max_row and existing_max_column:
+        return existing_max_row, existing_max_column
+
+    get_source = getattr(sheet, "_get_source", None)
+    if not callable(get_source):
+        return existing_max_row, existing_max_column
+
+    discovered_max_row = 0
+    discovered_max_column = 0
+    fallback_row = 0
+    source = cast(BinaryIO, get_source())
+    try:
+        for _, element in ElementTree.iterparse(source, events=("end",)):
+            if element.tag.rsplit("}", 1)[-1] != "row":
+                continue
+            fallback_row += 1
+            raw_row = element.attrib.get("r", "")
+            try:
+                row_number = int(raw_row) if raw_row else fallback_row
+            except ValueError:
+                row_number = fallback_row
+            fallback_row = max(fallback_row, row_number)
+            discovered_max_row = max(discovered_max_row, row_number)
+            for cell in element:
+                if cell.tag.rsplit("}", 1)[-1] != "c":
+                    continue
+                reference = cell.attrib.get("r", "")
+                match = re.match(r"[A-Za-z]+", reference)
+                if match:
+                    try:
+                        discovered_max_column = max(
+                            discovered_max_column,
+                            column_index_from_string(match.group(0)),
+                        )
+                    except ValueError:
+                        continue
+                else:
+                    discovered_max_column = max(discovered_max_column, 1)
+            element.clear()
+    except (ElementTree.ParseError, OSError) as exc:
+        raise ServiceError(
+            422,
+            "无法读取 Excel 文件，请确认文件未损坏且格式正确",
+            code="invalid_dictionary_excel",
+        ) from exc
+    finally:
+        source.close()
+
+    return (
+        max(discovered_max_row, existing_max_row),
+        max(discovered_max_column, existing_max_column),
+    )
 
 
 def _dictionary_name(value: str) -> str:
@@ -218,10 +287,23 @@ class DictionaryService:
             sheets: list[dict[str, Any]] = []
             for sheet_name in workbook.sheetnames:
                 sheet = workbook[sheet_name]
-                rows = list(sheet.iter_rows(min_row=1, max_row=min(sheet.max_row, 6), values_only=True))
+                max_row, max_column = _worksheet_dimensions(sheet)
+                rows = (
+                    list(
+                        sheet.iter_rows(
+                            min_row=1,
+                            max_row=min(max_row, 6),
+                            min_col=1,
+                            max_col=max_column,
+                            values_only=True,
+                        )
+                    )
+                    if max_row > 0 and max_column > 0
+                    else []
+                )
                 header = [_clean_text(value) or f"第 {index} 列" for index, value in enumerate(rows[0] if rows else [], start=1)]
                 preview = [[_clean_text(value) for value in row[: len(header)]] for row in rows[1:]]
-                sheets.append({"name": sheet_name, "columns": header, "preview": preview, "row_count": max(0, sheet.max_row - 1)})
+                sheets.append({"name": sheet_name, "columns": header, "preview": preview, "row_count": max(0, max_row - 1)})
             return {"file_name": Path(file_name).name, "sheets": sheets}
         finally:
             workbook.close()
@@ -246,7 +328,18 @@ class DictionaryService:
             if sheet_name not in workbook.sheetnames:
                 raise ServiceError(422, "所选工作表不存在", code="invalid_dictionary_excel")
             sheet = workbook[sheet_name]
-            rows = sheet.iter_rows(values_only=True)
+            max_row, max_column = _worksheet_dimensions(sheet)
+            rows = (
+                sheet.iter_rows(
+                    min_row=1,
+                    max_row=max_row,
+                    min_col=1,
+                    max_col=max_column,
+                    values_only=True,
+                )
+                if max_row > 0 and max_column > 0
+                else iter(())
+            )
             header_values = next(rows, ())
             headers = [_clean_text(value) or f"第 {index} 列" for index, value in enumerate(header_values, start=1)]
             index_by_name = {column: index for index, column in enumerate(headers)}

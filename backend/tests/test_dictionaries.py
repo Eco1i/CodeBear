@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
+import re
+import zipfile
 
 import pytest
 from openpyxl import Workbook
@@ -47,6 +49,7 @@ def import_sample(service: WorkspaceService, tmp_path: Path, project_name: str =
 def workbook_bytes() -> BytesIO:
     workbook = Workbook()
     sheet = workbook.active
+    assert sheet is not None
     sheet.title = "业务标志"
     sheet.append(["字典值", "字典值名称", "说明"])
     sheet.append([40101, "增加现金", "现金增加业务"])
@@ -55,6 +58,19 @@ def workbook_bytes() -> BytesIO:
     workbook.save(stream)
     stream.seek(0)
     return stream
+
+
+def workbook_without_dimension() -> BytesIO:
+    source = workbook_bytes()
+    target = BytesIO()
+    with zipfile.ZipFile(source) as archive, zipfile.ZipFile(target, "w") as output:
+        for entry in archive.infolist():
+            content = archive.read(entry.filename)
+            if entry.filename == "xl/worksheets/sheet1.xml":
+                content = re.sub(rb"<dimension[^>]*/>", b"", content, count=1)
+            output.writestr(entry, content)
+    target.seek(0)
+    return target
 
 
 def test_refresh_preserves_field_bindings(tmp_path: Path) -> None:
@@ -74,6 +90,27 @@ def test_refresh_preserves_field_bindings(tmp_path: Path) -> None:
     bindings = dictionaries.field_bindings(str(detail["id"]))
     assert len(bindings) == 1
     assert bindings[0]["dictionary_name"] == "O32 业务标志"
+
+
+def test_excel_import_handles_worksheet_without_dimension(tmp_path: Path) -> None:
+    _, dictionaries = make_services(tmp_path)
+
+    inspection = dictionaries.inspect_excel(workbook_without_dimension(), "无维度.xlsx")
+    assert inspection["sheets"][0]["row_count"] == 2
+    assert inspection["sheets"][0]["columns"] == ["字典值", "字典值名称", "说明"]
+
+    source = workbook_without_dimension()
+    imported = dictionaries.import_excel(
+        source,
+        "无维度.xlsx",
+        name="无维度字典",
+        description="",
+        sheet_name="业务标志",
+        code_columns=["字典值"],
+        name_column="字典值名称",
+        description_column="说明",
+    )
+    assert imported["item_count"] == 2
 
 
 def test_dictionary_crud_excel_and_batch_binding(tmp_path: Path) -> None:
@@ -184,6 +221,7 @@ def test_bind_mode_excludes_fields_already_bound_to_same_dictionary(tmp_path: Pa
 def workbook_with_rows(rows: list[tuple[object, object, object]]) -> BytesIO:
     workbook = Workbook()
     sheet = workbook.active
+    assert sheet is not None
     sheet.title = "业务操作类型"
     sheet.append(["字典值", "字典值名称", "说明"])
     for row in rows:
@@ -234,6 +272,7 @@ def test_excel_import_composes_multiple_code_columns(tmp_path: Path) -> None:
     _, dictionaries = make_services(tmp_path)
     workbook = Workbook()
     sheet = workbook.active
+    assert sheet is not None
     sheet.title = "委托方向"
     sheet.append(["方向", "市场", "名称", "说明"])
     sheet.append(["0", "1", "预受要约", ""])
