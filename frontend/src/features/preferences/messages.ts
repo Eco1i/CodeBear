@@ -180,9 +180,13 @@ const zhCN: MessageCatalog = {
   "ddl.storageEngine": "存储引擎",
   "ddl.charsets": "字符集（{count}）",
   "ddl.mysqlCharsetHint": "MySQL 8.x 完整字符集清单；utf8mb4 为推荐默认值",
+  "ddl.oceanbaseCharsetHint":
+    "OceanBase MySQL 模式使用 utf8mb4；仅提供 OceanBase 兼容的排序规则",
   "ddl.collations": "排序规则（{count}）",
   "ddl.collationHint":
     "排序规则随字符集联动；utf8mb4 包含 utf8mb4_0900_bin 等 89 项规则",
+  "ddl.oceanbaseCollationHint":
+    "OceanBase MySQL 模式支持 utf8mb4_general_ci 和 utf8mb4_bin",
   "ddl.tableType": "表类型",
   "ddl.tablespace": "表空间（可选）",
   "ddl.tablespacePlaceholder": "留空则使用数据库默认表空间",
@@ -919,9 +923,13 @@ const enUS: MessageCatalog = {
   "ddl.storageEngine": "Storage engine",
   "ddl.charsets": "Character sets ({count})",
   "ddl.mysqlCharsetHint": "MySQL 8.x character sets; utf8mb4 recommended",
+  "ddl.oceanbaseCharsetHint":
+    "OceanBase MySQL mode uses utf8mb4 with its compatible collations",
   "ddl.collations": "Collations ({count})",
   "ddl.collationHint":
     "Collations follow the character set; utf8mb4 has 89 options, including utf8mb4_0900_bin",
+  "ddl.oceanbaseCollationHint":
+    "OceanBase MySQL mode supports utf8mb4_general_ci and utf8mb4_bin",
   "ddl.tableType": "Type",
   "ddl.tablespace": "Tablespace (optional)",
   "ddl.tablespacePlaceholder":

@@ -16,15 +16,18 @@ from starlette.background import BackgroundTask
 
 from .ai import AiService
 from .ai_history import AiConversationService
-from .backup import MAX_ARCHIVE_BYTES, extract_dictionary_payload, extract_relation_payload
+from .backup import (
+    MAX_ARCHIVE_BYTES,
+    extract_dictionary_payload,
+    extract_relation_payload,
+)
 from .config import APP_NAME, APP_VERSION, AppPaths, SettingsStore, bundled_resource
 from .database import Database
-from .dictionaries import DictionaryService, MAX_EXCEL_BYTES
+from .dictionaries import MAX_EXCEL_BYTES, DictionaryService
 from .progress import RefreshProgressStore
 from .security import LocalRequestGuardMiddleware
 from .service import ServiceError, WorkspaceService
 from .updates import CHECK_INTERVAL_SECONDS, UpdateService
-
 
 MAX_PDM_FILES = 500
 MAX_PDM_FILE_BYTES = 512 * 1024 * 1024
@@ -90,7 +93,9 @@ app.add_middleware(LocalRequestGuardMiddleware)
 async def service_error_handler(_: Request, exc: ServiceError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": {"message": exc.message, "code": exc.code, "data": exc.data}},
+        content={
+            "detail": {"message": exc.message, "code": exc.code, "data": exc.data}
+        },
     )
 
 
@@ -159,7 +164,7 @@ class TableDeletePayload(BaseModel):
 class DdlConfigPayload(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    database: Literal["mysql", "oracle", "dameng", "tdsql", "ignite"]
+    database: Literal["mysql", "oceanbase", "oracle", "dameng", "tdsql", "ignite"]
     version: str = Field(min_length=1, max_length=20)
     schema_name: str = Field(default="", max_length=128, alias="schema")
     include_comments: bool = True
@@ -238,16 +243,19 @@ class LegacyDataPayload(BaseModel):
 class AiSettingsUpdate(BaseModel):
     api_key: SecretStr | None = Field(default=None, min_length=10, max_length=512)
     assistant_name: str | None = Field(default=None, min_length=1, max_length=20)
-    assistant_accessory: Literal[
-        "none",
-        "blue_scarf",
-        "red_cap",
-        "knit_hat",
-        "round_glasses",
-        "headphones",
-        "bow_tie",
-        "data_crown",
-    ] | None = None
+    assistant_accessory: (
+        Literal[
+            "none",
+            "blue_scarf",
+            "red_cap",
+            "knit_hat",
+            "round_glasses",
+            "headphones",
+            "bow_tie",
+            "data_crown",
+        ]
+        | None
+    ) = None
 
 
 class AiConnectionTest(BaseModel):
@@ -262,7 +270,13 @@ class AiHistoryEvidence(BaseModel):
 
 
 class AiHistoryRetrieval(BaseModel):
-    intent: Literal["find_tables", "find_field", "describe_table", "out_of_scope", "sensitive_request"]
+    intent: Literal[
+        "find_tables",
+        "find_field",
+        "describe_table",
+        "out_of_scope",
+        "sensitive_request",
+    ]
     resolved_question: str = Field(default="", max_length=1000)
     scope_terms: list[str] = Field(default_factory=list, max_length=8)
     business_terms: list[str] = Field(default_factory=list, max_length=32)
@@ -365,7 +379,9 @@ def list_ai_conversations(limit: int = Query(default=200, ge=1, le=500)) -> list
 
 @app.post("/api/ai/conversations", status_code=201)
 def create_ai_conversation(payload: AiConversationCreate) -> dict:
-    return ai_conversation_service.create_conversation(payload.first_message.model_dump())
+    return ai_conversation_service.create_conversation(
+        payload.first_message.model_dump()
+    )
 
 
 @app.get("/api/ai/conversations/{conversation_id}")
@@ -385,7 +401,9 @@ def delete_ai_conversation(conversation_id: str) -> dict[str, bool]:
 
 
 @app.post("/api/ai/conversations/{conversation_id}/messages", status_code=201)
-def append_ai_conversation_message(conversation_id: str, payload: AiConversationMessageCreate) -> dict:
+def append_ai_conversation_message(
+    conversation_id: str, payload: AiConversationMessageCreate
+) -> dict:
     return ai_conversation_service.add_message(conversation_id, payload.model_dump())
 
 
@@ -443,7 +461,9 @@ def import_pdm_files(
     if not files:
         raise ServiceError(422, "请选择至少一个 PDM 文件", code="missing_files")
     if len(files) > MAX_PDM_FILES:
-        raise ServiceError(413, f"一次最多导入 {MAX_PDM_FILES} 个 PDM 文件", code="too_many_files")
+        raise ServiceError(
+            413, f"一次最多导入 {MAX_PDM_FILES} 个 PDM 文件", code="too_many_files"
+        )
     staging_root = paths.app_data / "staging"
     staging_root.mkdir(parents=True, exist_ok=True)
     staged: list[tuple[str, Path]] = []
@@ -502,7 +522,11 @@ def export_backup(payload: BackupExportPayload) -> FileResponse:
         include_dictionaries=payload.include_dictionaries,
         include_bindings=payload.include_dictionary_bindings,
     )
-    relation_payload = service.export_relation_payload(selections) if payload.include_relations else None
+    relation_payload = (
+        service.export_relation_payload(selections)
+        if payload.include_relations
+        else None
+    )
     archive_path, file_name = service.export_backup(
         selections,
         dictionary_payload=dictionary_payload,
@@ -535,9 +559,13 @@ def inspect_backup(file: Annotated[UploadFile, File()]) -> dict:
             for chunk in iter(lambda: file.file.read(1024 * 1024), b""):
                 copied += len(chunk)
                 if copied > MAX_ARCHIVE_BYTES:
-                    raise ServiceError(413, "备份包不能超过 2 GB", code="backup_too_large")
+                    raise ServiceError(
+                        413, "备份包不能超过 2 GB", code="backup_too_large"
+                    )
                 stream.write(chunk)
-        return service.stage_backup_file(temporary_path, file.filename or "backup.cbbak")
+        return service.stage_backup_file(
+            temporary_path, file.filename or "backup.cbbak"
+        )
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
@@ -586,7 +614,9 @@ def rename_node(payload: RenamePayload) -> dict:
 
 @app.post("/api/nodes/move")
 def move_node(payload: MovePayload) -> dict:
-    return service.move_node(payload.project_id, payload.relative_path, payload.target_parent_path)
+    return service.move_node(
+        payload.project_id, payload.relative_path, payload.target_parent_path
+    )
 
 
 @app.post("/api/nodes/trash")
@@ -634,7 +664,9 @@ def _prepare_dictionary_excel(file: UploadFile) -> None:
     size = file.file.tell()
     file.file.seek(0)
     if size > MAX_EXCEL_BYTES:
-        raise ServiceError(413, "Excel 文件不能超过 50 MB", code="dictionary_excel_too_large")
+        raise ServiceError(
+            413, "Excel 文件不能超过 50 MB", code="dictionary_excel_too_large"
+        )
 
 
 @app.get("/api/dictionaries")
@@ -651,7 +683,9 @@ def create_dictionary(payload: DictionaryCreatePayload) -> dict:
 def inspect_dictionary_excel(file: Annotated[UploadFile, File()]) -> dict:
     try:
         _prepare_dictionary_excel(file)
-        return dictionary_service.inspect_excel(file.file, file.filename or "dictionary.xlsx")
+        return dictionary_service.inspect_excel(
+            file.file, file.filename or "dictionary.xlsx"
+        )
     finally:
         file.file.close()
 
@@ -685,7 +719,9 @@ def import_dictionary_excel(
 
 
 @app.get("/api/dictionaries/field-bindings")
-def dictionary_field_bindings(table_id: str = Query(min_length=1, max_length=100)) -> list[dict]:
+def dictionary_field_bindings(
+    table_id: str = Query(min_length=1, max_length=100),
+) -> list[dict]:
     return dictionary_service.field_bindings(table_id)
 
 
@@ -717,7 +753,9 @@ def dictionary_detail(dictionary_id: str) -> dict:
 
 @app.put("/api/dictionaries/{dictionary_id}")
 def update_dictionary(dictionary_id: str, payload: DictionaryCreatePayload) -> dict:
-    return dictionary_service.update_dictionary(dictionary_id, payload.name, payload.description)
+    return dictionary_service.update_dictionary(
+        dictionary_id, payload.name, payload.description
+    )
 
 
 @app.delete("/api/dictionaries/{dictionary_id}")
@@ -737,7 +775,9 @@ def list_dictionary_items(
 
 
 @app.put("/api/dictionaries/{dictionary_id}/items")
-def replace_dictionary_items(dictionary_id: str, payload: DictionaryItemsPayload) -> dict:
+def replace_dictionary_items(
+    dictionary_id: str, payload: DictionaryItemsPayload
+) -> dict:
     return dictionary_service.replace_items(
         dictionary_id,
         [item.model_dump() for item in payload.items],
@@ -753,13 +793,21 @@ def list_dictionary_bindings(
 
 
 @app.post("/api/dictionaries/{dictionary_id}/bindings")
-def bind_dictionary_fields(dictionary_id: str, payload: DictionaryBindingPayload) -> dict[str, int]:
+def bind_dictionary_fields(
+    dictionary_id: str, payload: DictionaryBindingPayload
+) -> dict[str, int]:
     return {"count": dictionary_service.bind_fields(dictionary_id, payload.field_ids)}
 
 
 @app.post("/api/dictionaries/{dictionary_id}/unbind")
-def unbind_dictionary_fields(dictionary_id: str, payload: DictionaryUnbindPayload) -> dict[str, int]:
-    return {"count": dictionary_service.unbind_fields(dictionary_id, payload.field_ids or None)}
+def unbind_dictionary_fields(
+    dictionary_id: str, payload: DictionaryUnbindPayload
+) -> dict[str, int]:
+    return {
+        "count": dictionary_service.unbind_fields(
+            dictionary_id, payload.field_ids or None
+        )
+    }
 
 
 @app.get("/api/ddl/options")
@@ -784,7 +832,9 @@ def ddl_catalog(
 
 @app.post("/api/ddl/generate")
 def generate_ddl(payload: DdlGeneratePayload) -> dict:
-    return service.generate_ddl(payload.table_ids, payload.config.model_dump(by_alias=True))
+    return service.generate_ddl(
+        payload.table_ids, payload.config.model_dump(by_alias=True)
+    )
 
 
 class IgnoreUpdatePayload(BaseModel):
@@ -808,7 +858,9 @@ def updates_ignore(payload: IgnoreUpdatePayload) -> dict:
 
 @app.post("/api/tables/delete-preview")
 def preview_table_deletion(payload: TableDeletePayload) -> dict:
-    return service.preview_table_deletion([table.model_dump() for table in payload.tables])
+    return service.preview_table_deletion(
+        [table.model_dump() for table in payload.tables]
+    )
 
 
 @app.post("/api/tables/delete")

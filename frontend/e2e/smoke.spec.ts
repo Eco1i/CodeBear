@@ -574,11 +574,18 @@ test.describe
         "background-color",
         "rgba(0, 0, 0, 0)",
       );
-      await page.keyboard.press("Escape");
+      await expect(
+        page.locator(".ddl-database-option").filter({ hasText: "OceanBase" }),
+      ).toBeVisible();
+      await page
+        .locator(".ddl-database-option")
+        .filter({ hasText: "OceanBase" })
+        .click();
+      await expect(ddlTarget).toContainText("OceanBase");
       await ddlDialog.getByRole("button", { name: "生成脚本" }).click();
       await expect(ddlDialog.getByText(/生成完成 · 1 张表/)).toBeVisible();
       await expect(ddlDialog.locator(".cm-content")).toContainText(
-        "CREATE TABLE",
+        "DEFAULT CHARSET=utf8mb4",
       );
       await captureVisual(page, "ddl");
       await ddlClose.click();
