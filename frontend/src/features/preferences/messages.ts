@@ -175,12 +175,18 @@ const zhCN: MessageCatalog = {
   "ddl.sqlCopied": "SQL 已复制到剪贴板",
   "ddl.copyFailed": "复制失败，请在编辑区手动复制",
   "ddl.downloaded": "已下载 {file}",
+  "ddl.saved": "已保存 {file}",
+  "ddl.downloadFailed": "保存 SQL 文件失败",
   "ddl.storageEngine": "存储引擎",
   "ddl.charsets": "字符集（{count}）",
   "ddl.mysqlCharsetHint": "MySQL 8.x 完整字符集清单；utf8mb4 为推荐默认值",
+  "ddl.oceanbaseCharsetHint":
+    "OceanBase MySQL 模式使用 utf8mb4；仅提供 OceanBase 兼容的排序规则",
   "ddl.collations": "排序规则（{count}）",
   "ddl.collationHint":
     "排序规则随字符集联动；utf8mb4 包含 utf8mb4_0900_bin 等 89 项规则",
+  "ddl.oceanbaseCollationHint":
+    "OceanBase MySQL 模式支持 utf8mb4_general_ci 和 utf8mb4_bin",
   "ddl.tableType": "表类型",
   "ddl.tablespace": "表空间（可选）",
   "ddl.tablespacePlaceholder": "留空则使用数据库默认表空间",
@@ -635,6 +641,8 @@ const zhCN: MessageCatalog = {
   "backup.modalTitle": "备份与迁移",
   "backup.selectExportRequired": "请至少选择一个待导出节点",
   "backup.generated": "备份已生成：{file}",
+  "backup.saved": "备份已保存：{file}",
+  "backup.downloaded": "备份已下载：{file}",
   "backup.exportFailed": "导出备份失败",
   "backup.tooLarge": "备份包不能超过 2 GB",
   "backup.readArchiveFailed": "无法读取备份包",
@@ -910,12 +918,18 @@ const enUS: MessageCatalog = {
   "ddl.sqlCopied": "SQL copied to clipboard",
   "ddl.copyFailed": "Copy failed; use the editor to copy manually",
   "ddl.downloaded": "Downloaded {file}",
+  "ddl.saved": "Saved {file}",
+  "ddl.downloadFailed": "Could not save the SQL file",
   "ddl.storageEngine": "Storage engine",
   "ddl.charsets": "Character sets ({count})",
   "ddl.mysqlCharsetHint": "MySQL 8.x character sets; utf8mb4 recommended",
+  "ddl.oceanbaseCharsetHint":
+    "OceanBase MySQL mode uses utf8mb4 with its compatible collations",
   "ddl.collations": "Collations ({count})",
   "ddl.collationHint":
     "Collations follow the character set; utf8mb4 has 89 options, including utf8mb4_0900_bin",
+  "ddl.oceanbaseCollationHint":
+    "OceanBase MySQL mode supports utf8mb4_general_ci and utf8mb4_bin",
   "ddl.tableType": "Type",
   "ddl.tablespace": "Tablespace (optional)",
   "ddl.tablespacePlaceholder":
@@ -1382,6 +1396,8 @@ const enUS: MessageCatalog = {
   "backup.modalTitle": "Backup & migrate",
   "backup.selectExportRequired": "Select at least one node to export",
   "backup.generated": "Backup created: {file}",
+  "backup.saved": "Backup saved: {file}",
+  "backup.downloaded": "Backup downloaded: {file}",
   "backup.exportFailed": "Backup export failed",
   "backup.tooLarge": "A backup archive cannot exceed 2 GB",
   "backup.readArchiveFailed": "Could not read the backup archive",

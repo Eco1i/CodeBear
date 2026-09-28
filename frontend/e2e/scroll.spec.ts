@@ -170,7 +170,25 @@ test("one mouse-wheel notch advances exactly one complete table row", async ({
   expect(result.uniqueValues.some((value) => value > 0 && value < 32)).toBe(
     true,
   );
-  expect(result.maxFrameDelta).toBeLessThanOrEqual(5);
+  // WebKit can skip an animation frame under load; keep the bound below
+  // one-third of a 32px row while allowing that platform quantization.
+  expect(result.maxFrameDelta).toBeLessThanOrEqual(10);
+});
+
+test("leaves small pixel-mode wheel events to native scrolling", async ({
+  page,
+}) => {
+  await prepareTable(page);
+
+  await page.mouse.wheel(0, 120);
+  await page.mouse.wheel(0, 8);
+  await page.waitForTimeout(250);
+
+  const result = await readResult(page);
+  expect(result.prevented).toBe(false);
+  expect(result.reachedTarget).toBe(true);
+  expect(result.final).toBeGreaterThan(0);
+  expect(result.final).toBeLessThan(32);
 });
 
 test("repeated wheel notches continue one row at a time in both directions", async ({
@@ -232,6 +250,58 @@ test("repeated wheel notches keep working through the real React virtual table",
   await expect
     .poll(() => tableBody.evaluate((element) => element.scrollTop % 32))
     .toBe(0);
+
+  const visualPath = process.env.CODEBEAR_SCROLL_VISUAL_PATH;
+  if (visualPath) {
+    await tableBody.evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await page.mouse.wheel(0, 8);
+    await page.waitForTimeout(180);
+    await page.screenshot({
+      path: visualPath,
+      animations: "disabled",
+      fullPage: true,
+    });
+  }
+});
+
+test("wheel reaches the native lower edge when the viewport is not row-aligned", async ({
+  page,
+}) => {
+  await prepareTable(page);
+
+  const metrics = await page.evaluate(() => {
+    const body = document.querySelector<HTMLElement>(".table-grid-body");
+    if (!body) throw new Error("表格滚动容器不存在");
+    body.style.height = "200px";
+    body.style.minHeight = "0px";
+    body.scrollTop = 0;
+    return {
+      maximum: body.scrollHeight - body.clientHeight,
+      rowStep: 32,
+    };
+  });
+  expect(metrics.maximum % metrics.rowStep).toBeGreaterThan(0);
+
+  await page.evaluate((maximum) => {
+    const body = document.querySelector<HTMLElement>(".table-grid-body");
+    if (!body) throw new Error("表格滚动容器不存在");
+    body.scrollTop = maximum - (maximum % 32);
+  }, metrics.maximum);
+  await page.mouse.wheel(0, 120);
+  await expect
+    .poll(() =>
+      page.locator(".table-grid-body").evaluate((element) => element.scrollTop),
+    )
+    .toBe(metrics.maximum);
+
+  await page.mouse.wheel(0, -120);
+  await expect
+    .poll(() =>
+      page.locator(".table-grid-body").evaluate((element) => element.scrollTop),
+    )
+    .toBe(metrics.maximum - (metrics.maximum % metrics.rowStep));
 });
 
 test("non-default browser zoom keeps repeated real-table wheel steps moving", async ({

@@ -751,6 +751,21 @@
   color: #147f91;
 }
 
+.ddl-database-logo.is-oceanbase {
+  color: #249cff;
+}
+
+.ddl-database-logo.is-oceanbase img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.ddl-title-flow .ddl-database-logo.is-oceanbase img {
+  width: 18px;
+  height: 18px;
+}
+
 .ddl-database-logo.is-oracle {
   color: #e1463b;
 }

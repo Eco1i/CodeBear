@@ -27,6 +27,11 @@ import {
 
 import { ddlApi } from "../features/ddl/api";
 import { useI18n } from "../features/preferences/PreferencesProvider";
+import {
+  chooseSaveFileTarget,
+  downloadBlob,
+  isSaveDialogCancellation,
+} from "../shared/fileDownload";
 import { DraggableModal } from "./DraggableModal";
 import {
   cacheCatalogTables,
@@ -73,11 +78,14 @@ type DdlGenerateMeta = Omit<DdlGenerateResult, "script">;
 
 const ENGLISH_DATABASE_LABELS: Record<DdlDatabase, string> = {
   mysql: "MySQL",
+  oceanbase: "OceanBase",
   oracle: "Oracle",
   dameng: "Dameng",
   tdsql: "TDSQL for MySQL",
   ignite: "Apache Ignite",
 };
+
+const OCEANBASE_COLLATIONS = new Set(["utf8mb4_general_ci", "utf8mb4_bin"]);
 
 function databaseLabel(
   database: DdlDatabase,
@@ -100,6 +108,13 @@ function DatabaseLogo({ database }: { database: DdlDatabase }) {
             MySQL
           </text>
         </svg>
+      </span>
+    );
+  }
+  if (database === "oceanbase") {
+    return (
+      <span className="ddl-database-logo is-oceanbase" aria-hidden="true">
+        <img src="/oceanbase-logo.png" alt="" draggable={false} />
       </span>
     );
   }
@@ -562,6 +577,9 @@ export function DdlExportModal({
       ...current,
       database,
       version: databaseOption.default_version,
+      charset: database === "oceanbase" ? "utf8mb4" : current.charset,
+      collation:
+        database === "oceanbase" ? "utf8mb4_general_ci" : current.collation,
       schema:
         database === "ignite" && !current.schema ? "PUBLIC" : current.schema,
     }));
@@ -795,7 +813,7 @@ export function DdlExportModal({
     }
   };
 
-  const downloadScript = () => {
+  const downloadScript = async () => {
     const script = getCurrentScript();
     if (!script || !project) return;
     const fileName =
@@ -803,17 +821,25 @@ export function DdlExportModal({
         `${project.name}_${databaseLabel(config.database, result?.database_label || currentDatabase?.label, language)}_${result?.version || config.version}`,
         language,
       ) + (result?.extension || ".sql");
-    const url = URL.createObjectURL(
-      new Blob([script], { type: "text/sql;charset=utf-8" }),
-    );
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    message.success(t("ddl.downloaded", { file: fileName }));
+    const blob = new Blob([script], { type: "text/sql;charset=utf-8" });
+    try {
+      const saveTarget = await chooseSaveFileTarget(fileName, {
+        description: "SQL 建表脚本",
+        mimeType: "text/sql",
+        extension: result?.extension || ".sql",
+      });
+      if (saveTarget) {
+        await saveTarget.write(blob);
+        message.success(t("ddl.saved", { file: saveTarget.fileName }));
+      } else {
+        downloadBlob(blob, fileName);
+        message.success(t("ddl.downloaded", { file: fileName }));
+      }
+    } catch (error) {
+      if (!isSaveDialogCancellation(error)) {
+        message.error(errorText(error, "ddl.downloadFailed"));
+      }
+    }
   };
 
   const closeModal = () => {
@@ -830,37 +856,47 @@ export function DdlExportModal({
 
   const renderDynamicConfig = () => {
     if (!options) return null;
-    if (config.database === "mysql") {
+    if (config.database === "mysql" || config.database === "oceanbase") {
+      const isOceanBase = config.database === "oceanbase";
+      const characterSets = options.mysql_character_sets.filter(
+        (item) => !isOceanBase || item.value === "utf8mb4",
+      );
       const collations = options.mysql_collations.filter(
-        (item) => item.charset === config.charset,
+        (item) =>
+          item.charset === config.charset &&
+          (!isOceanBase || OCEANBASE_COLLATIONS.has(item.value)),
       );
       return (
         <>
-          <label className="ddl-config-field">
-            <span>{t("ddl.storageEngine")}</span>
-            <ValueSelect
-              ariaLabel={t("ddl.storageEngine")}
-              value={config.engine}
-              options={options.mysql_storage_engines}
-              searchable
-              onChange={(value) => updateConfig("engine", value)}
-            />
-          </label>
+          {isOceanBase ? null : (
+            <label className="ddl-config-field">
+              <span>{t("ddl.storageEngine")}</span>
+              <ValueSelect
+                ariaLabel={t("ddl.storageEngine")}
+                value={config.engine}
+                options={options.mysql_storage_engines}
+                searchable
+                onChange={(value) => updateConfig("engine", value)}
+              />
+            </label>
+          )}
           <label className="ddl-config-field">
             <span>
-              {t("ddl.charsets", {
-                count: options.mysql_character_sets.length,
-              })}
-              <Tooltip title={t("ddl.mysqlCharsetHint")}>
+              {t("ddl.charsets", { count: characterSets.length })}
+              <Tooltip
+                title={t(
+                  isOceanBase
+                    ? "ddl.oceanbaseCharsetHint"
+                    : "ddl.mysqlCharsetHint",
+                )}
+              >
                 <InfoCircleOutlined />
               </Tooltip>
             </span>
             <ValueSelect
-              ariaLabel={t("ddl.charsets", {
-                count: options.mysql_character_sets.length,
-              })}
+              ariaLabel={t("ddl.charsets", { count: characterSets.length })}
               value={config.charset}
-              options={options.mysql_character_sets}
+              options={characterSets}
               searchable
               onChange={changeCharset}
             />
@@ -868,7 +904,13 @@ export function DdlExportModal({
           <label className="ddl-config-field">
             <span>
               {t("ddl.collations", { count: collations.length })}
-              <Tooltip title={t("ddl.collationHint")}>
+              <Tooltip
+                title={t(
+                  isOceanBase
+                    ? "ddl.oceanbaseCollationHint"
+                    : "ddl.collationHint",
+                )}
+              >
                 <InfoCircleOutlined />
               </Tooltip>
             </span>

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# Pytest executes from the repository root; backend package imports resolve at runtime.
+# pyright: reportMissingImports=false
 from pathlib import Path
 
 from backend.app.config import AppPaths, SettingsStore
@@ -118,9 +120,14 @@ def test_generate_mysql_ddl_maps_types_comments_and_options() -> None:
 
     assert "DROP TABLE IF EXISTS `demo`.`T_PRODUCT`;" in result["script"]
     assert "`PRODUCT_ID` DECIMAL(20) NOT NULL" in result["script"]
-    assert "`PRODUCT_NAME` VARCHAR(64) NOT NULL DEFAULT '未命名' COMMENT '商品名称'" in result["script"]
+    assert (
+        "`PRODUCT_NAME` VARCHAR(64) NOT NULL DEFAULT '未命名' COMMENT '商品名称'"
+        in result["script"]
+    )
     assert "`CREATED_AT` DATETIME" in result["script"]
-    assert "ENGINE=InnoDB DEFAULT CHARSET=gb18030 COLLATE=gb18030_bin" in result["script"]
+    assert (
+        "ENGINE=InnoDB DEFAULT CHARSET=gb18030 COLLATE=gb18030_bin" in result["script"]
+    )
     assert "PRIMARY KEY (`PRODUCT_ID`)" in result["script"]
     assert any(warning["code"] == "unknown_type" for warning in result["warnings"])
 
@@ -140,14 +147,34 @@ def test_generate_oracle_and_dameng_comments() -> None:
     oracle = generate_ddl([sample_table()], base_config("oracle", "19c"))
     assert '"PRODUCT_ID" NUMBER(20) NOT NULL' in oracle["script"]
     assert '"PRODUCT_NAME" VARCHAR2(64)' in oracle["script"]
-    assert "EXECUTE IMMEDIATE 'DROP TABLE \"demo\".\"T_PRODUCT\" CASCADE CONSTRAINTS'" in oracle["script"]
-    assert 'COMMENT ON TABLE "demo"."T_PRODUCT" IS \'商品基础信息\';' in oracle["script"]
-    assert 'COMMENT ON COLUMN "demo"."T_PRODUCT"."PRODUCT_NAME" IS \'商品名称\';' in oracle["script"]
+    assert (
+        'EXECUTE IMMEDIATE \'DROP TABLE "demo"."T_PRODUCT" CASCADE CONSTRAINTS\''
+        in oracle["script"]
+    )
+    assert (
+        'COMMENT ON TABLE "demo"."T_PRODUCT" IS \'商品基础信息\';' in oracle["script"]
+    )
+    assert (
+        'COMMENT ON COLUMN "demo"."T_PRODUCT"."PRODUCT_NAME" IS \'商品名称\';'
+        in oracle["script"]
+    )
 
     dameng = generate_ddl([sample_table()], base_config("dameng", "DM8"))
     assert 'DROP TABLE IF EXISTS "demo"."T_PRODUCT";' in dameng["script"]
     assert '"PRODUCT_NAME" VARCHAR(64)' in dameng["script"]
     assert 'COMMENT ON TABLE "demo"."T_PRODUCT"' in dameng["script"]
+
+
+def test_generate_oceanbase_mysql_mode_ddl() -> None:
+    config = base_config("oceanbase", "4.3")
+    result = generate_ddl([sample_table()], config)
+
+    assert "-- 码熊生成 · OceanBase 4.3" in result["script"]
+    assert "CREATE TABLE IF NOT EXISTS `demo`.`T_PRODUCT`" in result["script"]
+    assert "DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci" in result["script"]
+    assert "ENGINE=" not in result["script"]
+    assert "SHARDKEY" not in result["script"]
+    assert any(warning["code"] == "invalid_collation" for warning in result["warnings"])
 
 
 def test_generate_tdsql_modes_and_ignite_cache_options() -> None:
@@ -162,10 +189,16 @@ def test_generate_tdsql_modes_and_ignite_cache_options() -> None:
 
     ignite = generate_ddl([sample_table()], base_config("ignite", "2.15"))
     assert 'CREATE TABLE IF NOT EXISTS "demo"."T_PRODUCT"' in ignite["script"]
-    assert 'WITH "TEMPLATE=PARTITIONED,BACKUPS=1,ATOMICITY=TRANSACTIONAL' in ignite["script"]
+    assert (
+        'WITH "TEMPLATE=PARTITIONED,BACKUPS=1,ATOMICITY=TRANSACTIONAL'
+        in ignite["script"]
+    )
     assert "CACHE_GROUP=CATALOG" in ignite["script"]
     assert "AFFINITY_KEY=PRODUCT_ID" in ignite["script"]
-    assert any(warning["code"] == "ignite_comments_not_persisted" for warning in ignite["warnings"])
+    assert any(
+        warning["code"] == "ignite_comments_not_persisted"
+        for warning in ignite["warnings"]
+    )
 
 
 def make_service(tmp_path: Path) -> WorkspaceService:
@@ -180,12 +213,16 @@ def make_service(tmp_path: Path) -> WorkspaceService:
     return WorkspaceService(database, SettingsStore(paths))
 
 
-def test_workspace_ddl_catalog_and_generation_use_indexed_tables(tmp_path: Path) -> None:
+def test_workspace_ddl_catalog_and_generation_use_indexed_tables(
+    tmp_path: Path,
+) -> None:
     service = make_service(tmp_path)
     source = write_sample(tmp_path / "用户模型.pdm")
     project = service.create_project("DDL 测试")
     project_id = str(project["id"])
-    service.import_staged_files(project_id, "", [(source.name, source)], overwrite=False)
+    service.import_staged_files(
+        project_id, "", [(source.name, source)], overwrite=False
+    )
 
     catalog = service.ddl_catalog(project_id)
     assert catalog["table_count"] == 1
@@ -207,27 +244,37 @@ def test_ddl_generate_payload_accepts_large_table_selection() -> None:
         table_ids=[f"t{i}" for i in range(7309)],
         config=DdlConfigPayload(database="mysql", version="8.4"),
     )
+    oceanbase_config = DdlConfigPayload(database="oceanbase", version="4.3")
     assert len(payload.table_ids) == 7309
+    assert oceanbase_config.database == "oceanbase"
 
 
-def test_ddl_generate_service_cap_is_high_enough_for_full_project(tmp_path: Path) -> None:
+def test_ddl_generate_service_cap_is_high_enough_for_full_project(
+    tmp_path: Path,
+) -> None:
     """全项目 7309 张表不应触发 5000 上限，应走到表不存在校验。"""
     from backend.app.service import ServiceError
 
     service = make_service(tmp_path)
     try:
-        service.generate_ddl([f"t{i}" for i in range(7309)], base_config("mysql", "8.4"))
+        service.generate_ddl(
+            [f"t{i}" for i in range(7309)], base_config("mysql", "8.4")
+        )
     except ServiceError as error:
         assert error.code != "ddl_selection_too_large"
         assert error.code == "ddl_table_not_found"
 
 
-def test_workspace_ddl_catalog_supports_lazy_groups_and_submitted_search(tmp_path: Path) -> None:
+def test_workspace_ddl_catalog_supports_lazy_groups_and_submitted_search(
+    tmp_path: Path,
+) -> None:
     service = make_service(tmp_path)
     source = write_sample(tmp_path / "用户模型.pdm")
     project = service.create_project("DDL 懒加载测试")
     project_id = str(project["id"])
-    service.import_staged_files(project_id, "", [(source.name, source)], overwrite=False)
+    service.import_staged_files(
+        project_id, "", [(source.name, source)], overwrite=False
+    )
 
     summary = service.ddl_catalog(project_id, include_tables=False)
     assert summary["table_count"] == 1

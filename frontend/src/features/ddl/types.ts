@@ -1,4 +1,10 @@
-export type DdlDatabase = "mysql" | "oracle" | "dameng" | "tdsql" | "ignite";
+export type DdlDatabase =
+  | "mysql"
+  | "oceanbase"
+  | "oracle"
+  | "dameng"
+  | "tdsql"
+  | "ignite";
 export type TdsqlTableMode = "shard" | "single" | "broadcast";
 export type IgniteTemplate = "PARTITIONED" | "REPLICATED";
 export type IgniteAtomicity = "ATOMIC" | "TRANSACTIONAL";

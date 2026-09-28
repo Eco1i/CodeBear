@@ -356,14 +356,23 @@ html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   width: 252px;
   padding: 0;
   overflow: hidden;
-  border: 1px solid var(--cb-border);
   border-radius: 9px;
   background: var(--cb-surface);
-  box-shadow: 0 10px 24px var(--cb-shadow);
 }
 
 .preferences-popover .ant-popover-content {
   background: transparent;
+}
+
+/* Match the panel surface in both themes and overlap the filtered edge by 1px. */
+.preferences-popover[class*="ant-popover-placement-bottom"]
+> .preferences-popover-arrow {
+  z-index: 2;
+  transform: translateY(calc(-100% + 1px));
+}
+
+.preferences-popover .preferences-popover-arrow::before {
+  background: var(--cb-surface);
 }
 
 .preferences-popover-content {
