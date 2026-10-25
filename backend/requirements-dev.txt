@@ -1,4 +1,5 @@
 -r requirements.txt
+httpx2==2.16.0
 pytest==9.0.3
 pip-audit==2.10.1
 
