@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { buildScopeOptions, restoredScopeFromConversation } from "./model";
+import {
+  buildScopeOptions,
+  MODEL_ID,
+  restoredScopeFromConversation,
+} from "./model";
 import type { AiConversationDetail } from "./types";
 import type { TableDetail } from "../tables/types";
 import type { Project, WorkspaceNode } from "../workspace/types";
+
+describe("AI model configuration", () => {
+  it("uses the current DeepSeek Flash API model ID", () => {
+    expect(MODEL_ID).toBe("deepseek-flash");
+  });
+});
 
 describe("AI scope model", () => {
   it("builds scopes from the current table through the global workspace", () => {
@@ -22,25 +32,33 @@ describe("AI scope model", () => {
       name: "订单表",
     } as TableDetail;
 
-    expect(buildScopeOptions(project, node, table).map((option) => option.scope.type))
-      .toEqual(["table", "pdm", "project", "all"]);
+    expect(
+      buildScopeOptions(project, node, table).map(
+        (option) => option.scope.type,
+      ),
+    ).toEqual(["table", "pdm", "project", "all"]);
   });
 
   it("restores a historical scope even when the current workspace no longer contains it", () => {
     const conversation = {
       id: "conversation-1",
-      messages: [{
-        id: "message-1",
-        role: "user",
-        content: "查旧项目",
-        created_at: "2026-08-14T10:00:00",
-        scope: { type: "project", project_id: "old-project" },
-        scope_kind: "原项目",
-        scope_value: "历史订单库",
-      }],
+      messages: [
+        {
+          id: "message-1",
+          role: "user",
+          content: "查旧项目",
+          created_at: "2026-08-14T10:00:00",
+          scope: { type: "project", project_id: "old-project" },
+          scope_kind: "原项目",
+          scope_value: "历史订单库",
+        },
+      ],
     } as AiConversationDetail;
 
-    expect(restoredScopeFromConversation(conversation, []))
-      .toMatchObject({ kind: "原项目", value: "历史订单库", scope: { project_id: "old-project" } });
+    expect(restoredScopeFromConversation(conversation, [])).toMatchObject({
+      kind: "原项目",
+      value: "历史订单库",
+      scope: { project_id: "old-project" },
+    });
   });
 });

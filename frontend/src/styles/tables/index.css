@@ -336,6 +336,8 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .table-row-open:focus-visible {
@@ -878,14 +880,14 @@
   outline-offset: -1px;
 }
 
-.table-tabs-dropdown .ant-dropdown-menu {
+.compact-dropdown .ant-dropdown-menu {
   min-width: 176px;
   padding: 4px;
   font-family: inherit;
   font-size: 11px;
 }
 
-.table-tabs-dropdown .ant-dropdown-menu .ant-dropdown-menu-item {
+.compact-dropdown .ant-dropdown-menu .ant-dropdown-menu-item {
   min-height: 28px;
   padding: 5px 8px !important;
   font-family: inherit;
@@ -893,7 +895,7 @@
   line-height: 1.2 !important;
 }
 
-.table-tabs-dropdown .ant-dropdown-menu .ant-dropdown-menu-title-content {
+.compact-dropdown .ant-dropdown-menu .ant-dropdown-menu-title-content {
   font-size: 11px !important;
   line-height: 1.2 !important;
 }

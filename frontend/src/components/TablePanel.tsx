@@ -341,10 +341,35 @@ export function TablePanel({
                         }
                       />
                     </span>
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       className="table-row-open table-grid-columns table-grid-core"
-                      onClick={() => onSelect(table)}
+                      onClick={(event) => {
+                        const selection = window.getSelection();
+                        if (
+                          event.detail > 0 &&
+                          selection &&
+                          !selection.isCollapsed
+                        ) {
+                          return;
+                        }
+                        onSelect(table);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.repeat) {
+                          event.preventDefault();
+                          onSelect(table);
+                        } else if (event.key === " ") {
+                          event.preventDefault();
+                        }
+                      }}
+                      onKeyUp={(event) => {
+                        if (event.key === " ") {
+                          event.preventDefault();
+                          onSelect(table);
+                        }
+                      }}
                     >
                       <span className="grid-index">
                         {String(index + 1).padStart(2, "0")}
@@ -378,7 +403,7 @@ export function TablePanel({
                         {table.relative_path}
                       </span>
                       <span className="number-cell">{table.field_count}</span>
-                    </button>
+                    </div>
                     <span className="table-action-cell">
                       <Tooltip
                         title={t("table.deleteTable", {

@@ -16,7 +16,7 @@ import { translateError } from "../preferences/messages";
 import type { AppLanguage } from "../preferences/types";
 import type { Project, WorkspaceNode } from "../workspace/types";
 
-export const MODEL_ID = "deepseek-v4-flash";
+export const MODEL_ID = "deepseek-flash";
 export const DEFAULT_ASSISTANT_NAME = "小码";
 export const AI_SCOPE_STORAGE_KEY = "maxiong.ai.scope-type";
 const AI_ACTIVE_CONVERSATION_STORAGE_KEY = "maxiong.ai.active-conversation";

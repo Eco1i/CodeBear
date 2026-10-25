@@ -12,7 +12,7 @@
 
 CodeBear is built for database designers, backend engineers, and data-governance teams that need to inspect and maintain PowerDesigner PDM files over time. It organizes models by project and brings table and field search, dictionary maintenance, relationship review, and DDL export into one local workspace—without uploading complete PDM files to an online service.
 
-- **Latest stable version:** `v1.6.0`
+- **Latest stable version:** `v1.8.0`
 - **Supported systems:** Windows 10/11 x64; macOS 13+ on Apple Silicon
 - **How it runs:** the desktop app starts a local service and opens the workspace in your browser
 
@@ -28,11 +28,13 @@ CodeBear is built for database designers, backend engineers, and data-governance
 ## Core capabilities
 
 - **PDM browsing and search:** organize `.pdm` files by project and directory, search table and field metadata, and compare multiple tables in tabs.
+- **Table structure export:** export table metadata and field definitions to Excel, CSV, JSON, or Markdown; select and copy table text directly from the list.
 - **Safer structural maintenance:** edit table and field definitions with automatic backups; conflicts and write failures stop the update instead of silently overwriting data.
 - **Business dictionaries:** maintain values manually or import them from Excel, bind dictionaries to fields, and inspect where they are used.
 - **Table relationships:** parse PDM foreign keys, maintain additional manual relationships, and explore upstream and downstream tables in list or graph views.
 - **DDL export:** generate table scripts for MySQL, Oracle, Dameng, TDSQL MySQL, and Apache Ignite.
 - **Local backup and migration:** use the recycle bin, selective backups, and `.cbbak` files to move workspace data between installations.
+- **Launch at startup:** optionally start in the system tray on user sign-in in Windows and macOS desktop builds.
 - **Optional AI assistant:** use your own DeepSeek API key to ask natural-language questions about the current data dictionary.
 
 ## Interface preview
@@ -59,8 +61,8 @@ Download the package and SHA-256 checksum for your platform from [GitHub Release
 
 | Platform | Package |
 | --- | --- |
-| Windows 10/11 x64 | `CodeBear-v1.6.0-win-x64.zip` |
-| macOS 13+ Apple Silicon | `CodeBear-v1.6.0-mac-arm64.dmg` |
+| Windows 10/11 x64 | `CodeBear-v1.8.0-win-x64.zip` |
+| macOS 13+ Apple Silicon | `CodeBear-v1.8.0-mac-arm64.dmg` |
 
 Windows and macOS packages are independent. The macOS build supports Apple Silicon only; Intel Macs are not currently supported.
 

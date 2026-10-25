@@ -1,7 +1,7 @@
 {
   "name": "maxiong-frontend",
   "private": true,
-  "version": "1.7.0",
+  "version": "1.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -31,7 +31,7 @@
     "@vitejs/plugin-react": "^6.0.5",
     "jsdom": "^29.1.1",
     "typescript": "^7.0.2",
-    "vite": "^8.2.1",
-    "vitest": "^4.1.10"
+    "vite": "^8.3.5",
+    "vitest": "^4.1.12"
   }
 }
