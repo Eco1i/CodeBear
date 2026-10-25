@@ -22,12 +22,13 @@ const visualOutput = path.resolve(
 async function captureVisual(
   page: import("@playwright/test").Page,
   name: string,
+  fullPage = true,
 ): Promise<void> {
   if (!visualPrefix) return;
   await page.screenshot({
     path: path.join(visualOutput, `${visualPrefix}-${name}.png`),
     animations: "disabled",
-    fullPage: true,
+    fullPage,
   });
 }
 
@@ -234,11 +235,11 @@ test.describe
       await expect(page.getByRole("button", { name: "AI 设置" })).toBeVisible();
     });
 
-    test("creates a project, imports and edits a PDM, generates DDL, and exports a backup", async ({
+    test("creates a project, imports and edits a PDM, exports table structure and DDL, and exports a backup", async ({
       page,
       browserName,
     }) => {
-      test.setTimeout(45_000);
+      test.setTimeout(75_000);
       const projectName = `端到端测试项目-${browserName}`;
       if (browserName === "chromium") {
         await page.addInitScript(() => {
@@ -449,13 +450,139 @@ test.describe
       await expect(page.locator(".table-heading code")).toHaveText(
         "t_account_user",
       );
+      await expect(
+        page.getByText("数据字典已写回项目 PDM，原文件备份已保留"),
+      ).toBeHidden();
       await captureVisual(page, "workspace");
+
+      const tableCodeCell = page
+        .locator(".table-list-row .code-cell")
+        .filter({ hasText: "t_account_user" });
+      const tableCodeRange = await tableCodeCell.evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const rect = range.getBoundingClientRect();
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      });
+      const selectionY = tableCodeRange.y + tableCodeRange.height / 2;
+      await page.mouse.move(tableCodeRange.x + 1, selectionY);
+      await page.mouse.down();
+      await page.mouse.move(
+        tableCodeRange.x + tableCodeRange.width - 1,
+        selectionY,
+        { steps: 8 },
+      );
+      await expect
+        .poll(() => page.evaluate(() => window.getSelection()?.toString() ?? ""))
+        .toBe("t_account_user");
+      await page.mouse.up();
+      await expect
+        .poll(() => page.evaluate(() => window.getSelection()?.toString() ?? ""))
+        .toBe("t_account_user");
+      if (browserName === "chromium") {
+        await page.context().grantPermissions([
+          "clipboard-read",
+          "clipboard-write",
+        ]);
+        await page.keyboard.press("Control+C");
+        await expect
+          .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+          .toBe("t_account_user");
+      }
+      await captureVisual(page, "table-name-text-selection", false);
+
+      await page.getByRole("button", { name: "导出", exact: true }).click();
+      const exportMenuItem = page.getByRole("menuitem", {
+        name: "Excel 工作簿（.xlsx）",
+      });
+      await expect(exportMenuItem).toBeVisible();
+      await expect(exportMenuItem).toHaveCSS("font-size", "11px");
+      const exportMenu = page.getByRole("menu");
+      await expect(exportMenu).toBeInViewport();
+      if (visualPrefix) {
+        await exportMenu.screenshot({
+          path: path.join(
+            visualOutput,
+            `${visualPrefix}-table-structure-export-menu-dropdown.png`,
+          ),
+          animations: "disabled",
+        });
+      }
+      await captureVisual(page, "table-structure-export-menu", false);
+      await page.keyboard.press("Escape");
+      const originalViewport = page.viewportSize();
+      await page.setViewportSize({ width: 500, height: 760 });
+      await page.getByRole("button", { name: "导出", exact: true }).click();
+      await expect(
+        page.getByRole("menuitem", { name: "CSV 文件（.csv）" }),
+      ).toBeVisible();
+      await expect(exportMenu).toBeInViewport();
+      if (visualPrefix) {
+        await exportMenu.screenshot({
+          path: path.join(
+            visualOutput,
+            `${visualPrefix}-table-structure-export-narrow-dropdown.png`,
+          ),
+          animations: "disabled",
+        });
+      }
+      await captureVisual(page, "table-structure-export-narrow", false);
+      await page.keyboard.press("Escape");
+      if (originalViewport) await page.setViewportSize(originalViewport);
+      const tableStructureDownloadPromise =
+        browserName === "chromium" ? null : page.waitForEvent("download");
+      await page.getByRole("button", { name: "导出", exact: true }).click();
+      await page
+        .getByRole("menuitem", { name: "Excel 工作簿（.xlsx）" })
+        .click();
+      if (browserName === "chromium") {
+        await expect
+          .poll(() =>
+            page.evaluate(() => {
+              const saved = (
+                window as Window & {
+                  __codebearSavedFile?: {
+                    name: string;
+                    bytes: number[];
+                  } | null;
+                }
+              ).__codebearSavedFile;
+              return saved
+                ? {
+                    name: saved.name,
+                    signature: saved.bytes.slice(0, 2),
+                    size: saved.bytes.length,
+                  }
+                : null;
+            }),
+          )
+          .toMatchObject({
+            name: "t_account_user.xlsx",
+            signature: [80, 75],
+          });
+      } else {
+        const download = await tableStructureDownloadPromise!;
+        expect(download.suggestedFilename()).toBe("t_account_user.xlsx");
+      }
+      await expect(
+        page.getByText(/(?:已保存|已下载) t_account_user\.xlsx/),
+      ).toBeVisible();
+      await expect(
+        page.getByText(/(?:已保存|已下载) t_account_user\.xlsx/),
+      ).toBeHidden();
 
       await page.getByRole("button", { name: "打开偏好设置" }).click();
       await page.getByText("暗夜", { exact: true }).click();
       await expect
         .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
         .toBe("dark");
+      await page.getByRole("button", { name: "导出", exact: true }).click();
+      await expect(
+        page.getByRole("menuitem", { name: "CSV 文件（.csv）" }),
+      ).toBeVisible();
+      await expect(page.getByRole("menu")).toBeInViewport();
+      await captureVisual(page, "table-structure-export-dark-menu", false);
+      await page.keyboard.press("Escape");
 
       const darkTableTab = page.locator(
         '.table-tabs .table-tab.is-active [role="tab"]',
@@ -615,10 +742,10 @@ test.describe
         await page.waitForFunction(() => {
           const value = (
             window as unknown as {
-              __codebearSavedFile?: unknown;
+              __codebearSavedFile?: { name?: string } | null;
             }
           ).__codebearSavedFile;
-          return value !== null && value !== undefined;
+          return value?.name?.toLowerCase().endsWith(".cbbak") ?? false;
         });
         const savedFile = await page.evaluate(
           () =>

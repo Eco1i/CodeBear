@@ -398,6 +398,41 @@ html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   gap: 8px;
 }
 
+.preferences-startup-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.preferences-startup-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.preferences-startup-copy .preferences-setting-label {
+  flex: none;
+}
+
+.preferences-startup-hint {
+  color: var(--cb-text-secondary);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.preferences-startup-hint.is-error {
+  color: var(--cb-text);
+  font-weight: 600;
+}
+
+.preferences-startup-setting .ant-switch {
+  flex: 0 0 auto;
+}
+
 .preferences-setting-label {
   flex: 0 0 76px;
   display: inline-flex;

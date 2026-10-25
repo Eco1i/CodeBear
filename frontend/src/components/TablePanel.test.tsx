@@ -73,7 +73,17 @@ describe("TablePanel", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /^01.*t_user/ }));
+    const tableRow = screen.getByRole("button", { name: /^01.*t_user/ });
+    await user.click(tableRow);
+    expect(onSelect).toHaveBeenCalledWith(table);
+
+    onSelect.mockClear();
+    tableRow.focus();
+    await user.keyboard("{Enter}");
+    expect(onSelect).toHaveBeenCalledWith(table);
+
+    onSelect.mockClear();
+    await user.keyboard(" ");
     expect(onSelect).toHaveBeenCalledWith(table);
   });
 

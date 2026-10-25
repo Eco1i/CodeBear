@@ -1799,7 +1799,7 @@ export function AiAssistant({
               <strong>{displayName}</strong>
               <small>
                 <i className={configured ? "is-ready" : ""} />
-                DeepSeek V4 Flash ·{" "}
+                DeepSeek V4.1 Flash ·{" "}
                 {configured ? t("ai.ready") : t("ai.notConfigured")}
               </small>
             </span>

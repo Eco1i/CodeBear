@@ -5,21 +5,19 @@ import ctypes
 import json
 import os
 import sys
+from ctypes import wintypes
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
 from typing import Any
 
-from ctypes import wintypes
-
 from backend.platform_support import default_data_dir
 
-
 APP_NAME = "码熊"
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.8.0"
 INTERNAL_DIR_NAMES = {".码熊回收站", ".码熊备份"}
 AI_PROVIDER = "deepseek"
-AI_MODEL = "deepseek-v4-flash"
+AI_MODEL = "deepseek-flash"
 AI_BASE_URL = "https://api.deepseek.com"
 AI_KEY_ENVIRONMENT_VARIABLE = "DEEPSEEK_API_KEY"
 AI_KEYCHAIN_SERVICE = "com.eco1i.codebear"
@@ -28,16 +26,18 @@ DPAPI_PREFIX = "dpapi:v1:"
 KEYCHAIN_PREFIX = "keychain:v1:"
 DEFAULT_AI_ASSISTANT_NAME = "小码"
 DEFAULT_AI_ASSISTANT_ACCESSORY = "none"
-AI_ASSISTANT_ACCESSORIES = frozenset({
-    "none",
-    "blue_scarf",
-    "red_cap",
-    "knit_hat",
-    "round_glasses",
-    "headphones",
-    "bow_tie",
-    "data_crown",
-})
+AI_ASSISTANT_ACCESSORIES = frozenset(
+    {
+        "none",
+        "blue_scarf",
+        "red_cap",
+        "knit_hat",
+        "round_glasses",
+        "headphones",
+        "bow_tie",
+        "data_crown",
+    }
+)
 
 
 class SecretProtectionError(RuntimeError):
@@ -53,7 +53,9 @@ class _DataBlob(ctypes.Structure):
 
 def _windows_dpapi(data: bytes, *, protect: bool) -> bytes:
     if sys.platform != "win32":
-        raise SecretProtectionError("当前系统不支持 Windows DPAPI，无法安全保存 API Key")
+        raise SecretProtectionError(
+            "当前系统不支持 Windows DPAPI，无法安全保存 API Key"
+        )
 
     input_buffer = ctypes.create_string_buffer(data)
     input_blob = _DataBlob(
@@ -108,7 +110,9 @@ def _windows_dpapi(data: bytes, *, protect: bool) -> bytes:
             ctypes.byref(output_blob),
         )
     if not succeeded:
-        raise SecretProtectionError(f"Windows DPAPI 操作失败（{ctypes.get_last_error()}）")
+        raise SecretProtectionError(
+            f"Windows DPAPI 操作失败（{ctypes.get_last_error()}）"
+        )
     try:
         return ctypes.string_at(output_blob.pbData, output_blob.cbData)
     finally:
@@ -208,7 +212,7 @@ class AppPaths:
     settings: Path
 
     @classmethod
-    def create(cls) -> "AppPaths":
+    def create(cls) -> AppPaths:
         app_data = default_app_data_dir()
         app_data.mkdir(parents=True, exist_ok=True)
         return cls(
@@ -235,9 +239,13 @@ class SettingsStore:
     @staticmethod
     def _ai_appearance(payload: dict[str, Any]) -> dict[str, str]:
         ai_payload = payload.get("ai")
-        stored_name = ai_payload.get("assistant_name") if isinstance(ai_payload, dict) else None
+        stored_name = (
+            ai_payload.get("assistant_name") if isinstance(ai_payload, dict) else None
+        )
         stored_accessory = (
-            ai_payload.get("assistant_accessory") if isinstance(ai_payload, dict) else None
+            ai_payload.get("assistant_accessory")
+            if isinstance(ai_payload, dict)
+            else None
         )
         assistant_name = (
             str(stored_name or DEFAULT_AI_ASSISTANT_NAME).strip()[:20]
@@ -353,7 +361,11 @@ class SettingsStore:
             normalized_accessory = assistant_accessory.strip()
             if normalized_accessory not in AI_ASSISTANT_ACCESSORIES:
                 raise ValueError("不支持的助手配饰")
-        if protected is None and normalized_name is None and normalized_accessory is None:
+        if (
+            protected is None
+            and normalized_name is None
+            and normalized_accessory is None
+        ):
             return self.ai_status()
         with self._lock:
             payload = self._read_unlocked()

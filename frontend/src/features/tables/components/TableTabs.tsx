@@ -115,7 +115,7 @@ export function TableTabs({
               }}
               trigger={["contextMenu"]}
               placement="bottomLeft"
-              classNames={{ root: "table-tabs-dropdown" }}
+              classNames={{ root: "compact-dropdown" }}
             >
               <div className={`table-tab${active ? " is-active" : ""}`}>
                 <button
@@ -170,7 +170,7 @@ export function TableTabs({
           menu={{ items: activeMenuItems, onClick: handleActiveMenuClick }}
           trigger={["click"]}
           placement="bottomRight"
-          classNames={{ root: "table-tabs-dropdown" }}
+          classNames={{ root: "compact-dropdown" }}
         >
           <Button
             type="text"

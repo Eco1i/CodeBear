@@ -1,7 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { App as AntApp } from "antd";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { TableDetail } from "../types";
+import { tablesApi } from "../features/tables/api";
+import * as fileDownload from "../shared/fileDownload";
 import { FieldPanel } from "./FieldPanel";
 
 const detail: TableDetail = {
@@ -180,6 +183,48 @@ describe("FieldPanel", () => {
         "学习用户表",
       ),
     );
+  });
+
+  it("exports the current table structure and hides export while editing", async () => {
+    const user = userEvent.setup();
+    const exportSpy = vi
+      .spyOn(tablesApi, "exportStructure")
+      .mockResolvedValue(new Blob(["table export"]));
+    const savePickerSpy = vi
+      .spyOn(fileDownload, "chooseSaveFileTarget")
+      .mockResolvedValue(null);
+    const downloadSpy = vi
+      .spyOn(fileDownload, "downloadBlob")
+      .mockImplementation(() => {});
+    render(
+      <AntApp>
+        <FieldPanel
+          detail={detail}
+          loading={false}
+          saving={false}
+          highlightQuery=""
+          onSave={vi.fn()}
+          onDirtyChange={vi.fn()}
+        />
+      </AntApp>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "导出" }));
+    await user.click(screen.getByRole("menuitem", { name: /CSV 文件/ }));
+    await waitFor(() =>
+      expect(exportSpy).toHaveBeenCalledWith("table-1", "csv", "zh-CN"),
+    );
+    expect(savePickerSpy).toHaveBeenCalledWith(
+      "t_user.csv",
+      expect.objectContaining({ extension: ".csv", mimeType: "text/csv" }),
+    );
+    expect(downloadSpy).toHaveBeenCalledWith(expect.any(Blob), "t_user.csv");
+
+    await user.click(screen.getByRole("button", { name: /编辑字典/ }));
+    expect(
+      screen.queryByRole("button", { name: "导出" }),
+    ).not.toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 
   it("adds a new field and removes an existing non-primary field before saving", async () => {

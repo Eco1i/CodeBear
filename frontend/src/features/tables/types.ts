@@ -1,4 +1,5 @@
 export type SearchMode = "table" | "field";
+export type TableExportFormat = "xlsx" | "csv" | "json" | "md";
 
 export interface TableSummary {
   id: string;
@@ -15,7 +16,13 @@ export interface TableSummary {
 
 export type TableTab = Pick<
   TableSummary,
-  "id" | "name" | "code" | "project_id" | "project_name" | "pdm_id" | "relative_path"
+  | "id"
+  | "name"
+  | "code"
+  | "project_id"
+  | "project_name"
+  | "pdm_id"
+  | "relative_path"
 >;
 
 export interface FieldDefinition {

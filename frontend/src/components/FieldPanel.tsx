@@ -10,14 +10,17 @@ import {
   CheckOutlined,
   CloseOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   InfoCircleOutlined,
   PlusOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
 import {
+  App as AntApp,
   Button,
   Checkbox,
+  Dropdown,
   Drawer,
   Empty,
   Input,
@@ -31,17 +34,28 @@ import type { ColumnsType } from "antd/es/table";
 import type {
   FieldDefinition,
   TableDetail,
+  TableExportFormat,
   TableMetadataUpdate,
   TableTab,
 } from "../types";
 import { useI18n } from "../features/preferences/PreferencesProvider";
 import { dictionariesApi } from "../features/dictionaries/api";
+import { tablesApi } from "../features/tables/api";
+import {
+  TABLE_EXPORT_FORMATS,
+  tableStructureFileName,
+} from "../features/tables/export";
 import { TableTabs } from "../features/tables/components/TableTabs";
 import type {
   DictionaryFieldBinding,
   DictionaryItem,
 } from "../features/dictionaries/types";
 import { useGridScrollbarGutter } from "../useGridScrollbarGutter";
+import {
+  chooseSaveFileTarget,
+  downloadBlob,
+  isSaveDialogCancellation,
+} from "../shared/fileDownload";
 import { FullTextPopover } from "./FullTextPopover";
 import { HighlightedText } from "./HighlightedText";
 import { TableGlyph } from "./PrototypeGlyphs";
@@ -168,7 +182,8 @@ export const FieldPanel = forwardRef<FieldPanelHandle, FieldPanelProps>(
     }: FieldPanelProps,
     ref,
   ) {
-    const { t } = useI18n();
+    const { message } = AntApp.useApp();
+    const { t, language, errorText } = useI18n();
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState<FieldDefinition[]>([]);
     const [draftTable, setDraftTable] = useState<TableMetadataUpdate>(
@@ -186,6 +201,8 @@ export const FieldPanel = forwardRef<FieldPanelHandle, FieldPanelProps>(
     const [drawerQuery, setDrawerQuery] = useState("");
     const [drawerDraftQuery, setDrawerDraftQuery] = useState("");
     const [drawerLoading, setDrawerLoading] = useState(false);
+    const [exportingFormat, setExportingFormat] =
+      useState<TableExportFormat | null>(null);
     const [syncedDetailId, setSyncedDetailId] = useState<string | null>(
       detail?.id || null,
     );
@@ -419,6 +436,42 @@ export const FieldPanel = forwardRef<FieldPanelHandle, FieldPanelProps>(
       setDraftTable({ ...draftTable });
       setEditing(false);
       return true;
+    };
+
+    const exportTableStructure = async (format: TableExportFormat) => {
+      if (!detail || editing || loading || exportingFormat) return;
+      const tableId = detail.id;
+      const fileName = tableStructureFileName(detail, format);
+      const mimeType = {
+        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        csv: "text/csv",
+        json: "application/json",
+        md: "text/markdown",
+      }[format];
+      setExportingFormat(format);
+      try {
+        const saveTarget = await chooseSaveFileTarget(fileName, {
+          description: t(`field.exportFormat.${format}`),
+          mimeType,
+          extension: fileName.slice(fileName.lastIndexOf(".")),
+        });
+        const blob = await tablesApi.exportStructure(tableId, format, language);
+        if (saveTarget) {
+          await saveTarget.write(blob);
+          message.success(
+            t("field.exportSaved", { file: saveTarget.fileName }),
+          );
+        } else {
+          downloadBlob(blob, fileName);
+          message.success(t("field.exportDownloaded", { file: fileName }));
+        }
+      } catch (error) {
+        if (!isSaveDialogCancellation(error)) {
+          message.error(errorText(error, "field.exportFailed"));
+        }
+      } finally {
+        setExportingFormat(null);
+      }
     };
 
     const renderFieldCode = (field: FieldDefinition) => {
@@ -754,9 +807,33 @@ export const FieldPanel = forwardRef<FieldPanelHandle, FieldPanelProps>(
                   </Button>
                 </>
               ) : (
-                <Button icon={<EditOutlined />} onClick={startEditing}>
-                  {t("field.editDictionary")}
-                </Button>
+                <>
+                  <Button icon={<EditOutlined />} onClick={startEditing}>
+                    {t("field.editDictionary")}
+                  </Button>
+                  <Dropdown
+                    trigger={["click"]}
+                    placement="bottomRight"
+                    classNames={{ root: "compact-dropdown" }}
+                    menu={{
+                      items: TABLE_EXPORT_FORMATS.map((format) => ({
+                        key: format,
+                        label: t(`field.exportFormat.${format}`),
+                        disabled: exportingFormat !== null || loading,
+                      })),
+                      onClick: ({ key }) =>
+                        void exportTableStructure(key as TableExportFormat),
+                    }}
+                  >
+                    <Button
+                      icon={<DownloadOutlined />}
+                      loading={exportingFormat !== null}
+                      aria-label={t("field.exportStructure")}
+                    >
+                      {t("field.exportStructure")}
+                    </Button>
+                  </Dropdown>
+                </>
               )}
             </div>
           )}

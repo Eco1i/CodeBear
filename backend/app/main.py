@@ -6,12 +6,13 @@ import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any, Literal
+from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, StrictBool
 from starlette.background import BackgroundTask
 
 from .ai import AiService
@@ -27,6 +28,8 @@ from .dictionaries import MAX_EXCEL_BYTES, DictionaryService
 from .progress import RefreshProgressStore
 from .security import LocalRequestGuardMiddleware
 from .service import ServiceError, WorkspaceService
+from .startup import StartupService
+from .table_export import TableExportFormat, build_table_export, table_export_stem
 from .updates import CHECK_INTERVAL_SECONDS, UpdateService
 
 MAX_PDM_FILES = 500
@@ -46,6 +49,7 @@ ai_service = AiService(database, settings_store)
 ai_conversation_service = AiConversationService(database)
 update_service = UpdateService(paths.app_data / "update-check.json")
 progress_store = RefreshProgressStore()
+startup_service = StartupService()
 
 
 async def _update_check_loop() -> None:
@@ -101,6 +105,10 @@ async def service_error_handler(_: Request, exc: ServiceError) -> JSONResponse:
 
 class WorkspaceUpdate(BaseModel):
     workspace_root: str = Field(min_length=1)
+
+
+class StartupSettingsUpdate(BaseModel):
+    enabled: StrictBool
 
 
 class NamePayload(BaseModel):
@@ -329,6 +337,16 @@ def health() -> dict[str, str]:
 @app.get("/api/settings")
 def get_settings() -> dict[str, str]:
     return service.get_settings()
+
+
+@app.get("/api/settings/startup")
+def get_startup_settings() -> dict[str, bool]:
+    return startup_service.get_status()
+
+
+@app.put("/api/settings/startup")
+def update_startup_settings(payload: StartupSettingsUpdate) -> dict[str, bool]:
+    return startup_service.set_enabled(payload.enabled)
 
 
 @app.put("/api/settings/workspace")
@@ -871,6 +889,26 @@ def delete_tables(payload: TableDeletePayload) -> dict:
 @app.get("/api/tables/{table_id}")
 def table_detail(table_id: str) -> dict:
     return service.table_detail(table_id)
+
+
+@app.get("/api/tables/{table_id}/export")
+def export_table_structure(
+    table_id: str,
+    format: TableExportFormat = "xlsx",
+    language: Literal["zh-CN", "en-US"] = "zh-CN",
+) -> Response:
+    detail = service.table_detail(table_id)
+    content, media_type, extension = build_table_export(detail, format, language)
+    file_name = f"{table_export_stem(detail)}{extension}"
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(file_name, safe='')}",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 class RelationCreatePayload(BaseModel):
